@@ -45,6 +45,7 @@ if [ "$target" = "$MYSQL_DATABASE" ] && [ "$force" -ne 1 ]; then
 fi
 gzip -t "$file"
 
+trap remove_defaults_file EXIT
 install_defaults_file
 
 mysql_cli -e "DROP DATABASE IF EXISTS \`$target\`; CREATE DATABASE \`$target\` CHARACTER SET utf8mb4;"

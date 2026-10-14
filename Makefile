@@ -35,3 +35,4 @@ down:
 test-restore:
 	$(RUN) sh -c 'npm run migrate -w backend && npm run seed -w backend'
 	COMPOSE_FILE=compose.dev.yml ./deployment/test-restore.sh
+	COMPOSE_FILE=compose.dev.yml ./deployment/test-cleanup.sh

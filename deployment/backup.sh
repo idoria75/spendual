@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# File name pattern: spendual-*.sql.gz. The backend status check (backend/src/services/backup.ts,
+# BACKUP_FILE_RE) counts only files with this name. Keep both in sync.
+#
 # Dump the Spendual database to a timestamped .sql.gz in BACKUP_DIR and keep the last N files.
 #
 # Env:
@@ -26,13 +29,13 @@ check_db_name "$MYSQL_DATABASE"
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
 
-install_defaults_file
 
 stamp="$(date +%Y%m%d-%H%M%S)"
 final="$BACKUP_DIR/spendual-$stamp.sql.gz"
 # Hidden name while writing, so a half file is never taken for a backup.
 partial="$BACKUP_DIR/.spendual-$stamp.partial"
 trap 'rm -f "$partial"; remove_defaults_file' EXIT
+install_defaults_file
 
 mysqldump_cli --single-transaction --routines --triggers --events --hex-blob \
   --no-tablespaces "$MYSQL_DATABASE" | gzip -9 > "$partial"

@@ -56,6 +56,9 @@ rows="$(awk '{s += $2} END {print s + 0}' "$work/main.txt")"
 [ "$tables" -gt 0 ] || die "main database has no tables"
 [ "$rows" -gt 0 ] || die "main database has no rows, nothing to compare (run the seed first)"
 
+# Test hook: lets test-cleanup.sh check the cleanup on the fail path.
+[ "${TEST_RESTORE_FAIL:-}" != 1 ] || die "forced failure"
+
 if diff "$work/main.txt" "$work/restored.txt"; then
   echo "restore test OK: $tables tables, $rows rows match"
 else

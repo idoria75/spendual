@@ -28,14 +28,14 @@ check_defaults_file() {
 }
 
 # Copy the defaults file into the container (through stdin, never on a command line) so that
-# stdin stays free for the SQL stream. The copy is removed on exit.
+# stdin stays free for the SQL stream. The caller must call remove_defaults_file from its own
+# EXIT trap (the library sets no trap, so it cannot replace the caller's).
 CNF_IN_CONTAINER=""
 install_defaults_file() {
   check_defaults_file
   CNF_IN_CONTAINER="/tmp/.spendual-$$-${RANDOM}.cnf"
   dc exec -T "$MYSQL_SERVICE" sh -c "umask 077; cat > '$CNF_IN_CONTAINER'" \
     < "$MYSQL_DEFAULTS_FILE"
-  trap remove_defaults_file EXIT
 }
 
 remove_defaults_file() {
