@@ -15,7 +15,11 @@ import {
 } from "@spendual/shared";
 import { AppError, asyncHandler } from "../auth/errors.js";
 import * as bills from "../services/bills.js";
-import { AllocationExistsError, OwnerNotFoundError, createAllocation } from "../services/allowance.js";
+import {
+  AllocationExistsError,
+  OwnerNotFoundError,
+  createAllocation,
+} from "../services/allowance.js";
 import { editBudget } from "../services/budget.js";
 import * as dash from "../services/dashboard.js";
 import { assertActiveUser } from "../services/transactions.js";

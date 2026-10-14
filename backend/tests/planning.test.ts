@@ -176,15 +176,19 @@ describe("allowances", () => {
 
 describe("budgets", () => {
   it("edits, versions and reports spent net of refunds", async () => {
-    const put = (body: Record<string, unknown>) => send(ctx.ana, "put" as "post", "/api/budgets", body);
-    void put;
     const token = (await ctx.ana.get("/api/auth/csrf")).body.csrfToken as string;
     const edit = (body: Record<string, unknown>) =>
       ctx.ana.put("/api/budgets").set("X-CSRF-Token", token).send(body);
 
     const e = await tx({ type: "expense", amount: "80.00" });
     await tx({ type: "refund", amount: "30.00", relatedTransactionId: e.body.id });
-    await tx({ type: "expense", amount: "20.00", categoryId: ctx.categoryId, scope: "personal", ownerId: ctx.anaId });
+    await tx({
+      type: "expense",
+      amount: "20.00",
+      categoryId: ctx.categoryId,
+      scope: "personal",
+      ownerId: ctx.anaId,
+    });
 
     const r1 = await edit({
       categoryId: ctx.categoryId,
@@ -201,17 +205,25 @@ describe("budgets", () => {
     });
     expect(o.overall).toEqual({ categoryId: null, amount: null, spent: "50.00" });
 
-    expect((await edit({ categoryId: null, period: M, amount: "900.00", mode: "going_forward" })).status).toBe(200);
+    expect(
+      (await edit({ categoryId: null, period: M, amount: "900.00", mode: "going_forward" })).status,
+    ).toBe(200);
     const next = budgetOverviewSchema.parse((await ctx.ana.get("/api/budgets?month=2027-05")).body);
     expect(next.overall.amount).toBe("900.00");
-    const before = budgetOverviewSchema.parse((await ctx.ana.get("/api/budgets?month=2027-02")).body);
+    const before = budgetOverviewSchema.parse(
+      (await ctx.ana.get("/api/budgets?month=2027-02")).body,
+    );
     expect(before.overall.amount).toBeNull();
 
     const d = await dash();
     expect(d.overallBudget).toEqual({ budget: "900.00", spent: "50.00" });
 
-    expect((await edit({ categoryId: 999, period: M, amount: "1.00", mode: "going_forward" })).status).toBe(400);
-    expect((await edit({ categoryId: null, period: M, amount: "-1.00", mode: "going_forward" })).status).toBe(400);
+    expect(
+      (await edit({ categoryId: 999, period: M, amount: "1.00", mode: "going_forward" })).status,
+    ).toBe(400);
+    expect(
+      (await edit({ categoryId: null, period: M, amount: "-1.00", mode: "going_forward" })).status,
+    ).toBe(400);
   });
 });
 
@@ -299,7 +311,9 @@ describe("recurrence generation", () => {
     const items = (await bills("2027-04")).items;
     expect(items[0]!.expectedAmount).toBe("150.00");
     expect((await bills()).items[0]!.expectedAmount).toBe("100.00");
-    expect((await send(ctx.beto, "patch", "/api/recurrence-rules/999", { state: "ended" })).status).toBe(404);
+    expect(
+      (await send(ctx.beto, "patch", "/api/recurrence-rules/999", { state: "ended" })).status,
+    ).toBe(404);
     expect((await send(ctx.beto, "patch", `/api/recurrence-rules/${ruleId}`, {})).status).toBe(400);
   });
 });
@@ -335,7 +349,11 @@ describe("installment plans", () => {
   it("clamps the due day and rejects a bad count", async () => {
     const d = installmentPlanDetailSchema.parse((await plan({})).body);
     expect(d.items.map((i) => i.dueDate)).toEqual(["2027-03-31", "2027-04-30", "2027-05-31"]);
-    expect(d.items[0]).toMatchObject({ installmentCount: 3, kind: "installment", status: "planned" });
+    expect(d.items[0]).toMatchObject({
+      installmentCount: 3,
+      kind: "installment",
+      status: "planned",
+    });
     expect((await plan({ installmentCount: 1 })).status).toBe(400);
     expect((await plan({ categoryId: 9999 })).status).toBe(400);
   });
@@ -353,7 +371,11 @@ describe("installment plans", () => {
     expect(res.status).toBe(200);
     const bill = billSchema.parse(res.body);
     const t = await prisma.transaction.findUniqueOrThrow({ where: { id: bill.transactionId! } });
-    expect(t).toMatchObject({ type: "expense", status: "confirmed", installmentOccurrenceId: first.id });
+    expect(t).toMatchObject({
+      type: "expense",
+      status: "confirmed",
+      installmentOccurrenceId: first.id,
+    });
     expect(t.amount.toFixed(2)).toBe("33.33");
     expect((await dash()).sharedExpensesNet).toBe("33.33");
   });
@@ -396,7 +418,10 @@ describe("confirm and cancel", () => {
 
     const audit = await prisma.auditEvent.findMany({ where: { action: "bill.confirm" } });
     expect(audit).toHaveLength(1);
-    expect(audit[0]).toMatchObject({ entityType: "RecurrenceOccurrence", entityId: String(occ.id) });
+    expect(audit[0]).toMatchObject({
+      entityType: "RecurrenceOccurrence",
+      entityId: String(occ.id),
+    });
   });
 
   it("parallel confirms give one 200 and one 409, one transaction", async () => {
@@ -463,7 +488,10 @@ describe("confirm and cancel", () => {
   it("cancel closes a planned bill, writes an audit row, and it never counts", async () => {
     await rule();
     const occ = (await bills()).items[0]!;
-    expect((await send(ctx.ana, "post", `/api/bills/recurrence/${occ.id}/cancel`, { reason: " " })).status).toBe(400);
+    expect(
+      (await send(ctx.ana, "post", `/api/bills/recurrence/${occ.id}/cancel`, { reason: " " }))
+        .status,
+    ).toBe(400);
     const res = await send(ctx.beto, "post", `/api/bills/recurrence/${occ.id}/cancel`, {
       reason: "Cancelou o contrato",
     });
@@ -477,7 +505,8 @@ describe("confirm and cancel", () => {
     expect(audit).toMatchObject({ reason: "Cancelou o contrato", actorId: ctx.betoId });
     expect((await confirm("recurrence", occ.id)).status).toBe(409);
     expect(
-      (await send(ctx.ana, "post", `/api/bills/recurrence/${occ.id}/cancel`, { reason: "x" })).status,
+      (await send(ctx.ana, "post", `/api/bills/recurrence/${occ.id}/cancel`, { reason: "x" }))
+        .status,
     ).toBe(409);
   });
 
@@ -485,7 +514,9 @@ describe("confirm and cancel", () => {
     await rule();
     const occ = (await bills()).items[0]!;
     await confirm("recurrence", occ.id);
-    const res = await send(ctx.ana, "post", `/api/bills/recurrence/${occ.id}/cancel`, { reason: "x" });
+    const res = await send(ctx.ana, "post", `/api/bills/recurrence/${occ.id}/cancel`, {
+      reason: "x",
+    });
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe("invalid_state");
   });

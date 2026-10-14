@@ -19,12 +19,7 @@ import type {
 } from "@spendual/shared";
 import { AppError } from "../auth/errors.js";
 import { centsToMoney, moneyToCents } from "../domain/accounting.js";
-import {
-  dateOnlyToDate,
-  dateToDateOnly,
-  formatPeriod,
-  nextPeriod,
-} from "../lib/period.js";
+import { dateOnlyToDate, dateToDateOnly, formatPeriod, nextPeriod } from "../lib/period.js";
 import { parseMoney } from "../lib/serialize.js";
 import { withRetry } from "../lib/withRetry.js";
 import { generateForAllRules } from "./dashboard.js";
@@ -112,7 +107,10 @@ function currentPeriod(): string {
 }
 
 export async function listBills(db: PrismaClient | Db, month: string): Promise<BillList> {
-  const dueDate = { gte: dateOnlyToDate(`${month}-01`), lt: dateOnlyToDate(`${nextPeriod(month)}-01`) };
+  const dueDate = {
+    gte: dateOnlyToDate(`${month}-01`),
+    lt: dateOnlyToDate(`${nextPeriod(month)}-01`),
+  };
   const [rec, ins] = await Promise.all([
     db.recurrenceOccurrence.findMany({ where: { dueDate }, include: recInclude }),
     db.installmentOccurrence.findMany({ where: { dueDate }, include: insInclude }),
@@ -189,14 +187,9 @@ export function patchRule(
       const locked = await tx.$queryRaw<{ id: number }[]>(
         Prisma.sql`SELECT id FROM RecurrenceRule WHERE id = ${id} FOR UPDATE`,
       );
-      const cur = locked.length
-        ? await tx.recurrenceRule.findUnique({ where: { id } })
-        : null;
+      const cur = locked.length ? await tx.recurrenceRule.findUnique({ where: { id } }) : null;
       if (!cur) throw new AppError(404, "not_found", "Recurrence rule not found");
-      if (
-        patch.endDate != null &&
-        patch.endDate < dateToDateOnly(cur.startDate)
-      ) {
+      if (patch.endDate != null && patch.endDate < dateToDateOnly(cur.startDate)) {
         throw invalid("endDate", "End before start");
       }
       const amount =
@@ -353,7 +346,8 @@ export function confirmBill(
       const cur = await lockBill(tx, kind, id);
       requirePlanned(cur);
       const amount = input.amount ?? cur.expectedAmount;
-      if (amount === null) throw invalid("amount", "Amount required: the expected amount is unknown");
+      if (amount === null)
+        throw invalid("amount", "Amount required: the expected amount is unknown");
       if (cur.categoryId == null) throw invalid("categoryId", "Category required");
 
       const payerId = input.payerId ?? cur.payerId ?? actorId;

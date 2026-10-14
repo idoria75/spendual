@@ -115,16 +115,15 @@ export async function getDashboard(prisma: PrismaClient, month: string): Promise
   const range = monthRange(month);
   const household = { scope: "household" as const };
   const planned = { status: "planned" as const, dueDate: range };
-  const [income, sharedNet, people, recAgg, recUnknown, insAgg, overall] =
-    await Promise.all([
-      sumTx(prisma, { ...household, type: "income", transactionDate: range }),
-      netSpent(prisma, household, range),
-      personSummaries(prisma, month),
-      prisma.recurrenceOccurrence.aggregate({ _sum: { expectedAmount: true }, where: planned }),
-      prisma.recurrenceOccurrence.count({ where: { ...planned, expectedAmount: null } }),
-      prisma.installmentOccurrence.aggregate({ _sum: { expectedAmount: true }, where: planned }),
-      budgetFor(prisma, null, month),
-    ]);
+  const [income, sharedNet, people, recAgg, recUnknown, insAgg, overall] = await Promise.all([
+    sumTx(prisma, { ...household, type: "income", transactionDate: range }),
+    netSpent(prisma, household, range),
+    personSummaries(prisma, month),
+    prisma.recurrenceOccurrence.aggregate({ _sum: { expectedAmount: true }, where: planned }),
+    prisma.recurrenceOccurrence.count({ where: { ...planned, expectedAmount: null } }),
+    prisma.installmentOccurrence.aggregate({ _sum: { expectedAmount: true }, where: planned }),
+    budgetFor(prisma, null, month),
+  ]);
   const allocations = people.reduce((a, p) => a + moneyToCents(p.allowanceAllocated), 0n);
   const savings = savingsBeforeGoals({
     householdIncome: income,
@@ -219,10 +218,7 @@ export async function assertBudgetCategory(db: Db, categoryId: number | null): P
   }
 }
 
-export async function getAllowanceOverview(
-  db: Db,
-  month: string,
-): Promise<AllowanceOverview> {
+export async function getAllowanceOverview(db: Db, month: string): Promise<AllowanceOverview> {
   const [people, rows] = await Promise.all([
     personSummaries(db, month),
     db.personalAllowanceEntry.findMany({ where: { periodKey: month, kind: "ALLOCATION" } }),
