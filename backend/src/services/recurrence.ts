@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { withRetry } from "../lib/withRetry.js";
 import { addPeriods, dateOnlyToDate, dateToDateOnly, resolveDueDate } from "../lib/period.js";
 
@@ -20,7 +20,7 @@ export async function generateOccurrences(
   if (rule.state !== "active") return 0;
   const startPeriod = dateToDateOnly(rule.startDate).slice(0, 7);
   const endPeriod = rule.endDate ? dateToDateOnly(rule.endDate).slice(0, 7) : null;
-  const data = [];
+  const data: Prisma.RecurrenceOccurrenceCreateManyInput[] = [];
   for (let i = 0; i < months; i++) {
     const periodKey = addPeriods(fromPeriod, i);
     if (periodKey < startPeriod || (endPeriod !== null && periodKey > endPeriod)) continue;
