@@ -1,7 +1,15 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const databaseUrl =
-  process.env.DATABASE_URL ?? "mysql://root:root@mysql:3306/spendual_e2e";
+// The webServer command runs `migrate reset --force`, which wipes the database.
+// Only a database whose name contains "e2e" is allowed. Anything else is ignored (default)
+// or refused, never used.
+const defaultUrl = "mysql://root:root@mysql:3306/spendual_e2e";
+const databaseName = (url: string) => new URL(url).pathname.slice(1);
+const fromEnv = process.env.DATABASE_URL;
+const databaseUrl = fromEnv && databaseName(fromEnv).includes("e2e") ? fromEnv : defaultUrl;
+if (!databaseName(databaseUrl).includes("e2e")) {
+  throw new Error(`Refusing to reset database "${databaseName(databaseUrl)}": name must contain "e2e".`);
+}
 const env = {
   DATABASE_URL: databaseUrl,
   SESSION_SECRET: process.env.SESSION_SECRET ?? "e2e-only-secret-0123456789-0123456789",
@@ -13,7 +21,8 @@ export default defineConfig({
   // One shared database and a 2-account signup cap: tests run one at a time.
   workers: 1,
   fullyParallel: false,
-  retries: process.env.CI ? 1 : 0,
+  // No retries: the database is reset once per run, so a retry would start dirty.
+  retries: 0,
   reporter: [["list"], ["html", { open: "never" }]],
   outputDir: "test-results",
   use: {
