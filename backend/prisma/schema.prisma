@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Household {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(120)
+  createdAt DateTime @default(now())
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique @db.VarChar(60)
+  passwordHash String   @db.VarChar(255)
+  displayName  String   @db.VarChar(80)
+  tonePalette  String?  @unique @db.VarChar(30)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique @db.VarChar(80)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum AccountType {
+  bank
+  cash
+  credit_card
+  other
+}
+
+model Account {
+  id        Int         @id @default(autoincrement())
+  name      String      @unique @db.VarChar(80)
+  type      AccountType
+  currency  String      @default("BRL") @db.VarChar(3)
+  active    Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model PaymentMethod {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique @db.VarChar(80)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
