@@ -193,8 +193,8 @@ function audit(
       entityType: ENTITY,
       entityId: String(id),
       action,
-      before: before as unknown as Prisma.InputJsonValue,
-      after: after as unknown as Prisma.InputJsonValue,
+      before: before,
+      after: after,
       reason,
     },
   });

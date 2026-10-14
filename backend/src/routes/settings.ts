@@ -31,7 +31,7 @@ export function settingsRouter(prisma: PrismaClient, backupDir: string | undefin
         if (
           err instanceof Prisma.PrismaClientKnownRequestError &&
           err.code === "P2002" &&
-          String(err.meta?.target ?? "").includes("tonePalette")
+          JSON.stringify(err.meta?.target ?? "").includes("tonePalette")
         ) {
           throw toneTaken();
         }

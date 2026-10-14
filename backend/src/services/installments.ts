@@ -4,7 +4,7 @@ import { addPeriods, resolveDueDate } from "../lib/period.js";
 export function moneyToCents(money: string): bigint {
   const m = /^(-?)(\d{1,10})\.(\d{2})$/.exec(money);
   if (!m) throw new Error(`Invalid money: ${money}`);
-  const cents = BigInt(m[2]!) * 100n + BigInt(m[3]!);
+  const cents = BigInt(m[2]) * 100n + BigInt(m[3]);
   return m[1] ? -cents : cents;
 }
 

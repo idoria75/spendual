@@ -356,8 +356,8 @@ function auditBill(
       entityType: before.kind === "recurrence" ? "RecurrenceOccurrence" : "InstallmentOccurrence",
       entityId: String(before.id),
       action,
-      before: before as unknown as Prisma.InputJsonValue,
-      after: after as unknown as Prisma.InputJsonValue,
+      before: before,
+      after: after,
       reason,
     },
   });

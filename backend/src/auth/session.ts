@@ -44,7 +44,7 @@ export function sessionMiddleware(prisma: PrismaClient, opts: SessionOptions): R
 export const newCsrfToken = (): string => randomBytes(32).toString("base64url");
 
 const call = (fn: (cb: (err?: unknown) => void) => void): Promise<void> =>
-  new Promise((resolve, reject) => fn((err) => (err ? reject(err) : resolve())));
+  new Promise((resolve, reject) => fn((err) => (err ? reject(err instanceof Error ? err : new Error("Session store error", { cause: err })) : resolve())));
 
 export const saveSession = (req: Request) => call((cb) => req.session.save(cb));
 export const destroySession = (req: Request) => call((cb) => req.session.destroy(cb));

@@ -96,7 +96,7 @@ export function authRouter(prisma: PrismaClient, loginLimit: LoginLimit, maxAgeM
   );
 
   router.get("/me", requireAuth(prisma), (req, res) => {
-    res.json(req.authUser as AuthUser);
+    res.json(req.authUser);
   });
 
   return router;
