@@ -1,4 +1,4 @@
-import type { Transaction, TransactionType } from "@spendual/shared";
+import type { Bill, Transaction, TransactionType } from "@spendual/shared";
 import { ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
@@ -21,11 +21,14 @@ import {
   rememberMethod,
 } from "../../lib/recent";
 import { cn } from "../../lib/cn";
+import { confirmBill } from "../planning/api";
 import { createTransaction, listTransactions, patchTransaction } from "./api";
 import { CategoryTile } from "./CategoryTile";
 import {
+  buildConfirm,
   buildCreate,
   buildPatch,
+  valuesFromBill,
   valuesFromTransaction,
   visibleFields,
   type FieldErrors,
@@ -48,33 +51,37 @@ const TYPES: TransactionType[] = ["expense", "income", "other_receipt", "transfe
 
 interface Props {
   editing: Transaction | null;
+  /** A planned bill to confirm: the form is pre-filled and saves through /bills/:kind/:id/confirm. */
+  bill?: Bill | null;
   amountRef: React.RefObject<HTMLInputElement>;
   onSaved: () => void;
 }
 
-export function TransactionForm({ editing, amountRef, onSaved }: Props) {
+export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Props) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const { data: lookups, failed, reload } = useLookups();
   const { showToast } = useToast();
 
   const [values, setValues] = useState<FormValues>(() =>
-    editing
-      ? valuesFromTransaction(editing)
-      : {
-          type: "expense",
-          amount: "",
-          description: "",
-          scope: "household",
-          ownerId: user?.id ?? null,
-          categoryId: null,
-          payerId: user?.id ?? null,
-          date: today(),
-          paymentMethodId: lastMethodId(),
-          accountId: null,
-          relatedTransactionId: null,
-          notes: "",
-        },
+    bill
+      ? valuesFromBill(bill, user?.id ?? null, bill.dueDate)
+      : editing
+        ? valuesFromTransaction(editing)
+        : {
+            type: "expense",
+            amount: "",
+            description: "",
+            scope: "household",
+            ownerId: user?.id ?? null,
+            categoryId: null,
+            payerId: user?.id ?? null,
+            date: today(),
+            paymentMethodId: lastMethodId(),
+            accountId: null,
+            relatedTransactionId: null,
+            notes: "",
+          },
   );
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<ReturnType<typeof messageKeyFor> | null>(null);
@@ -145,7 +152,15 @@ export function TransactionForm({ editing, amountRef, onSaved }: Props) {
     if (locked.current) return;
     setFormError(null);
     let run: (() => Promise<unknown>) | null;
-    if (editing) {
+    if (bill) {
+      const built = buildConfirm(values);
+      if (!built.ok) {
+        setErrors(built.errors);
+        return;
+      }
+      const body = built.body;
+      run = () => confirmBill(bill.kind, bill.id, body);
+    } else if (editing) {
       const built = buildPatch(values, editing);
       if (!built.ok) {
         setErrors(built.errors);
@@ -171,9 +186,9 @@ export function TransactionForm({ editing, amountRef, onSaved }: Props) {
     setSubmitting(true);
     try {
       await run();
-      if (values.categoryId !== null && f.category) rememberCategory(values.categoryId);
-      if (!editing) rememberMethod(values.paymentMethodId);
-      showToast(t(editing ? "form.savedEdit" : "form.saved"));
+      if (!bill && values.categoryId !== null && f.category) rememberCategory(values.categoryId);
+      if (!editing && !bill) rememberMethod(values.paymentMethodId);
+      showToast(t(bill ? "bills.confirmed" : editing ? "form.savedEdit" : "form.saved"));
       onSaved();
     } catch (error) {
       setFormError(messageKeyFor(error));
@@ -188,7 +203,7 @@ export function TransactionForm({ editing, amountRef, onSaved }: Props) {
 
   return (
     <form onSubmit={(e) => void submit(e)} noValidate className="flex flex-1 flex-col gap-3">
-      {editing ? null : (
+      {editing || bill ? null : (
         <div role="group" aria-label={t("form.typeLabel")} className="flex flex-wrap gap-2">
           {TYPES.map((ty) => (
             <Chip key={ty} active={values.type === ty} onClick={() => set("type", ty)}>
@@ -212,6 +227,9 @@ export function TransactionForm({ editing, amountRef, onSaved }: Props) {
           aria-describedby={errors.amount ? "tx-amount-error" : undefined}
           className="min-h-[56px] text-[34px] font-bold"
         />
+        {bill && bill.expectedAmount === null ? (
+          <p className="text-[0.75rem] text-muted">{t("bills.unknownHint")}</p>
+        ) : null}
         {errors.amount ? (
           <p id="tx-amount-error" className="text-[0.75rem] text-err">
             {t("form.errors.amount")}
@@ -219,16 +237,24 @@ export function TransactionForm({ editing, amountRef, onSaved }: Props) {
         ) : null}
       </div>
 
-      <Field
-        label={t("form.description")}
-        value={values.description}
-        onChange={(e) => set("description", e.target.value)}
-        error={err("description", "form.errors.description")}
-        maxLength={200}
-        autoComplete="off"
-      />
+      {bill ? (
+        <p className="truncate text-[0.95rem] font-semibold">
+          {bill.sequenceNumber !== null && bill.installmentCount !== null
+            ? `${bill.description} · ${bill.sequenceNumber}/${bill.installmentCount}`
+            : bill.description}
+        </p>
+      ) : (
+        <Field
+          label={t("form.description")}
+          value={values.description}
+          onChange={(e) => set("description", e.target.value)}
+          error={err("description", "form.errors.description")}
+          maxLength={200}
+          autoComplete="off"
+        />
+      )}
 
-      {editing ? null : (
+      {editing || bill ? null : (
         <Segmented
           label={t("form.scopeLabel")}
           value={values.scope}
@@ -240,7 +266,7 @@ export function TransactionForm({ editing, amountRef, onSaved }: Props) {
         />
       )}
 
-      {f.owner && !editing ? (
+      {f.owner && !editing && !bill ? (
         <Select
           label={t("form.owner")}
           value={values.ownerId ?? ""}
@@ -256,7 +282,7 @@ export function TransactionForm({ editing, amountRef, onSaved }: Props) {
         </Select>
       ) : null}
 
-      {f.related && !editing ? (
+      {f.related && !editing && !bill ? (
         <Select
           label={t("form.related")}
           value={values.relatedTransactionId ?? ""}
@@ -288,7 +314,7 @@ export function TransactionForm({ editing, amountRef, onSaved }: Props) {
         </Select>
       ) : null}
 
-      {f.category && (!editing || editing.type !== "transfer") ? (
+      {!bill && f.category && (!editing || editing.type !== "transfer") ? (
         <fieldset className="flex flex-col gap-1">
           <legend className="text-[0.72rem] font-semibold text-muted">{t("form.category")}</legend>
           <div className="grid grid-cols-2 gap-2 min-[380px]:grid-cols-4">
@@ -412,7 +438,7 @@ export function TransactionForm({ editing, amountRef, onSaved }: Props) {
 
       <div className="sticky bottom-0 -mx-4 mt-auto bg-surface px-4 pb-1 pt-2">
         <Button type="submit" disabled={submitting} className="w-full">
-          {submitting ? t("form.saving") : t("form.save")}
+          {submitting ? t("form.saving") : t(bill ? "bills.confirm" : "form.save")}
         </Button>
       </div>
     </form>

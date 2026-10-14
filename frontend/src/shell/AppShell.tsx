@@ -7,6 +7,7 @@ import {
   Plus,
   Receipt,
   Settings,
+  User,
   Wallet,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -23,7 +24,7 @@ import { toneColor } from "../features/transactions/display";
 import { cn } from "../lib/cn";
 import { formatMonth, shiftMonth } from "../lib/date";
 
-type NavKey = "inicio" | "lancamentos" | "aPagar" | "orcamentos" | "mais" | "ajustes";
+type NavKey = "inicio" | "pessoal" | "lancamentos" | "aPagar" | "orcamentos" | "mais" | "ajustes";
 interface NavItem {
   to: string;
   key: NavKey;
@@ -35,6 +36,7 @@ const SIDEBAR: NavItem[] = [
   { to: "/lancamentos", key: "lancamentos", icon: List },
   { to: "/a-pagar", key: "aPagar", icon: Receipt },
   { to: "/orcamentos", key: "orcamentos", icon: Wallet },
+  { to: "/pessoal", key: "pessoal", icon: User },
   { to: "/ajustes", key: "ajustes", icon: Settings },
 ];
 const TABS_LEFT: NavItem[] = [SIDEBAR[0]!, SIDEBAR[1]!];

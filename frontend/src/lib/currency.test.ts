@@ -12,6 +12,8 @@ describe("parseAmountInput", () => {
     ["007,10", "7.10"],
     [" R$ 9,99 ", "9.99"],
     ["0", "0.00"],
+    ["10.000,00", "10000.00"],
+    ["1.250,5", "1250.50"],
   ])("parses %s", (input, expected) => expect(parseAmountInput(input)).toBe(expected));
 
   it.each([
@@ -24,6 +26,8 @@ describe("parseAmountInput", () => {
     ["12.5"],
     ["1.23.4"],
     ["-5"],
+    ["1,234.56"],
+    ["R$"],
     ["12345678901"],
   ])("rejects %j", (input) => expect(parseAmountInput(input)).toBeNull());
 });
