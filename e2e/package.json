@@ -1,0 +1,16 @@
+{
+  "name": "@spendual/e2e",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "e2e": "node check-version.mjs && playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.49.1",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2"
+  }
+}
