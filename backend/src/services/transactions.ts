@@ -134,11 +134,8 @@ export function createTransaction(
   const amount = parseMoney(input.amount);
   return withRetry(() =>
     prisma.$transaction(async (tx) => {
-      const payerId = input.payerId ?? actorId;
-      await assertActiveUser(tx, payerId, "payerId");
-      if (input.ownerId != null) await assertActiveUser(tx, input.ownerId, "ownerId");
-      await assertCatalogActive(tx, input);
-
+      // The refund lock must come first. Any earlier plain read would fix the snapshot
+      // before the lock, and the refund sum would then miss a refund that just committed.
       if (input.type === "refund") {
         const relatedId = input.relatedTransactionId as number;
         const related = await tx.$queryRaw<{ id: number }[]>`
@@ -151,6 +148,11 @@ export function createTransaction(
         }
         assertRefundFits(expense, await confirmedRefundsSum(tx, expense.id), amount);
       }
+
+      const payerId = input.payerId ?? actorId;
+      await assertActiveUser(tx, payerId, "payerId");
+      if (input.ownerId != null) await assertActiveUser(tx, input.ownerId, "ownerId");
+      await assertCatalogActive(tx, input);
 
       const row = await tx.transaction.create({
         data: {
@@ -245,9 +247,14 @@ export function patchTransaction(
         if (cur.type === "expense") {
           const refunds = await confirmedRefundsSum(tx, cur.id);
           if (refunds.gt(amount)) {
-            throw new AppError(409, "refund_exceeds", "Confirmed refunds are more than the amount", {
-              amount: "Confirmed refunds are more than the amount",
-            });
+            throw new AppError(
+              409,
+              "refund_exceeds",
+              "Confirmed refunds are more than the amount",
+              {
+                amount: "Confirmed refunds are more than the amount",
+              },
+            );
           }
         } else if (cur.type === "refund" && cur.relatedTransactionId != null) {
           const expense = await lockTransaction(tx, cur.relatedTransactionId);
@@ -306,7 +313,15 @@ function closeTransaction(
         data: { status: to, voidReason: reason, updatedById: actorId },
       });
       const after = toTransactionDto(row);
-      await audit(tx, actorId, id, `transaction.${to === "voided" ? "void" : "cancel"}`, toTransactionDto(cur), after, reason);
+      await audit(
+        tx,
+        actorId,
+        id,
+        `transaction.${to === "voided" ? "void" : "cancel"}`,
+        toTransactionDto(cur),
+        after,
+        reason,
+      );
       return after;
     }),
   );
