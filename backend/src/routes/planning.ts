@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
 import type { PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import {
@@ -14,6 +14,7 @@ import {
   type RecurrenceRuleList,
 } from "@spendual/shared";
 import { AppError, asyncHandler } from "../auth/errors.js";
+import { MONTHS_AHEAD, MONTHS_BACK, isMonthInWindow } from "../lib/period.js";
 import * as bills from "../services/bills.js";
 import {
   AllocationExistsError,
@@ -28,20 +29,31 @@ import { actorId, idParam } from "./params.js";
 const monthQuery = dashboardQuerySchema; // every GET here takes only ?month=
 const billParams = z.object({ kind: BillKind, id: z.coerce.number().int().positive() });
 
-export function planningRouter(prisma: PrismaClient): Router {
+export function planningRouter(prisma: PrismaClient, clock: () => Date = () => new Date()): Router {
   const r = Router();
+
+  /** ?month= inside the window. Far months would write rows or overflow the year. */
+  const month = (req: Request): string => {
+    const m = monthQuery.parse(req.query).month;
+    if (!isMonthInWindow(m, clock())) {
+      throw new AppError(400, "validation_error", "Invalid request", {
+        month: `Must be within ${MONTHS_BACK} months back and ${MONTHS_AHEAD} ahead`,
+      });
+    }
+    return m;
+  };
 
   r.get(
     "/dashboard",
     asyncHandler(async (req, res) => {
-      res.json(await dash.getDashboard(prisma, monthQuery.parse(req.query).month));
+      res.json(await dash.getDashboard(prisma, month(req), clock()));
     }),
   );
 
   r.get(
     "/budgets",
     asyncHandler(async (req, res) => {
-      res.json(await dash.getBudgetOverview(prisma, monthQuery.parse(req.query).month));
+      res.json(await dash.getBudgetOverview(prisma, month(req)));
     }),
   );
 
@@ -58,7 +70,7 @@ export function planningRouter(prisma: PrismaClient): Router {
   r.get(
     "/allowances",
     asyncHandler(async (req, res) => {
-      res.json(await dash.getAllowanceOverview(prisma, monthQuery.parse(req.query).month));
+      res.json(await dash.getAllowanceOverview(prisma, month(req)));
     }),
   );
 
@@ -95,7 +107,7 @@ export function planningRouter(prisma: PrismaClient): Router {
   r.get(
     "/bills",
     asyncHandler(async (req, res) => {
-      res.json(await bills.getBills(prisma, monthQuery.parse(req.query).month));
+      res.json(await bills.getBills(prisma, month(req), clock()));
     }),
   );
 
@@ -103,7 +115,7 @@ export function planningRouter(prisma: PrismaClient): Router {
     "/recurrence-rules",
     asyncHandler(async (req, res) => {
       const input = recurrenceRuleCreateSchema.parse(req.body);
-      res.status(201).json(await bills.createRule(prisma, actorId(req), input));
+      res.status(201).json(await bills.createRule(prisma, actorId(req), input, clock()));
     }),
   );
 

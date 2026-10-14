@@ -16,9 +16,10 @@ import {
   unallocatedSavings,
 } from "../domain/accounting.js";
 import { AppError } from "../auth/errors.js";
-import { dateOnlyToDate, nextPeriod } from "../lib/period.js";
-import { budgetFor } from "./budget.js";
-import { generateOccurrences } from "./recurrence.js";
+import { currentPeriod, dateOnlyToDate, nextPeriod } from "../lib/period.js";
+import { withRetry } from "../lib/withRetry.js";
+import { budgetFor, budgetKey } from "./budget.js";
+import { generateForRules } from "./recurrence.js";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 interface Range {
@@ -60,71 +61,99 @@ async function netSpent(
   return netExpenses(expenses, refunds);
 }
 
-/** Create missing planned occurrences for every active rule, from `month` on. Idempotent. */
-export async function generateForAllRules(prisma: PrismaClient, month: string): Promise<void> {
-  const rules = await prisma.recurrenceRule.findMany({
-    where: { state: "active" },
-    select: { id: true },
-  });
-  for (const r of rules) await generateOccurrences(prisma, r.id, month);
+/**
+ * Create missing planned occurrences for every active rule. Idempotent.
+ * Never looks at past months: generation starts at the later of `month` and today's month.
+ * Rules are locked and read once, then one INSERT IGNORE runs, so a rule edit that
+ * commits first is seen here, and one that waits sees the new rows.
+ */
+export async function generateForAllRules(
+  prisma: PrismaClient,
+  month: string,
+  now: Date = new Date(),
+): Promise<void> {
+  const cur = currentPeriod(now);
+  const from = month < cur ? cur : month;
+  await withRetry(() =>
+    prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM RecurrenceRule WHERE state = 'active' ORDER BY id FOR UPDATE`;
+      const rules = await tx.recurrenceRule.findMany({ where: { state: "active" } });
+      await generateForRules(tx, rules, from);
+    }),
+  );
 }
 
 export async function personSummaries(db: Db, month: string): Promise<PersonSummary[]> {
   const users = await db.user.findMany({ where: { active: true }, orderBy: { id: "asc" } });
   const range = monthRange(month);
-  const out: PersonSummary[] = [];
-  for (const u of users) {
-    const own = { scope: "personal" as const, ownerId: u.id };
-    const credits = (r: Range) =>
-      sumTx(db, { ...own, type: { in: ["income", "other_receipt"] }, transactionDate: r });
-    const allowances = async (where: Prisma.PersonalAllowanceEntryWhereInput) => {
-      const agg = await db.personalAllowanceEntry.aggregate({
-        _sum: { amount: true },
-        where: { ownerId: u.id, ...where },
-      });
-      return cents(agg._sum.amount);
-    };
-    const [openAllow, openCredits, openSpent, allowance, personalCredits, personalSpent] =
-      await Promise.all([
-        allowances({ periodKey: { lt: month } }),
-        credits(before(month)),
-        netSpent(db, own, before(month)),
-        allowances({ periodKey: month }),
-        credits(range),
-        netSpent(db, own, range),
-      ]);
-    const closing = personalClosingBalance({
-      opening: openAllow + openCredits - openSpent,
-      allowanceAllocations: allowance,
-      personalCredits,
-      personalExpensesNet: personalSpent,
-    });
-    out.push({
-      userId: u.id,
-      allowanceAllocated: centsToMoney(allowance),
-      personalSpent: centsToMoney(personalSpent),
-      personalCredits: centsToMoney(personalCredits),
-      closingBalance: centsToMoney(closing),
-    });
-  }
-  return out;
+  return Promise.all(users.map((u) => personSummary(db, u.id, month, range)));
 }
 
-export async function getDashboard(prisma: PrismaClient, month: string): Promise<Dashboard> {
-  await generateForAllRules(prisma, month);
+async function personSummary(
+  db: Db,
+  userId: number,
+  month: string,
+  range: Range,
+): Promise<PersonSummary> {
+  const own = { scope: "personal" as const, ownerId: userId };
+  const credits = (r: Range) =>
+    sumTx(db, { ...own, type: { in: ["income", "other_receipt"] }, transactionDate: r });
+  const allowances = async (where: Prisma.PersonalAllowanceEntryWhereInput) => {
+    const agg = await db.personalAllowanceEntry.aggregate({
+      _sum: { amount: true },
+      where: { ownerId: userId, ...where },
+    });
+    return cents(agg._sum.amount);
+  };
+  const [openAllow, openCredits, openSpent, allowance, personalCredits, personalSpent] =
+    await Promise.all([
+      allowances({ periodKey: { lt: month } }),
+      credits(before(month)),
+      netSpent(db, own, before(month)),
+      allowances({ periodKey: month }),
+      credits(range),
+      netSpent(db, own, range),
+    ]);
+  const closing = personalClosingBalance({
+    opening: openAllow + openCredits - openSpent,
+    allowanceAllocations: allowance,
+    personalCredits,
+    personalExpensesNet: personalSpent,
+  });
+  return {
+    userId,
+    allowanceAllocated: centsToMoney(allowance),
+    personalSpent: centsToMoney(personalSpent),
+    personalCredits: centsToMoney(personalCredits),
+    closingBalance: centsToMoney(closing),
+  };
+}
+
+export async function getDashboard(
+  prisma: PrismaClient,
+  month: string,
+  now: Date = new Date(),
+): Promise<Dashboard> {
+  await generateForAllRules(prisma, month, now);
   const range = monthRange(month);
   const household = { scope: "household" as const };
   const planned = { status: "planned" as const, dueDate: range };
-  const [income, sharedNet, people, recAgg, recUnknown, insAgg, overall] = await Promise.all([
-    sumTx(prisma, { ...household, type: "income", transactionDate: range }),
-    netSpent(prisma, household, range),
-    personSummaries(prisma, month),
-    prisma.recurrenceOccurrence.aggregate({ _sum: { expectedAmount: true }, where: planned }),
-    prisma.recurrenceOccurrence.count({ where: { ...planned, expectedAmount: null } }),
-    prisma.installmentOccurrence.aggregate({ _sum: { expectedAmount: true }, where: planned }),
-    budgetFor(prisma, null, month),
-  ]);
-  const allocations = people.reduce((a, p) => a + moneyToCents(p.allowanceAllocated), 0n);
+  const [income, sharedNet, people, allocationAgg, recAgg, recUnknown, insAgg, overall] =
+    await Promise.all([
+      sumTx(prisma, { ...household, type: "income", transactionDate: range }),
+      netSpent(prisma, household, range),
+      personSummaries(prisma, month),
+      // Every user counts here, active or not: the household already paid these out.
+      prisma.personalAllowanceEntry.aggregate({
+        _sum: { amount: true },
+        where: { periodKey: month },
+      }),
+      prisma.recurrenceOccurrence.aggregate({ _sum: { expectedAmount: true }, where: planned }),
+      prisma.recurrenceOccurrence.count({ where: { ...planned, expectedAmount: null } }),
+      prisma.installmentOccurrence.aggregate({ _sum: { expectedAmount: true }, where: planned }),
+      budgetFor(prisma, null, month),
+    ]);
+  const allocations = cents(allocationAgg._sum.amount);
   const savings = savingsBeforeGoals({
     householdIncome: income,
     sharedExpensesNet: sharedNet,
@@ -157,7 +186,7 @@ export async function getBudgetOverview(db: Db, month: string): Promise<BudgetOv
   const household = { scope: "household" as const };
   const where = { ...household, type: "expense" as const, transactionDate: range };
 
-  const [expenses, refunds, categories, overall, overallSpent] = await Promise.all([
+  const [expenses, refunds, categories, overallSpent, budgetRows] = await Promise.all([
     db.transaction.groupBy({
       by: ["categoryId"],
       _sum: { amount: true },
@@ -172,10 +201,16 @@ export async function getBudgetOverview(db: Db, month: string): Promise<BudgetOv
       select: { amount: true, relatedTransaction: { select: { categoryId: true } } },
     }),
     db.category.findMany({ orderBy: { id: "asc" } }),
-    budgetFor(db, null, month),
     netSpent(db, household, range),
+    db.monthlyBudget.findMany({
+      where: { effectiveFrom: { lte: month } },
+      orderBy: { effectiveFrom: "desc" },
+    }),
   ]);
 
+  // Rows come newest first, so the first one per key is the budget in force.
+  const inForce = (key: string) => budgetRows.find((b) => b.categoryKey === key) ?? null;
+  const overall = inForce(budgetKey(null).categoryKey);
   const spent = new Map<number, bigint>();
   for (const e of expenses) {
     if (e.categoryId != null) spent.set(e.categoryId, cents(e._sum.amount));
@@ -187,7 +222,7 @@ export async function getBudgetOverview(db: Db, month: string): Promise<BudgetOv
 
   const lines: BudgetLine[] = [];
   for (const c of categories) {
-    const b = await budgetFor(db, c.id, month);
+    const b = inForce(budgetKey(c.id).categoryKey);
     const s = spent.get(c.id) ?? 0n;
     // Archived categories only show while they still have a budget or spending.
     if (!c.active && !b && s === 0n) continue;

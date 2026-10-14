@@ -18,6 +18,8 @@ export interface AppOptions {
   loginLimit?: LoginLimit;
   /** Seconds between sweeps of expired sessions. Off when unset. */
   sessionCleanupSeconds?: number;
+  /** Clock for month windows and generation. Tests inject a fixed one. */
+  now?: () => Date;
 }
 
 export function createApp(opts: AppOptions) {
@@ -45,7 +47,7 @@ export function createApp(opts: AppOptions) {
   const protectedApi = Router();
   protectedApi.use(requireAuth(opts.prisma), requireCsrf);
   protectedApi.use(catalogRouter(opts.prisma));
-  protectedApi.use(planningRouter(opts.prisma));
+  protectedApi.use(planningRouter(opts.prisma, opts.now));
   protectedApi.use("/transactions", transactionsRouter(opts.prisma));
   api.use(protectedApi);
   app.use("/api", api);
