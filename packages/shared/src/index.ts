@@ -23,3 +23,4 @@ export type TransactionStatus = z.infer<typeof TransactionStatus>;
 
 export const Scope = z.enum(["household", "personal"]);
 export type Scope = z.infer<typeof Scope>;
+export * from "./auth.js";
