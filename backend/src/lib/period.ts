@@ -46,3 +46,36 @@ export function dateOnlyToDate(s: string): Date {
 export function dateToDateOnly(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
+
+/** The app runs on Brazilian household time, whatever the server clock says. */
+export const APP_TIME_ZONE = "America/Sao_Paulo";
+
+/** Month key of `now` in the app time zone. */
+export function currentPeriod(now: Date = new Date()): PeriodKey {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(now);
+  const get = (t: string) => parts.find((p) => p.type === t)!.value;
+  return `${get("year")}-${get("month")}`;
+}
+
+/** Months the client may ask for: this many back and ahead of the current month. */
+export const MONTHS_BACK = 12;
+export const MONTHS_AHEAD = 24;
+
+export function isMonthInWindow(key: PeriodKey, now: Date = new Date()): boolean {
+  const cur = currentPeriod(now);
+  return key >= addPeriods(cur, -MONTHS_BACK) && key <= addPeriods(cur, MONTHS_AHEAD);
+}
+
+/** Today's date "YYYY-MM-DD" in the app time zone. */
+export function currentDate(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
