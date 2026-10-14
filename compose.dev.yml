@@ -11,6 +11,7 @@ services:
       SESSION_SECRET: dev-only-secret-change-for-real-use-0123456789
       TZ: America/Sao_Paulo
       HOME: /tmp
+      BACKUP_DIR: /workspace/backups
       NPM_CONFIG_UPDATE_NOTIFIER: "false"
       npm_config_cache: /tmp/.npm
     volumes:
