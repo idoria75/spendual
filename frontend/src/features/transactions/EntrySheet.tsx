@@ -7,13 +7,13 @@ import { TransactionForm } from "./TransactionForm";
 /** The Novo lançamento sheet (phone) or dialog (desktop). Also used to edit. */
 export function EntrySheet() {
   const { t } = useTranslation();
-  const { isOpen, close, editing, notifySaved } = useEntry();
+  const { isOpen, close, editing, bill, notifySaved } = useEntry();
   const amountRef = useRef<HTMLInputElement>(null);
   return (
     <Sheet
       open={isOpen}
       onOpenChange={(open) => !open && close()}
-      title={t(editing ? "form.titleEdit" : "form.titleNew")}
+      title={t(bill ? "bills.confirmTitle" : editing ? "form.titleEdit" : "form.titleNew")}
       tall
       onOpenAutoFocus={(e) => {
         e.preventDefault();
@@ -22,6 +22,7 @@ export function EntrySheet() {
     >
       <TransactionForm
         editing={editing}
+        bill={bill}
         amountRef={amountRef}
         onSaved={() => {
           notifySaved();

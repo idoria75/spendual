@@ -1,5 +1,8 @@
 import {
+  billConfirmSchema,
   positiveMoneySchema,
+  type Bill,
+  type BillConfirm,
   transactionCreateSchema,
   transactionPatchSchema,
   type Scope,
@@ -150,5 +153,47 @@ export function buildPatch(v: FormValues, original: Transaction): Built<Transact
     return { ok: false, errors: { ...errors, ...errorsFromIssues(parsed.error.issues) } };
   }
   if (Object.keys(errors).length > 0) return { ok: false, errors };
+  return { ok: true, body: parsed.data };
+}
+
+/** Pre-fill the form from a planned bill. Unknown amount stays empty (never "0"). */
+export function valuesFromBill(
+  bill: Bill,
+  fallbackUserId: number | null,
+  date: string,
+): FormValues {
+  return {
+    type: "expense",
+    amount: bill.expectedAmount === null ? "" : bill.expectedAmount.replace(".", ","),
+    description: bill.description,
+    scope: bill.scope,
+    ownerId: bill.ownerId,
+    categoryId: bill.categoryId,
+    payerId: bill.payerId ?? fallbackUserId,
+    date,
+    paymentMethodId: bill.paymentMethodId,
+    accountId: bill.accountId,
+    relatedTransactionId: null,
+    notes: "",
+  };
+}
+
+/** Body of "Confirmar pagamento": only what the person can change on a bill. */
+export function buildConfirm(v: FormValues): Built<BillConfirm> {
+  const amount = parseAmountInput(v.amount);
+  const parsed = billConfirmSchema.safeParse({
+    amount: amount ?? "",
+    transactionDate: v.date,
+    ...(v.payerId !== null ? { payerId: v.payerId } : {}),
+    accountId: v.accountId,
+    paymentMethodId: v.paymentMethodId,
+    ...(v.notes.trim() !== "" ? { notes: v.notes } : {}),
+  });
+  if (!parsed.success) {
+    return {
+      ok: false,
+      errors: { ...errorsFromIssues(parsed.error.issues), ...fallbackAmountError(amount) },
+    };
+  }
   return { ok: true, body: parsed.data };
 }
