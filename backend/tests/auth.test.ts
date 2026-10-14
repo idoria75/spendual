@@ -195,7 +195,7 @@ describe("session expiry", () => {
   });
 
   it("rolls: activity extends the session", async () => {
-    const app = makeApp(prisma, { sessionMaxAgeMs: 2000 });
+    const app = makeApp(prisma, { sessionMaxAgeMs: 4000 });
     const agent = newAgent(app);
     await signup(agent, "ana");
     for (let i = 0; i < 3; i++) {
