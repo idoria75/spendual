@@ -35,6 +35,8 @@ export const authUserSchema = z.object({
   username: z.string(),
   displayName: z.string(),
   tonePalette: z.string().nullable(),
+  /** "system" | "light" | "dark". Stored per user. */
+  theme: z.enum(["system", "light", "dark"]),
 });
 export type AuthUser = z.infer<typeof authUserSchema>;
 
@@ -56,6 +58,7 @@ export const ApiErrorCode = z.enum([
   "has_refunds",
   "refund_exceeds",
   "allocation_exists",
+  "tone_taken",
   "internal_error",
 ]);
 export type ApiErrorCode = z.infer<typeof ApiErrorCode>;

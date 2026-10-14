@@ -16,6 +16,7 @@ export const errorMessageKey = {
   has_refunds: "errors.has_refunds",
   refund_exceeds: "errors.refund_exceeds",
   allocation_exists: "errors.allocation_exists",
+  tone_taken: "errors.tone_taken",
   internal_error: "errors.internal_error",
 } as const satisfies Record<ApiErrorCode, string>;
 
