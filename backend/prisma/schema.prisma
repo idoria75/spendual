@@ -122,7 +122,7 @@ model RecurrenceRule {
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
-  owner         User?                  @relation("RuleOwner", fields: [ownerId], references: [id])
+  owner         User?                  @relation("RuleOwner", fields: [ownerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   payer         User?                  @relation("RulePayer", fields: [payerId], references: [id])
   createdBy     User                   @relation("RuleCreatedBy", fields: [createdById], references: [id])
   updatedBy     User                   @relation("RuleUpdatedBy", fields: [updatedById], references: [id])
@@ -174,7 +174,7 @@ model InstallmentPlan {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  owner       User?                   @relation("PlanOwner", fields: [ownerId], references: [id])
+  owner       User?                   @relation("PlanOwner", fields: [ownerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   payer       User?                   @relation("PlanPayer", fields: [payerId], references: [id])
   createdBy   User                    @relation("PlanCreatedBy", fields: [createdById], references: [id])
   updatedBy   User                    @relation("PlanUpdatedBy", fields: [updatedById], references: [id])
@@ -257,7 +257,7 @@ model Transaction {
   account               Account?               @relation(fields: [accountId], references: [id])
   paymentMethod         PaymentMethod?         @relation(fields: [paymentMethodId], references: [id])
   payer                 User?                  @relation("TxPayer", fields: [payerId], references: [id])
-  owner                 User?                  @relation("TxOwner", fields: [ownerId], references: [id])
+  owner                 User?                  @relation("TxOwner", fields: [ownerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   createdBy             User                   @relation("TxCreatedBy", fields: [createdById], references: [id])
   updatedBy             User                   @relation("TxUpdatedBy", fields: [updatedById], references: [id])
   relatedTransaction    Transaction?           @relation("TxRelated", fields: [relatedTransactionId], references: [id])
@@ -322,7 +322,7 @@ model MonthlyBudget {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
-  category  Category? @relation(fields: [categoryId], references: [id])
+  category  Category? @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   updatedBy User?     @relation("BudgetUpdatedBy", fields: [updatedById], references: [id])
 
   @@unique([categoryKey, effectiveFrom])
