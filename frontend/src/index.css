@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #eef1f3;
+  --surface: #ffffff;
+  --surface-2: #f4f6f8;
+  --fg: #1d2730;
+  --muted: #5d6b77;
+  --line: #dde3e7;
+  --accent: #1f6f78;
+  --accent-fg: #ffffff;
+  --pos: #1e8449;
+  --warn: #b86e00;
+  --err: #c62f3a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12171b;
+    --surface: #1b2227;
+    --surface-2: #232b31;
+    --fg: #e4e9ec;
+    --muted: #9aa7b1;
+    --line: #2d373e;
+    --accent: #5fb7b4;
+    --accent-fg: #0d1417;
+    --pos: #5cc98a;
+    --warn: #f0a630;
+    --err: #f07178;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #12171b;
+  --surface: #1b2227;
+  --surface-2: #232b31;
+  --fg: #e4e9ec;
+  --muted: #9aa7b1;
+  --line: #2d373e;
+  --accent: #5fb7b4;
+  --accent-fg: #0d1417;
+  --pos: #5cc98a;
+  --warn: #f0a630;
+  --err: #f07178;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
