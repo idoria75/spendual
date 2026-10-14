@@ -8,8 +8,8 @@ import { Segmented } from "../../components/ui/segmented";
 import { Sheet } from "../../components/ui/sheet";
 import { useToast } from "../../components/ui/toast";
 import { cn } from "../../lib/cn";
-import { formatMoney } from "../../lib/currency";
-import { addDays, formatDate, formatDayMonth, today } from "../../lib/date";
+import { formatMoney, fromCents, toCents } from "../../lib/currency";
+import { addDays, currentMonth, formatDate, formatDayMonth, today } from "../../lib/date";
 import { CategoryTile } from "../transactions/CategoryTile";
 import { toneColor } from "../transactions/display";
 import { useEntry } from "../transactions/entry";
@@ -85,22 +85,49 @@ function Group({
   );
 }
 
-function Upcoming({ bills, onOpen }: { bills: Bill[]; onOpen: (b: Bill) => void }) {
+function Upcoming({
+  bills,
+  grouped,
+  emptyKey,
+  onOpen,
+}: {
+  bills: Bill[];
+  /** Group by today only in the current month. Other months: plain list by due date. */
+  grouped: boolean;
+  emptyKey: "bills.empty" | "bills.emptyInstallments";
+  onOpen: (b: Bill) => void;
+}) {
   const { t } = useTranslation();
   const now = today();
   const weekEnd = addDays(now, 6);
   const planned = bills.filter((b) => b.status === "planned");
   const sorted = (list: Bill[]) => [...list].sort((a, b) => (a.dueDate < b.dueDate ? -1 : 1));
-  const late = sorted(planned.filter((b) => b.dueDate < now));
-  const week = sorted(planned.filter((b) => b.dueDate >= now && b.dueDate <= weekEnd));
-  const later = sorted(planned.filter((b) => b.dueDate > weekEnd));
   const done = sorted(bills.filter((b) => b.status !== "planned"));
-  if (bills.length === 0) return <p className="text-muted">{t("bills.empty")}</p>;
+  if (bills.length === 0) return <p className="text-muted">{t(emptyKey)}</p>;
   return (
     <div className="flex flex-col gap-4">
-      <Group title={t("bills.groups.late")} bills={late} late onOpen={onOpen} />
-      <Group title={t("bills.groups.week")} bills={week} onOpen={onOpen} />
-      <Group title={t("bills.groups.later")} bills={later} onOpen={onOpen} />
+      {grouped ? (
+        <>
+          <Group
+            title={t("bills.groups.late")}
+            bills={sorted(planned.filter((b) => b.dueDate < now))}
+            late
+            onOpen={onOpen}
+          />
+          <Group
+            title={t("bills.groups.week")}
+            bills={sorted(planned.filter((b) => b.dueDate >= now && b.dueDate <= weekEnd))}
+            onOpen={onOpen}
+          />
+          <Group
+            title={t("bills.groups.later")}
+            bills={sorted(planned.filter((b) => b.dueDate > weekEnd))}
+            onOpen={onOpen}
+          />
+        </>
+      ) : (
+        <Group title={t("bills.groups.planned")} bills={sorted(planned)} onOpen={onOpen} />
+      )}
       <Group title={t("bills.groups.done")} bills={done} onOpen={onOpen} />
     </div>
   );
@@ -212,6 +239,20 @@ export function BillsView() {
   const failed = tab === "recurring" ? rules.failed : bills.failed;
   const retry = tab === "recurring" ? rules.reload : bills.reload;
   const list = bills.data;
+  const shown =
+    list === null
+      ? []
+      : tab === "installments"
+        ? list.items.filter((b) => b.kind === "installment")
+        : list.items;
+  const planned = shown.filter((b) => b.status === "planned");
+  const knownTotal = fromCents(
+    planned.reduce(
+      (sum, b) => (b.expectedAmount === null ? sum : sum + toCents(b.expectedAmount)),
+      0n,
+    ),
+  );
+  const unknownCount = planned.filter((b) => b.expectedAmount === null).length;
 
   return (
     <section className="flex flex-col gap-3">
@@ -240,10 +281,8 @@ export function BillsView() {
       />
       {tab !== "recurring" && list ? (
         <p className="text-[0.85rem] text-muted tabular-nums">
-          {t("bills.plannedTotal", { amount: formatMoney(list.plannedTotal) })}
-          {list.unknownCount > 0
-            ? ` · ${t("bills.unknownCount", { count: list.unknownCount })}`
-            : ""}
+          {t("bills.plannedTotal", { amount: formatMoney(knownTotal) })}
+          {unknownCount > 0 ? ` · ${t("bills.unknownCount", { count: unknownCount })}` : ""}
         </p>
       ) : null}
       {failed ? (
@@ -266,9 +305,19 @@ export function BillsView() {
           {t("common.loading")}
         </p>
       ) : tab === "upcoming" ? (
-        <Upcoming bills={list.items} onOpen={setSelected} />
+        <Upcoming
+          bills={shown}
+          grouped={month === currentMonth()}
+          emptyKey="bills.empty"
+          onOpen={setSelected}
+        />
       ) : (
-        <Upcoming bills={list.items.filter((b) => b.kind === "installment")} onOpen={setSelected} />
+        <Upcoming
+          bills={shown}
+          grouped={month === currentMonth()}
+          emptyKey="bills.emptyInstallments"
+          onOpen={setSelected}
+        />
       )}
 
       <BillDetail
