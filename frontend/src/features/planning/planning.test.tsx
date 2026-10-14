@@ -150,6 +150,29 @@ describe("Início", () => {
     expect(screen.getByText("▲ R$ 1.000,00 acima")).toBeInTheDocument();
   });
 
+  it("shows negative savings in the warn color with the minus sign", async () => {
+    mockFetch(
+      base((req) =>
+        req.url.startsWith("/api/dashboard")
+          ? json(200, {
+              ...dashboard,
+              savingsBeforeGoals: "-500.00",
+              unallocatedSavings: "-500.00",
+            })
+          : undefined,
+      ),
+    );
+    renderAt("/");
+    const actual = await screen.findByRole("region", { name: "Realizado" });
+    const values = await within(actual).findAllByText(/500,00/);
+    expect(values).toHaveLength(2);
+    for (const el of values) {
+      expect(el).toHaveClass("text-warn");
+      expect(el.textContent).toMatch(/^[-\u2212]/);
+    }
+    expect(within(actual).getByText("R$ 10.000,00")).not.toHaveClass("text-warn");
+  });
+
   it("shows the balance of each person on Pessoal", async () => {
     mockFetch(base());
     renderAt("/pessoal");
@@ -195,6 +218,17 @@ describe("A pagar", () => {
     const row = (await screen.findByText("Luz")).closest("button")!;
     expect(within(row).getByText("valor ?")).toBeInTheDocument();
     expect(within(row).queryByText(/R\$ 0,00/)).not.toBeInTheDocument();
+  });
+
+  it("draws planned bills dashed and paid bills solid", async () => {
+    bills = [
+      bill({ id: 5, description: "Luz" }),
+      bill({ id: 6, description: "Gás", status: "confirmed" }),
+    ];
+    mockFetch(base());
+    renderAt("/a-pagar");
+    expect((await screen.findByText("Luz")).closest("button")).toHaveClass("border-dashed");
+    expect(screen.getByText("Gás").closest("button")).not.toHaveClass("border-dashed");
   });
 
   it("confirms with the form pre-filled from the bill, and submits only once", async () => {
