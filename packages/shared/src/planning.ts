@@ -33,6 +33,7 @@ import { periodKeySchema, positiveMoneySchema } from "./transactions.js";
  *   POST /bills/:kind/:id/cancel      -> 200 Bill   body ReasonRequest (planned -> cancelled)
  *
  * Rules:
+ *  - BillList.overdue is always returned. `plannedTotal` and `unknownCount` cover the month only.
  *  - `expectedAmount` null means "unknown" (UI shows `valor ?`). It is not 0. Totals skip nulls
  *    and report how many were skipped (`unknownCount`).
  *  - Planned items are never counted as actual spending. Only confirmed transactions count.
@@ -154,6 +155,11 @@ export type Bill = z.infer<typeof billSchema>;
 export const billListSchema = z.object({
   month: periodKeySchema,
   items: z.array(billSchema),
+  /**
+   * Planned bills (active rules only) due before min(today, first day of `month`),
+   * from any earlier month, oldest first. Not in `items`, `plannedTotal` or `unknownCount`.
+   */
+  overdue: z.array(billSchema),
   plannedTotal: moneySchema,
   unknownCount: z.number().int(),
 });
