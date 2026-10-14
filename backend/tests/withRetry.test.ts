@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import { isRetryableDbError, withRetry } from "../src/lib/withRetry.js";
 
 const mysqlError = (code: string) =>
-  Object.assign(new Error(`Raw query failed. Code: \`${code}\``), { code: "P2010", meta: { code } });
+  Object.assign(new Error(`Raw query failed. Code: \`${code}\``), {
+    code: "P2010",
+    meta: { code },
+  });
 const noWait = { delayMs: () => 0 };
 
 describe("withRetry", () => {

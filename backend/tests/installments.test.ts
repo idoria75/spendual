@@ -7,7 +7,17 @@ import {
 } from "../src/services/installments.js";
 
 describe("splitInstallments", () => {
-  const totals = ["0.00", "0.01", "0.99", "1.00", "10.00", "100.01", "999.99", "1234.56", "99999.97"];
+  const totals = [
+    "0.00",
+    "0.01",
+    "0.99",
+    "1.00",
+    "10.00",
+    "100.01",
+    "999.99",
+    "1234.56",
+    "99999.97",
+  ];
 
   it("sums to the total exactly for counts 1-60", () => {
     for (const total of totals) {
@@ -48,6 +58,11 @@ describe("buildInstallmentRows", () => {
 
   it("keeps the original day and clamps in short months", () => {
     const rows = buildInstallmentRows("400.00", 4, "2027-01-31");
-    expect(rows.map((r) => r.dueDate)).toEqual(["2027-01-31", "2027-02-28", "2027-03-31", "2027-04-30"]);
+    expect(rows.map((r) => r.dueDate)).toEqual([
+      "2027-01-31",
+      "2027-02-28",
+      "2027-03-31",
+      "2027-04-30",
+    ]);
   });
 });
