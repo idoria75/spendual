@@ -37,6 +37,10 @@ model User {
   allowanceOwned PersonalAllowanceEntry[] @relation("AllowanceOwner")
   allowanceActed PersonalAllowanceEntry[] @relation("AllowanceActor")
   budgetsUpdated MonthlyBudget[]          @relation("BudgetUpdatedBy")
+  goalsCreated   SavingsGoal[]            @relation("GoalCreatedBy")
+  goalsUpdated   SavingsGoal[]            @relation("GoalUpdatedBy")
+  goalEntries    GoalEntry[]              @relation("GoalEntryActor")
+  auditEvents    AuditEvent[]             @relation("AuditActor")
 }
 
 model Category {
@@ -324,4 +328,73 @@ model MonthlyBudget {
   @@unique([categoryKey, effectiveFrom])
   @@index([categoryId])
   @@index([updatedById])
+}
+
+enum GoalStatus {
+  active
+  completed
+  archived
+}
+
+enum GoalEntryKind {
+  ALLOCATION
+  WITHDRAWAL
+  CORRECTION
+}
+
+model SavingsGoal {
+  id           Int        @id @default(autoincrement())
+  name         String     @db.VarChar(120)
+  description  String?    @db.VarChar(500)
+  targetAmount Decimal?   @db.Decimal(12, 2)
+  targetDate   DateTime?  @db.Date
+  currency     String     @default("BRL") @db.VarChar(3)
+  status       GoalStatus @default(active)
+  createdById  Int
+  updatedById  Int
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  createdBy User        @relation("GoalCreatedBy", fields: [createdById], references: [id])
+  updatedBy User        @relation("GoalUpdatedBy", fields: [updatedById], references: [id])
+  entries   GoalEntry[]
+
+  @@index([createdById])
+  @@index([updatedById])
+}
+
+// Append-only. Correct mistakes by adding entries, never by editing rows.
+model GoalEntry {
+  id            Int           @id @default(autoincrement())
+  goalId        Int
+  kind          GoalEntryKind
+  amount        Decimal       @db.Decimal(12, 2)
+  currency      String        @default("BRL") @db.VarChar(3)
+  effectiveDate DateTime      @db.Date
+  actorId       Int
+  notes         String?       @db.VarChar(500)
+  createdAt     DateTime      @default(now())
+
+  goal  SavingsGoal @relation(fields: [goalId], references: [id])
+  actor User        @relation("GoalEntryActor", fields: [actorId], references: [id])
+
+  @@index([goalId])
+  @@index([actorId])
+}
+
+model AuditEvent {
+  id         Int      @id @default(autoincrement())
+  actorId    Int
+  entityType String   @db.VarChar(60)
+  entityId   String   @db.VarChar(40)
+  action     String   @db.VarChar(40)
+  before     Json?
+  after      Json?
+  reason     String?  @db.VarChar(500)
+  createdAt  DateTime @default(now())
+
+  actor User @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([actorId])
 }
