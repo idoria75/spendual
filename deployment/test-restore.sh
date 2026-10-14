@@ -44,7 +44,7 @@ count_rows() {
   mysql_cli -N -B -e \
     "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA='$db' AND TABLE_TYPE='BASE TABLE' ORDER BY TABLE_NAME" \
     | while IFS= read -r t; do
-      printf '%s %s\n' "$t" "$(mysql_cli -N -B -e "SELECT COUNT(*) FROM \`$db\`.\`$t\`")"
+      printf '%s %s\n' "$t" "$(mysql_cli -N -B -e "SELECT COUNT(*) FROM \`$db\`.\`$t\`" < /dev/null)"
     done
 }
 
