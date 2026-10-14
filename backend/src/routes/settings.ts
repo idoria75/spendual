@@ -15,13 +15,6 @@ export function settingsRouter(prisma: PrismaClient, backupDir: string | undefin
     asyncHandler(async (req, res) => {
       const patch = profilePatchSchema.parse(req.body);
       const me = (req.authUser as AuthUser).id;
-      if (patch.tonePalette) {
-        const other = await prisma.user.findFirst({
-          where: { tonePalette: patch.tonePalette, id: { not: me } },
-          select: { id: true },
-        });
-        if (other) throw toneTaken();
-      }
       try {
         const user = await prisma.user.update({
           where: { id: me },
@@ -34,8 +27,12 @@ export function settingsRouter(prisma: PrismaClient, backupDir: string | undefin
         const body: AuthUser = toAuthUser(user);
         res.json(body);
       } catch (err) {
-        // The UNIQUE on tonePalette wins a race that the pre-check missed.
-        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+        // The UNIQUE index on tonePalette is the only guard, so races end here too.
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === "P2002" &&
+          String(err.meta?.target ?? "").includes("tonePalette")
+        ) {
           throw toneTaken();
         }
         throw err;
