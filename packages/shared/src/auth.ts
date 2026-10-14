@@ -55,6 +55,7 @@ export const ApiErrorCode = z.enum([
   "invalid_state",
   "has_refunds",
   "refund_exceeds",
+  "allocation_exists",
   "internal_error",
 ]);
 export type ApiErrorCode = z.infer<typeof ApiErrorCode>;

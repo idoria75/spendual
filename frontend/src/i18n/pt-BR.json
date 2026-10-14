@@ -47,6 +47,7 @@
     "invalid_state": "Este registro não pode mais ser alterado assim.",
     "has_refunds": "Este lançamento tem reembolsos. Anule os reembolsos primeiro.",
     "refund_exceeds": "O reembolso passa do valor da despesa.",
+    "allocation_exists": "Já existe uma mesada deste mês para esta pessoa.",
     "internal_error": "Algo deu errado. Tente de novo em instantes.",
     "network": "Sem conexão com o servidor. Tente de novo.",
     "name_taken": "Já existe um item com este nome."
