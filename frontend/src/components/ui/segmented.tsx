@@ -1,3 +1,4 @@
+import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import { cn } from "../../lib/cn";
 
 interface Option<T extends string> {
@@ -22,18 +23,21 @@ export function Segmented<T extends string>({
   disabled,
 }: SegmentedProps<T>) {
   return (
-    <div
-      role="group"
+    <ToggleGroup.Root
+      type="single"
+      value={value}
+      // Radix sends "" when the active item is pressed again. Keep the current value.
+      onValueChange={(v) => {
+        if (v) onChange(v as T);
+      }}
+      disabled={disabled}
       aria-label={label}
       className="grid grid-flow-col auto-cols-fr rounded-input bg-surface-2 p-[3px] text-[0.8rem]"
     >
       {options.map((o) => (
-        <button
+        <ToggleGroup.Item
           key={o.value}
-          type="button"
-          aria-pressed={value === o.value}
-          disabled={disabled}
-          onClick={() => onChange(o.value)}
+          value={o.value}
           className={cn(
             "min-h-[44px] whitespace-nowrap rounded-[8px] px-2 disabled:cursor-not-allowed disabled:opacity-60",
             "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
@@ -41,8 +45,8 @@ export function Segmented<T extends string>({
           )}
         >
           {o.label}
-        </button>
+        </ToggleGroup.Item>
       ))}
-    </div>
+    </ToggleGroup.Root>
   );
 }

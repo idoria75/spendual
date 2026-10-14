@@ -50,8 +50,18 @@ Post-Phase-2 commits on `dev` (not in the tag): run-as-host-user dev container, 
 
 ## Open points (details in the memory file)
 
-- Phase 3 notes: any user can read and write the other user's personal records (no rule in the guide); list ignores `status=planned`; create writes no AuditEvent; the dev DB volume has 2 old accounts (use another `COMPOSE_PROJECT_NAME` for a clean DB).
-- Phase 3 frontend: native select and plain segmented buttons instead of Radix Select/Tabs; custom toast; native date input; generic category icon; `tonePalette` keys not pinned; 5 type chips (adds `other_receipt`); refund picker loads only the form month; no installment UI yet.
+- Decided (2026-10-14): both users may read and edit each other's personal records.
+- Frontend uses Radix where it fits: Dialog, Toggle Group (segmented), Toast. The `Select` stays native on purpose (best phone picker, simple in jsdom). Revisit if strict Radix is wanted.
+- Phase 3 open points, to assess later:
+  - Day totals are summed in the client; no server totals yet (Phase 4 dashboard should use the API).
+  - `tonePalette` keys not pinned in the contract; frontend accepts English and PT-BR names. Pin in Phase 5.
+  - Category icons are generic, color is `id % 12`. Needs a mapping or a contract field.
+  - Date input is native `type=date`, not typed dd/MM/yyyy.
+  - Refund picker lists only expenses from the form date's month.
+  - 5 type chips (adds `other_receipt` to the 4 in ui-guidelines §7.1).
+  - A bad refund link returns 400 `validation_error` (contract was silent).
+  - List ignores `status=planned`; create writes no AuditEvent.
+  - No "Parcelado" UI and no way to create planned rows yet (Phase 4).
 - ⚠ Needs a decision: signup is first-come; budget "this period only" with no earlier budget; budget "going forward" next to a P+1 row; edits to past periods.
 - `GET /auth/status` for "vagas livres" hint: skipped.
 - Phase 3/4 routes must validate input with Zod. The Phase 1 services do not.

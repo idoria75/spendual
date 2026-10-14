@@ -102,7 +102,7 @@ describe("Novo lançamento fields", () => {
     expect(within(dialog).getByLabelText("Valor")).toHaveAttribute("inputmode", "decimal");
     expect(within(dialog).getByLabelText("Valor")).toHaveFocus();
 
-    await userEvent.click(within(dialog).getByRole("button", { name: "Pessoal" }));
+    await userEvent.click(within(dialog).getByRole("radio", { name: "Pessoal" }));
     expect(within(dialog).getByLabelText("De quem")).toBeInTheDocument();
 
     await userEvent.click(within(dialog).getByRole("button", { name: "Transferência" }));
@@ -278,7 +278,7 @@ describe("Lançamentos list", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Editar" }));
     const dialog = await screen.findByRole("dialog", { name: "Editar lançamento" });
     expect(within(dialog).queryByRole("button", { name: "Despesa" })).not.toBeInTheDocument();
-    expect(within(dialog).queryByRole("button", { name: "Pessoal" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("radio", { name: "Pessoal" })).not.toBeInTheDocument();
     const amount = within(dialog).getByLabelText("Valor");
     expect(amount).toHaveValue("64,50");
     await userEvent.clear(amount);
