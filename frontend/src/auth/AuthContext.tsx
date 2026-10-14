@@ -23,9 +23,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [user, setUser] = useState<AuthUser | null>(null);
 
-  // The saved theme follows the user: applied on load and login, cleared on logout.
-  const theme = user?.theme ?? "system";
-  useEffect(() => applyTheme(theme), [theme]);
+  // The saved theme follows the user. Logout keeps it (login page, next visit).
+  const theme = user?.theme;
+  useEffect(() => {
+    if (theme) applyTheme(theme);
+  }, [theme]);
 
   useEffect(() => {
     let active = true;
