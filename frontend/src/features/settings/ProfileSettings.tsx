@@ -1,6 +1,7 @@
 import { TonePalette, type ThemePreference } from "@spendual/shared";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import type { ProfilePatch } from "@spendual/shared";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../auth/AuthContext";
 import { messageKeyFor } from "../../auth/error-messages";
@@ -25,12 +26,39 @@ const THEMES: ThemePreference[] = ["system", "light", "dark"];
 export function ProfileSettings() {
   const { t } = useTranslation();
   const { user, setUser } = useAuth();
-  const { data: lookups } = useLookups();
+  const { data: lookups, reload: reloadLookups } = useLookups();
   const [name, setName] = useState(user?.displayName ?? "");
   const [nameError, setNameError] = useState<string | undefined>();
   const [toneError, setToneError] = useState<string | undefined>();
   const [themeError, setThemeError] = useState<string | undefined>();
+  // One PATCH at a time: controls stay disabled, so a late answer cannot undo a newer one.
+  const [pending, setPending] = useState(false);
+  const storedName = user?.displayName;
+
+  // Fresh tones of the other person, every time the screen opens.
+  useEffect(() => {
+    void reloadLookups();
+  }, [reloadLookups]);
+
+  // The stored name is the base of the field. It changes after a save or a reload.
+  useEffect(() => {
+    if (storedName !== undefined) setName(storedName);
+  }, [storedName]);
+
   if (!user) return null;
+
+  async function save(patch: ProfilePatch, fail: (message: string) => void): Promise<void> {
+    setPending(true);
+    try {
+      setUser(await patchMe(patch));
+      await reloadLookups();
+    } catch (error) {
+      report(error);
+      fail(t(messageKeyFor(error)));
+    } finally {
+      setPending(false);
+    }
+  }
 
   const takenByOther = new Set(
     (lookups?.users ?? []).filter((u) => u.id !== user.id).map((u) => u.tonePalette),
@@ -44,32 +72,18 @@ export function ProfileSettings() {
       return;
     }
     setNameError(undefined);
-    try {
-      setUser(await patchMe({ displayName: trimmed }));
-    } catch (error) {
-      report(error);
-      setNameError(t(messageKeyFor(error)));
-    }
+    await save({ displayName: trimmed }, setNameError);
   }
 
   async function pickTone(tone: TonePalette) {
     setToneError(undefined);
-    try {
-      setUser(await patchMe({ tonePalette: tone }));
-    } catch (error) {
-      report(error);
-      setToneError(t(messageKeyFor(error)));
-    }
+    // Pressing the selected tone clears it.
+    await save({ tonePalette: user?.tonePalette === tone ? null : tone }, setToneError);
   }
 
   async function pickTheme(theme: ThemePreference) {
     setThemeError(undefined);
-    try {
-      setUser(await patchMe({ theme }));
-    } catch (error) {
-      report(error);
-      setThemeError(t(messageKeyFor(error)));
-    }
+    await save({ theme }, setThemeError);
   }
 
   return (
@@ -85,10 +99,11 @@ export function ProfileSettings() {
             value={name}
             maxLength={80}
             error={nameError}
+            disabled={pending}
             onChange={(e) => setName(e.target.value)}
           />
         </div>
-        <Button type="submit" disabled={name.trim() === user.displayName}>
+        <Button type="submit" disabled={pending || name.trim() === user.displayName}>
           {t("settings.save")}
         </Button>
       </form>
@@ -103,7 +118,7 @@ export function ProfileSettings() {
                 key={tone}
                 type="button"
                 aria-pressed={selected}
-                disabled={taken}
+                disabled={taken || pending}
                 onClick={() => void pickTone(tone)}
                 className={cn(
                   "flex min-h-[44px] items-center gap-2 rounded-chip border border-line px-3 text-[0.8rem]",
@@ -133,6 +148,7 @@ export function ProfileSettings() {
         <Segmented
           label={t("settings.profile.theme")}
           value={user.theme}
+          disabled={pending}
           onChange={(theme) => void pickTheme(theme)}
           options={THEMES.map((value) => ({
             value,
