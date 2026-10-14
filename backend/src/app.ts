@@ -6,6 +6,7 @@ import { errorHandler } from "./auth/errors.js";
 import { requireAuth } from "./auth/requireAuth.js";
 import { catalogRouter } from "./routes/catalog.js";
 import { planningRouter } from "./routes/planning.js";
+import { settingsRouter } from "./routes/settings.js";
 import { transactionsRouter } from "./routes/transactions.js";
 import { SESSION_MAX_AGE_MS, sessionMiddleware } from "./auth/session.js";
 
@@ -20,6 +21,8 @@ export interface AppOptions {
   sessionCleanupSeconds?: number;
   /** Clock for month windows and generation. Tests inject a fixed one. */
   now?: () => Date;
+  /** Directory that holds backup files. Backup status reports not configured when unset. */
+  backupDir?: string;
 }
 
 export function createApp(opts: AppOptions) {
@@ -47,6 +50,7 @@ export function createApp(opts: AppOptions) {
   const protectedApi = Router();
   protectedApi.use(requireAuth(opts.prisma), requireCsrf);
   protectedApi.use(catalogRouter(opts.prisma));
+  protectedApi.use(settingsRouter(opts.prisma, opts.backupDir));
   protectedApi.use(planningRouter(opts.prisma, opts.now));
   protectedApi.use("/transactions", transactionsRouter(opts.prisma));
   api.use(protectedApi);
