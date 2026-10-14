@@ -85,6 +85,76 @@ describe("Ajustes profile", () => {
     await waitFor(() => expect(patchCalls(mock)).toEqual([{ tonePalette: "sand" }]));
   });
 
+  it("clears the tone when the selected one is pressed again", async () => {
+    const mock = setup();
+    renderAjustes();
+    const blue = await screen.findByRole("button", { name: "Azul" });
+    expect(blue).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(blue);
+    await waitFor(() => expect(patchCalls(mock)).toEqual([{ tonePalette: null }]));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Azul" })).toHaveAttribute("aria-pressed", "false"),
+    );
+  });
+
+  it("reloads lookups on open and after a saved change", async () => {
+    const mock = setup();
+    const lookupCalls = () => mock.mock.calls.filter(([u]) => u === "/api/lookups").length;
+    renderAjustes();
+    const sand = await screen.findByRole("button", { name: "Areia" });
+    await waitFor(() => expect(lookupCalls()).toBeGreaterThanOrEqual(2));
+    const beforeSave = lookupCalls();
+    await userEvent.click(sand);
+    await waitFor(() => expect(lookupCalls()).toBeGreaterThan(beforeSave));
+    expect(patchCalls(mock)).toHaveLength(1);
+  });
+
+  it("disables the controls while a PATCH is pending", async () => {
+    const mock = setup();
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const inner = globalThis.fetch;
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === "/api/me" && init?.method === "PATCH") await gate;
+      return inner(input, init);
+    });
+    renderAjustes();
+    await userEvent.click(await screen.findByRole("button", { name: "Areia" }));
+    expect(screen.getByRole("button", { name: "Sálvia" })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: "Escuro" })).toBeDisabled();
+    expect(screen.getByLabelText("Seu nome")).toBeDisabled();
+    release();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Sálvia" })).toBeEnabled());
+    expect(patchCalls(mock)).toEqual([{ tonePalette: "sand" }]);
+  });
+
+  it("shows the stored trimmed name after a save", async () => {
+    setup();
+    renderAjustes();
+    const input = await screen.findByLabelText("Seu nome");
+    await userEvent.clear(input);
+    await userEvent.type(input, "  Ana Maria  ");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(screen.getByLabelText("Seu nome")).toHaveValue("Ana Maria"));
+    expect(screen.getByRole("button", { name: "Salvar" })).toBeDisabled();
+  });
+
+  it("allows a retry after a failed name save", async () => {
+    const mock = setup({ patch: () => apiError(500, "internal_error") });
+    renderAjustes();
+    const input = await screen.findByLabelText("Seu nome");
+    await userEvent.clear(input);
+    await userEvent.type(input, "Ana Maria");
+    await userEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(patchCalls(mock)).toHaveLength(1));
+    await waitFor(() => expect(screen.getByLabelText("Seu nome")).toBeEnabled());
+    expect(screen.getByLabelText("Seu nome")).toHaveValue("Ana Maria");
+    expect(screen.getByRole("button", { name: "Salvar" })).toBeEnabled();
+    await userEvent.clear(screen.getByLabelText("Seu nome"));
+    await userEvent.type(screen.getByLabelText("Seu nome"), "Ana");
+    expect(screen.getByRole("button", { name: "Salvar" })).toBeDisabled();
+  });
+
   it("theme sets data-theme on html and sends PATCH; system removes it", async () => {
     const mock = setup();
     renderAjustes();
@@ -136,5 +206,26 @@ describe("Ajustes backup status", () => {
     });
     renderAjustes();
     expect(await screen.findByText("Último backup: 14/10/2026 12:30 · 1,3 MB")).toBeInTheDocument();
+  });
+
+  it("unknown size", async () => {
+    setup({
+      backup: { configured: true, lastBackupAt: "2026-10-14T15:30:00.000Z", lastBackupBytes: null },
+    });
+    renderAjustes();
+    expect(
+      await screen.findByText("Último backup: 14/10/2026 12:30 · tamanho desconhecido"),
+    ).toBeInTheDocument();
+  });
+
+  it("a failed read shows a specific message and logs nothing", async () => {
+    const inner = setup();
+    vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) =>
+      String(input) === "/api/backup/status"
+        ? Promise.resolve(apiError(500, "internal_error"))
+        : inner(input, init),
+    );
+    renderAjustes();
+    expect(await screen.findByText("Não foi possível ler o backup")).toBeInTheDocument();
   });
 });

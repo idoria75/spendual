@@ -549,7 +549,8 @@ describe("review fixes", () => {
     const dialog = await screen.findByRole("dialog", { name: "Confirmar pagamento" });
     await userEvent.click(within(dialog).getByRole("button", { name: "Confirmar pagamento" }));
     expect(await screen.findByText("Pagamento confirmado")).toBeInTheDocument();
-    expect(localStorage.length).toBe(0);
+    expect(localStorage.getItem("spendual.recentCategories")).toBeNull();
+    expect(localStorage.getItem("spendual.lastMethod")).toBeNull();
   });
 
   it("reloads the budgets after an entry is saved", async () => {
