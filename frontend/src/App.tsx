@@ -1,6 +1,18 @@
-import { useTranslation } from "react-i18next";
+import { Route, Routes } from "react-router-dom";
+import { AuthProvider } from "./auth/AuthContext";
+import { ProtectedRoute } from "./auth/ProtectedRoute";
+import { HomePage } from "./pages/HomePage";
+import { LoginPage } from "./pages/LoginPage";
 
 export function App() {
-  const { t } = useTranslation();
-  return <h1 className="p-4 text-[17px] font-bold">{t("app.title")}</h1>;
+  return (
+    <AuthProvider>
+      <Routes>
+        <Route path="/entrar" element={<LoginPage />} />
+        <Route element={<ProtectedRoute />}>
+          <Route path="/" element={<HomePage />} />
+        </Route>
+      </Routes>
+    </AuthProvider>
+  );
 }
