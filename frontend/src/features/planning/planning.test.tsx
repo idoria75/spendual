@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { App } from "../../App";
 import { resetCsrfToken } from "../../lib/api-client";
-import { currentMonth, formatMonth } from "../../lib/date";
+import { currentMonth, formatMonth, shiftMonth } from "../../lib/date";
 import { apiError, json, mockFetch, user, type Handler } from "../../test/fetch-mock";
 import { buildRule, splitPreview, type PlanningValues } from "./form-model";
 
@@ -431,5 +431,141 @@ describe("planning form model", () => {
     });
     expect(splitPreview("100", "3")).toMatchObject({ each: "33.33", last: "33.34" });
     expect(splitPreview("100", "1")).toBeNull();
+  });
+});
+
+const savedTx = {
+  id: 10,
+  type: "expense",
+  status: "confirmed",
+  amount: "10.00",
+  currency: "BRL",
+  description: "Feira",
+  transactionDate: `${month}-02`,
+  scope: "household",
+  ownerId: null,
+  payerId: 1,
+  categoryId: 1,
+  accountId: null,
+  paymentMethodId: null,
+  relatedTransactionId: null,
+  notes: null,
+  voidReason: null,
+  createdById: 1,
+  updatedById: 1,
+  createdAt: "2026-10-02T10:00:00.000Z",
+  updatedAt: "2026-10-02T10:00:00.000Z",
+};
+
+describe("review fixes", () => {
+  it("does not keep a row of the old month while the next month loads", async () => {
+    bills = [bill({})];
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((r) => (release = r));
+    const mock = mockFetch(base());
+    const inner = mock.getMockImplementation()!;
+    mock.mockImplementation(async (input, init) => {
+      if (String(input).startsWith(`/api/bills?month=${shiftMonth(month, 1)}`)) await gate;
+      return inner(input, init);
+    });
+    renderAt("/a-pagar");
+    expect(await screen.findByText("Internet")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Próximo mês" }));
+    await waitFor(() => expect(screen.queryByText("Internet")).not.toBeInTheDocument());
+    expect(screen.getByRole("status")).toHaveTextContent("Carregando…");
+    release();
+    expect(await screen.findByText("Internet")).toBeInTheDocument();
+  });
+
+  it("computes the Parcelas totals and empty message from the filtered list", async () => {
+    bills = [bill({ expectedAmount: "190.00" })];
+    mockFetch(base());
+    renderAt("/a-pagar");
+    expect(await screen.findByText("Previsto: R$ 190,00")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("radio", { name: "Parcelas" }));
+    expect(await screen.findByText("As parcelas do mês aparecem aqui.")).toBeInTheDocument();
+    expect(screen.getByText("Previsto: R$ 0,00")).toBeInTheDocument();
+    expect(screen.queryByText("Internet")).not.toBeInTheDocument();
+  });
+
+  it("counts only installment bills without value in the Parcelas tab", async () => {
+    bills = [
+      bill({}),
+      bill({
+        kind: "installment",
+        id: 7,
+        description: "TV",
+        expectedAmount: "50.00",
+        sequenceNumber: 1,
+        installmentCount: 3,
+      }),
+      bill({
+        kind: "installment",
+        id: 8,
+        description: "Sofá",
+        expectedAmount: null,
+        sequenceNumber: 1,
+        installmentCount: 2,
+      }),
+    ];
+    mockFetch(base());
+    renderAt("/a-pagar");
+    await userEvent.click(await screen.findByRole("radio", { name: "Parcelas" }));
+    expect(await screen.findByText("Previsto: R$ 50,00 · 1 sem valor")).toBeInTheDocument();
+    expect(screen.queryByText("Internet")).not.toBeInTheDocument();
+  });
+
+  it("does not remember the method or category after confirming a bill", async () => {
+    bills = [bill({})];
+    mockFetch(
+      base((req) =>
+        req.method === "POST" && req.url === "/api/bills/recurrence/5/confirm"
+          ? json(200, bill({ status: "confirmed" }))
+          : undefined,
+      ),
+    );
+    renderAt("/a-pagar");
+    await userEvent.click((await screen.findByText("Internet")).closest("button")!);
+    await userEvent.click(await screen.findByRole("button", { name: "Confirmar pagamento" }));
+    const dialog = await screen.findByRole("dialog", { name: "Confirmar pagamento" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Confirmar pagamento" }));
+    expect(await screen.findByText("Pagamento confirmado")).toBeInTheDocument();
+    expect(localStorage.length).toBe(0);
+  });
+
+  it("reloads the budgets after an entry is saved", async () => {
+    const mock = mockFetch(
+      base((req) =>
+        req.method === "POST" && req.url === "/api/transactions" ? json(201, savedTx) : undefined,
+      ),
+    );
+    renderAt("/orcamentos");
+    await screen.findByText("▲ R$ 72,00 acima");
+    const budgetGets = () =>
+      mock.mock.calls.filter(([u]) => String(u).startsWith("/api/budgets")).length;
+    expect(budgetGets()).toBe(1);
+    await userEvent.click((await screen.findAllByRole("button", { name: "Novo lançamento" }))[0]!);
+    const dialog = await screen.findByRole("dialog", { name: "Novo lançamento" });
+    await userEvent.type(within(dialog).getByLabelText("Valor"), "10");
+    await userEvent.type(within(dialog).getByLabelText("Descrição"), "Feira");
+    await userEvent.click(await within(dialog).findByRole("button", { name: /Mercado/ }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(budgetGets()).toBe(2));
+  });
+
+  it("hints that short months use the last day when the day is above 28", async () => {
+    mockFetch(base());
+    renderAt("/a-pagar");
+    await userEvent.click(await screen.findByRole("button", { name: "Recorrente" }));
+    const dialog = await screen.findByRole("dialog", { name: "Nova conta recorrente" });
+    const day = within(dialog).getByLabelText("Dia do mês");
+    await userEvent.clear(day);
+    await userEvent.type(day, "31");
+    expect(
+      within(dialog).getByText("Em meses curtos, vale o último dia do mês."),
+    ).toBeInTheDocument();
+    await userEvent.clear(day);
+    await userEvent.type(day, "10");
+    expect(within(dialog).queryByText(/meses curtos/)).not.toBeInTheDocument();
   });
 });
