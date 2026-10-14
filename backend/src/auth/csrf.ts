@@ -3,6 +3,9 @@ import type { RequestHandler } from "express";
 import { AppError } from "./errors.js";
 import { newCsrfToken } from "./session.js";
 
+/** Anonymous sessions only hold a CSRF token, so they expire fast. Login starts a full-length one. */
+export const ANON_SESSION_MS = 15 * 60 * 1000;
+
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 /** Compare through SHA-256 so both buffers have the same length. */
@@ -15,6 +18,7 @@ function safeEqual(a: string, b: string): boolean {
 /** Return the session token, creating it on first use. */
 export const ensureCsrfToken: RequestHandler = (req, _res, next) => {
   req.session.csrfToken ??= newCsrfToken();
+  if (!req.session.userId) req.session.cookie.maxAge = ANON_SESSION_MS;
   next();
 };
 

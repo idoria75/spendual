@@ -210,6 +210,14 @@ describe("session expiry", () => {
     expect(cookie).toContain("HttpOnly");
     expect(cookie).toContain("SameSite=Lax");
     expect(cookie).not.toContain("Secure");
+    // Anonymous session: short lifetime.
+    const expires = new Date(/Expires=([^;]+)/.exec(cookie)?.[1] ?? "").getTime();
+    expect(Math.abs(expires - Date.now() - 15 * 60 * 1000)).toBeLessThan(60_000);
+  });
+
+  it("gives a signed-in session the full 7 days", async () => {
+    const res = await signup(newAgent(makeApp(prisma)), "ana");
+    const cookie = (res.headers["set-cookie"] as unknown as string[])[0] ?? "";
     const expires = new Date(/Expires=([^;]+)/.exec(cookie)?.[1] ?? "").getTime();
     const week = 7 * 24 * 60 * 60 * 1000;
     expect(Math.abs(expires - Date.now() - week)).toBeLessThan(60_000);
