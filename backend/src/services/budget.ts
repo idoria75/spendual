@@ -1,4 +1,4 @@
-import type { BudgetScope, Prisma, PrismaClient } from "@prisma/client";
+import { Prisma, type BudgetScope, type PrismaClient } from "@prisma/client";
 import { nextPeriod } from "../lib/period.js";
 import { withRetry } from "../lib/withRetry.js";
 
@@ -33,6 +33,7 @@ export async function budgetFor(
 
 /**
  * Edit a budget at period P, in one transaction. Past periods are never changed.
+ * Runs under a lock on the Household row, so racing edits run one at a time.
  * - going_forward: upsert the row at P.
  * - this_period_only: upsert the row at P. Then, only if no row exists at P+1,
  *   insert one at P+1 with the amount that was in force before the edit.
@@ -41,6 +42,12 @@ export function editBudget(prisma: PrismaClient, input: EditBudgetInput): Promis
   const { scope, categoryKey } = budgetKey(input.categoryId);
   return withRetry(() =>
     prisma.$transaction(async (tx) => {
+      // Edits are rare, so serialize them all on the Household row. This makes
+      // "read the prior amount, then write" safe when two edits race.
+      const lock = await tx.$queryRaw<{ id: number }[]>(
+        Prisma.sql`SELECT id FROM Household WHERE id = 1 FOR UPDATE`,
+      );
+      if (lock.length === 0) throw new Error("Household row missing. Run the seed.");
       const before = await budgetFor(tx, input.categoryId, input.period);
       await tx.monthlyBudget.upsert({
         where: { categoryKey_effectiveFrom: { categoryKey, effectiveFrom: input.period } },
