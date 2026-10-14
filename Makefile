@@ -3,7 +3,7 @@ export HOST_GID := $(shell id -g)
 COMPOSE = docker compose -f compose.dev.yml
 RUN = mkdir -p node_modules && $(COMPOSE) run --rm app
 
-.PHONY: install dev lint typecheck test build migrate down
+.PHONY: install dev lint typecheck test build migrate down test-restore
 
 install:
 	$(RUN) npm install
@@ -30,3 +30,8 @@ migrate:
 
 down:
 	$(COMPOSE) down
+
+# Needs the compose project to be up. Applies migrations and seed, then runs the restore test.
+test-restore:
+	$(RUN) sh -c 'npm run migrate -w backend && npm run seed -w backend'
+	COMPOSE_FILE=compose.dev.yml ./deployment/test-restore.sh
