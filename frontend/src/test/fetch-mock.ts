@@ -18,7 +18,13 @@ export function apiError(status: number, code: string, message = "msg"): Respons
   return json(status, { error: { code, message } });
 }
 
-export const user = { id: 1, username: "ana", displayName: "Ana", tonePalette: null };
+export const user = {
+  id: 1,
+  username: "ana",
+  displayName: "Ana",
+  tonePalette: null,
+  theme: "system",
+};
 
 /** Replace global fetch with a handler. Returns the mock to inspect calls. */
 export function mockFetch(handler: Handler) {
@@ -60,6 +66,12 @@ export function shellStubs(url: string): Response | null {
     });
   }
   if (path === "/api/bills")
-    return json(200, { month: "2026-10", items: [], overdue: [], plannedTotal: "0.00", unknownCount: 0 });
+    return json(200, {
+      month: "2026-10",
+      items: [],
+      overdue: [],
+      plannedTotal: "0.00",
+      unknownCount: 0,
+    });
   return null;
 }
