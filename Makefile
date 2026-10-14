@@ -9,7 +9,9 @@ install:
 	$(RUN) npm install
 
 dev:
-	mkdir -p node_modules && $(COMPOSE) run --rm --service-ports app npm run dev
+	mkdir -p node_modules && $(COMPOSE) run --rm --service-ports app sh -c \
+	  'npm run migrate -w backend && npm run seed -w backend && \
+	  (npm run dev -w backend & npm run dev -w frontend & wait)'
 
 lint:
 	$(RUN) npm run lint
