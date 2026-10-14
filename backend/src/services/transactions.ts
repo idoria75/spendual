@@ -15,7 +15,7 @@ type Db = Prisma.TransactionClient;
 
 const ENTITY = "Transaction";
 
-const invalid = (field: string, message: string) =>
+export const invalid = (field: string, message: string) =>
   new AppError(400, "validation_error", "Invalid request", { [field]: message });
 
 /** Lock the row until the DB transaction ends. Returns it fresh, or throws 404. */
@@ -27,7 +27,7 @@ async function lockTransaction(tx: Db, id: number): Promise<TxRow> {
   return row;
 }
 
-async function assertActiveUser(tx: Db, id: number, field: string): Promise<void> {
+export async function assertActiveUser(tx: Db, id: number, field: string): Promise<void> {
   const user = await tx.user.findUnique({ where: { id }, select: { active: true } });
   if (!user?.active) throw invalid(field, "Unknown or inactive user");
 }
@@ -39,7 +39,7 @@ interface CatalogIds {
 }
 
 /** Each given id must exist and be active. */
-async function assertCatalogActive(tx: Db, ids: CatalogIds): Promise<void> {
+export async function assertCatalogActive(tx: Db, ids: CatalogIds): Promise<void> {
   if (ids.categoryId != null) {
     const c = await tx.category.findUnique({ where: { id: ids.categoryId } });
     if (!c?.active) throw invalid("categoryId", "Unknown or archived category");
