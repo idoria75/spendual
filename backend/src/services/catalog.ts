@@ -2,7 +2,6 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import type {
   AccountInput,
   AccountPatch,
-  ApiErrorCode,
   CategoryInput,
   CategoryPatch,
   Lookups,
@@ -10,9 +9,6 @@ import type {
   PaymentMethodPatch,
 } from "@spendual/shared";
 import { AppError } from "../auth/errors.js";
-
-// "name_taken" is in the Phase 3 contract text but not yet in the shared ApiErrorCode enum.
-const NAME_TAKEN = "name_taken" as ApiErrorCode;
 
 const categorySelect = { id: true, name: true, active: true } as const;
 const accountSelect = { id: true, name: true, type: true, active: true } as const;
@@ -23,7 +19,7 @@ async function mapCatalogErrors<T>(fn: () => Promise<T>): Promise<T> {
     return await fn();
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError) {
-      if (err.code === "P2002") throw new AppError(409, NAME_TAKEN, "Name already in use");
+      if (err.code === "P2002") throw new AppError(409, "name_taken", "Name already in use");
       if (err.code === "P2025") throw new AppError(404, "not_found", "Not found");
     }
     throw err;

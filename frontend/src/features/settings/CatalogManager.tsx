@@ -7,7 +7,6 @@ import { messageKeyFor } from "../../auth/error-messages";
 import { Button } from "../../components/ui/button";
 import { Field } from "../../components/ui/field";
 import { Select } from "../../components/ui/select";
-import { ApiError } from "../../lib/api-client";
 import { cn } from "../../lib/cn";
 import {
   createAccount,
@@ -24,12 +23,6 @@ const ACCOUNT_TYPES: AccountType[] = ["bank", "cash", "credit_card", "other"];
 
 type Item = Category | Account | PaymentMethod;
 
-/** The contract says 409 name_taken, but the shared ApiErrorCode has no such code. */
-function errorKey(error: unknown) {
-  if (error instanceof ApiError && error.status === 409) return "errors.name_taken" as const;
-  return messageKeyFor(error);
-}
-
 export function CatalogManager({ kind }: { kind: CatalogKind }) {
   const { t } = useTranslation();
   const { data, reload } = useLookups();
@@ -37,7 +30,7 @@ export function CatalogManager({ kind }: { kind: CatalogKind }) {
   const [accountType, setAccountType] = useState<AccountType>("bank");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
-  const [error, setError] = useState<ReturnType<typeof errorKey> | null>(null);
+  const [error, setError] = useState<ReturnType<typeof messageKeyFor> | null>(null);
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
 
@@ -53,7 +46,7 @@ export function CatalogManager({ kind }: { kind: CatalogKind }) {
       await reload();
       return true;
     } catch (e) {
-      setError(errorKey(e));
+      setError(messageKeyFor(e));
       return false;
     } finally {
       locked.current = false;
