@@ -14,27 +14,32 @@ model Household {
 }
 
 model User {
-  id           Int              @id @default(autoincrement())
-  username     String           @unique @db.VarChar(60)
-  passwordHash String           @db.VarChar(255)
-  displayName  String           @db.VarChar(80)
-  tonePalette  String?          @unique @db.VarChar(30)
-  active       Boolean          @default(true)
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
-  ruleOwner    RecurrenceRule[] @relation("RuleOwner")
-  rulePayer    RecurrenceRule[] @relation("RulePayer")
-  ruleCreated  RecurrenceRule[] @relation("RuleCreatedBy")
-  ruleUpdated  RecurrenceRule[] @relation("RuleUpdatedBy")
+  id           Int               @id @default(autoincrement())
+  username     String            @unique @db.VarChar(60)
+  passwordHash String            @db.VarChar(255)
+  displayName  String            @db.VarChar(80)
+  tonePalette  String?           @unique @db.VarChar(30)
+  active       Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  ruleOwner    RecurrenceRule[]  @relation("RuleOwner")
+  rulePayer    RecurrenceRule[]  @relation("RulePayer")
+  ruleCreated  RecurrenceRule[]  @relation("RuleCreatedBy")
+  ruleUpdated  RecurrenceRule[]  @relation("RuleUpdatedBy")
+  planOwner    InstallmentPlan[] @relation("PlanOwner")
+  planPayer    InstallmentPlan[] @relation("PlanPayer")
+  planCreated  InstallmentPlan[] @relation("PlanCreatedBy")
+  planUpdated  InstallmentPlan[] @relation("PlanUpdatedBy")
 }
 
 model Category {
-  id              Int              @id @default(autoincrement())
-  name            String           @unique @db.VarChar(80)
-  active          Boolean          @default(true)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  recurrenceRules RecurrenceRule[]
+  id               Int               @id @default(autoincrement())
+  name             String            @unique @db.VarChar(80)
+  active           Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  recurrenceRules  RecurrenceRule[]
+  installmentPlans InstallmentPlan[]
 }
 
 enum AccountType {
@@ -45,14 +50,15 @@ enum AccountType {
 }
 
 model Account {
-  id              Int              @id @default(autoincrement())
-  name            String           @unique @db.VarChar(80)
-  type            AccountType
-  currency        String           @default("BRL") @db.VarChar(3)
-  active          Boolean          @default(true)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  recurrenceRules RecurrenceRule[]
+  id               Int               @id @default(autoincrement())
+  name             String            @unique @db.VarChar(80)
+  type             AccountType
+  currency         String            @default("BRL") @db.VarChar(3)
+  active           Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  recurrenceRules  RecurrenceRule[]
+  installmentPlans InstallmentPlan[]
 }
 
 model PaymentMethod {
@@ -131,5 +137,54 @@ model RecurrenceOccurrence {
   rule RecurrenceRule @relation(fields: [ruleId], references: [id])
 
   @@unique([ruleId, periodKey])
+  @@index([dueDate])
+}
+
+model InstallmentPlan {
+  id               Int      @id @default(autoincrement())
+  description      String   @db.VarChar(200)
+  totalAmount      Decimal  @db.Decimal(12, 2)
+  currency         String   @default("BRL") @db.VarChar(3)
+  installmentCount Int
+  firstDueDate     DateTime @db.Date
+  scope            Scope
+  ownerId          Int?
+  payerId          Int?
+  categoryId       Int?
+  accountId        Int?
+  notes            String?  @db.VarChar(500)
+  createdById      Int
+  updatedById      Int
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  owner       User?                   @relation("PlanOwner", fields: [ownerId], references: [id])
+  payer       User?                   @relation("PlanPayer", fields: [payerId], references: [id])
+  createdBy   User                    @relation("PlanCreatedBy", fields: [createdById], references: [id])
+  updatedBy   User                    @relation("PlanUpdatedBy", fields: [updatedById], references: [id])
+  category    Category?               @relation(fields: [categoryId], references: [id])
+  account     Account?                @relation(fields: [accountId], references: [id])
+  occurrences InstallmentOccurrence[]
+
+  @@index([ownerId])
+  @@index([payerId])
+  @@index([categoryId])
+  @@index([accountId])
+  @@index([createdById])
+  @@index([updatedById])
+}
+
+model InstallmentOccurrence {
+  id             Int              @id @default(autoincrement())
+  planId         Int
+  sequenceNumber Int
+  dueDate        DateTime         @db.Date
+  expectedAmount Decimal          @db.Decimal(12, 2)
+  status         OccurrenceStatus @default(planned)
+  createdAt      DateTime         @default(now())
+
+  plan InstallmentPlan @relation(fields: [planId], references: [id])
+
+  @@unique([planId, sequenceNumber])
   @@index([dueDate])
 }
