@@ -5,7 +5,7 @@
   "type": "module",
   "license": "AGPL-3.0-only",
   "scripts": {
-    "e2e": "playwright test",
+    "e2e": "node check-version.mjs && playwright test",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
