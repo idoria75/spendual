@@ -58,6 +58,8 @@ function base(extra?: Extra): Handler {
     if (path === "/api/auth/me") return json(200, user);
     if (path === "/api/auth/csrf") return json(200, { csrfToken: "tok" });
     if (path === "/api/lookups") return json(200, lookups);
+    if (path === "/api/backup/status")
+      return json(200, { configured: false, lastBackupAt: null, lastBackupBytes: null });
     if (path === "/api/transactions" && req.method === "GET") return json(200, { items: list });
     return extra?.(req) ?? json(404, {});
   };

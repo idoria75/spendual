@@ -1,4 +1,4 @@
-import type { Transaction } from "@spendual/shared";
+import { TonePalette, type Transaction } from "@spendual/shared";
 import { formatMoney, fromCents, toCents, type AmountSign } from "../../lib/currency";
 
 /** How an amount reads for each type (ui-guidelines §5). */
@@ -45,26 +45,8 @@ export function groupByDay(items: Transaction[]): { date: string; items: Transac
     .map(([date, list]) => ({ date, items: list }));
 }
 
-/** Palette key (English or PT-BR spelling, the contract only says "blue, rose, ...") to token. */
-const TONES: Record<string, string> = {
-  blue: "blue",
-  azul: "blue",
-  rose: "rose",
-  rosé: "rose",
-  sage: "sage",
-  sálvia: "sage",
-  salvia: "sage",
-  sand: "sand",
-  areia: "sand",
-  lavender: "lavender",
-  lavanda: "lavender",
-  slate: "slate",
-  ardósia: "slate",
-  ardosia: "slate",
-};
-
-/** CSS color for a user tone key. Unknown or empty falls back to the neutral line color. */
+/** CSS color for a user tone key (TonePalette). Unknown or empty falls back to the neutral line color. */
 export function toneColor(key: string | null | undefined): string {
-  const tone = key ? TONES[key.toLowerCase()] : undefined;
-  return tone ? `var(--tone-${tone})` : "var(--line)";
+  const tone = TonePalette.safeParse(key);
+  return tone.success ? `var(--tone-${tone.data})` : "var(--line)";
 }

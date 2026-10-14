@@ -160,6 +160,30 @@
     "cancelAction": "Cancelar lançamento"
   },
   "settings": {
+    "profile": {
+      "name": "Seu nome",
+      "nameError": "Informe um nome de até 80 caracteres.",
+      "tone": "Seu tom",
+      "tones": {
+        "blue": "Azul",
+        "rose": "Rosa",
+        "sage": "Sálvia",
+        "sand": "Areia",
+        "lavender": "Lavanda",
+        "slate": "Ardósia"
+      },
+      "theme": "Tema",
+      "themes": { "system": "Sistema", "light": "Claro", "dark": "Escuro" }
+    },
+    "backup": {
+      "title": "Backup",
+      "loading": "Carregando...",
+      "notConfigured": "Backup não configurado",
+      "none": "Nenhum backup ainda",
+      "last": "Último backup: {{date}} · {{size}}",
+      "lastNoSize": "Último backup: {{date}} · tamanho desconhecido",
+      "failed": "Não foi possível ler o backup"
+    },
     "catalogLabel": "O que gerenciar",
     "add": "Adicionar",
     "save": "Salvar",

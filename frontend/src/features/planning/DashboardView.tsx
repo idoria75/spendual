@@ -12,11 +12,27 @@ import { fetchBills, fetchDashboard } from "./api";
 import { Bar, formatRate, percentOf } from "./display";
 import { useLoad } from "./use-load";
 
-function Row({ label, value, strong }: { label: string; value: ReactNode; strong?: boolean }) {
+function Row({
+  label,
+  value,
+  strong,
+  warn,
+}: {
+  label: string;
+  value: ReactNode;
+  strong?: boolean;
+  warn?: boolean;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-3">
       <dt className="truncate text-[0.85rem] text-muted">{label}</dt>
-      <dd className={cn("whitespace-nowrap tabular-nums", strong ? "font-bold" : "font-semibold")}>
+      <dd
+        className={cn(
+          "whitespace-nowrap tabular-nums",
+          strong ? "font-bold" : "font-semibold",
+          warn && "text-warn",
+        )}
+      >
         {value}
       </dd>
     </div>
@@ -29,6 +45,8 @@ function Eyebrow({ children }: { children: ReactNode }) {
   );
 }
 
+const isNegative = (amount: string) => toCents(amount) < 0;
+
 function ActualCard({ d }: { d: Dashboard }) {
   const { t } = useTranslation();
   return (
@@ -40,8 +58,17 @@ function ActualCard({ d }: { d: Dashboard }) {
         <Row label={t("dashboard.income")} value={formatMoney(d.householdIncome)} />
         <Row label={t("dashboard.sharedExpenses")} value={formatMoney(d.sharedExpensesNet)} />
         <Row label={t("dashboard.allowances")} value={formatMoney(d.allowanceAllocations)} />
-        <Row strong label={t("dashboard.savings")} value={formatMoney(d.savingsBeforeGoals)} />
-        <Row label={t("dashboard.unallocated")} value={formatMoney(d.unallocatedSavings)} />
+        <Row
+          strong
+          warn={isNegative(d.savingsBeforeGoals)}
+          label={t("dashboard.savings")}
+          value={formatMoney(d.savingsBeforeGoals)}
+        />
+        <Row
+          warn={isNegative(d.unallocatedSavings)}
+          label={t("dashboard.unallocated")}
+          value={formatMoney(d.unallocatedSavings)}
+        />
         <Row label={t("dashboard.savingsRate")} value={formatRate(d.savingsRate)} />
       </dl>
     </section>

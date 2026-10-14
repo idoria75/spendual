@@ -80,3 +80,21 @@ export function addDays(date: DateOnly, days: number): DateOnly {
   const next = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d) + days));
   return next.toISOString().slice(0, 10);
 }
+
+const dateTimeParts = new Intl.DateTimeFormat("en-GB", {
+  timeZone: TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+/** ISO instant -> "dd/MM/yyyy HH:mm" in America/Sao_Paulo. */
+export function formatDateTime(iso: string): string {
+  const p = Object.fromEntries(
+    dateTimeParts.formatToParts(new Date(iso)).map((x) => [x.type, x.value]),
+  );
+  return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}`;
+}
