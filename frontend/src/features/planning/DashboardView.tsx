@@ -1,4 +1,4 @@
-import type { Dashboard } from "@spendual/shared";
+import type { AllowanceOverview, Dashboard } from "@spendual/shared";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -117,17 +117,15 @@ function OverallBudget({ d }: { d: Dashboard }) {
 
 function PeopleCard({
   d,
-  month,
+  allowances,
   onAllocate,
 }: {
   d: Dashboard;
-  month: string;
+  allowances: AllowanceOverview | null;
   onAllocate: (p: { id: number; name: string }) => void;
 }) {
   const { t } = useTranslation();
   const { data: lookups } = useLookups();
-  const { version } = useEntry();
-  const allowances = useLoad(() => fetchAllowances(month), [month, version]);
   return (
     <section aria-labelledby="dash-people" className="rounded-card bg-surface p-4">
       <Eyebrow>
@@ -137,8 +135,8 @@ function PeopleCard({
         {d.people.map((p) => {
           const u = lookups?.users.find((x) => x.id === p.userId);
           const name = u?.displayName ?? String(p.userId);
-          const entry = allowances.data?.people.find((x) => x.ownerId === p.userId);
-          const missing = allowances.data !== null && entry?.allocation === null;
+          const entry = allowances?.people.find((x) => x.ownerId === p.userId);
+          const missing = allowances !== null && entry?.allocation === null;
           return (
             <li
               key={p.userId}
@@ -180,7 +178,7 @@ export function DashboardView() {
   const { version } = useEntry();
   const { data, failed, reload } = useLoad(() => fetchDashboard(month), [month, version]);
   const [allocating, setAllocating] = useState<{ id: number; name: string } | null>(null);
-  const [refresh, setRefresh] = useState(0);
+  const allowances = useLoad(() => fetchAllowances(month), [month, version]);
 
   return (
     <section className="flex flex-col gap-3">
@@ -202,11 +200,11 @@ export function DashboardView() {
           {t("common.loading")}
         </p>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2" key={refresh}>
+        <div className="grid gap-3 md:grid-cols-2">
           <ActualCard d={data} />
           <PlannedCard d={data} />
           <OverallBudget d={data} />
-          <PeopleCard d={data} month={month} onAllocate={setAllocating} />
+          <PeopleCard d={data} allowances={allowances.data} onAllocate={setAllocating} />
         </div>
       )}
       <AllowanceSheet
@@ -215,7 +213,7 @@ export function DashboardView() {
         onClose={() => setAllocating(null)}
         onSaved={() => {
           setAllocating(null);
-          setRefresh((n) => n + 1);
+          allowances.reload();
           reload();
         }}
       />
