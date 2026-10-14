@@ -436,7 +436,7 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
         </p>
       ) : null}
 
-      <div className="sticky bottom-0 -mx-4 mt-auto bg-surface px-4 pb-1 pt-2">
+      <div className="sticky bottom-0 -mx-4 -mb-4 mt-auto bg-surface px-4 pb-5 pt-2">
         <Button type="submit" disabled={submitting} className="w-full">
           {submitting ? t("form.saving") : t(bill ? "bills.confirm" : "form.save")}
         </Button>

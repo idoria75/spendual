@@ -284,7 +284,7 @@ function CreateForm({ kind, onSaved }: { kind: CreateKind; onSaved: () => void }
           {t(formError)}
         </p>
       ) : null}
-      <div className="sticky bottom-0 -mx-4 mt-auto bg-surface px-4 pb-1 pt-2">
+      <div className="sticky bottom-0 -mx-4 -mb-4 mt-auto bg-surface px-4 pb-5 pt-2">
         <Button type="submit" disabled={busy} className="w-full">
           {busy ? t("form.saving") : t("form.save")}
         </Button>
