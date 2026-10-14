@@ -50,6 +50,10 @@ export const ApiErrorCode = z.enum([
   "household_full",
   "username_taken",
   "rate_limited",
+  "not_found",
+  "invalid_state",
+  "has_refunds",
+  "refund_exceeds",
   "internal_error",
 ]);
 export type ApiErrorCode = z.infer<typeof ApiErrorCode>;

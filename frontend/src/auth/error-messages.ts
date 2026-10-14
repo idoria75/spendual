@@ -10,6 +10,10 @@ export const errorMessageKey = {
   household_full: "errors.household_full",
   username_taken: "errors.username_taken",
   rate_limited: "errors.rate_limited",
+  not_found: "errors.not_found",
+  invalid_state: "errors.invalid_state",
+  has_refunds: "errors.has_refunds",
+  refund_exceeds: "errors.refund_exceeds",
   internal_error: "errors.internal_error",
 } as const satisfies Record<ApiErrorCode, string>;
 

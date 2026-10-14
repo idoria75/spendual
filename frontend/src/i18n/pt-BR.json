@@ -40,6 +40,10 @@
     "household_full": "Esta casa já tem 2 contas. O cadastro está fechado.",
     "username_taken": "Este usuário já existe. Escolha outro.",
     "rate_limited": "Muitas tentativas. Espere um pouco e tente de novo.",
+    "not_found": "Registro não encontrado.",
+    "invalid_state": "Este registro não pode mais ser alterado assim.",
+    "has_refunds": "Este lançamento tem reembolsos. Anule os reembolsos primeiro.",
+    "refund_exceeds": "O reembolso passa do valor da despesa.",
     "internal_error": "Algo deu errado. Tente de novo em instantes.",
     "network": "Sem conexão com o servidor. Tente de novo."
   }
