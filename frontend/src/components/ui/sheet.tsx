@@ -1,5 +1,6 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
+import { useLayoutEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/cn";
@@ -17,6 +18,13 @@ interface SheetProps {
 /** Bottom sheet on phones, centered dialog from 768px (ui-guidelines §6.7). No motion. */
 export function Sheet({ open, onOpenChange, title, children, tall, onOpenAutoFocus }: SheetProps) {
   const { t } = useTranslation();
+  // No Dialog.Trigger here (the sheet is opened from several places), so Radix cannot
+  // restore focus alone. Remember the opener before Radix moves focus into the sheet.
+  const opener = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (open && document.activeElement instanceof HTMLElement)
+      opener.current = document.activeElement;
+  }, [open]);
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -24,6 +32,12 @@ export function Sheet({ open, onOpenChange, title, children, tall, onOpenAutoFoc
         <Dialog.Content
           aria-describedby={undefined}
           {...(onOpenAutoFocus ? { onOpenAutoFocus } : {})}
+          onCloseAutoFocus={(event) => {
+            if (opener.current?.isConnected) {
+              event.preventDefault();
+              opener.current.focus();
+            }
+          }}
           className={cn(
             "fixed inset-x-0 bottom-0 z-50 flex flex-col overflow-hidden rounded-t-sheet bg-surface text-fg",
             tall ? "h-[92dvh]" : "max-h-[92dvh]",

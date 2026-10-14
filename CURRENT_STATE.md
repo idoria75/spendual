@@ -39,7 +39,8 @@ Post-Phase-2 commits on `dev` (not in the tag): run-as-host-user dev container, 
 - `make lint typecheck test build`: all exit 0.
 - Backend run against real MySQL, over HTTP: signup x2, third gets 409, logout revokes, bad login 401, missing CSRF 403.
 - Phase 3: lint, typecheck, test, build exit 0. Real flow over HTTP via the Vite proxy (signup, create, refund limit, void rules, patch, audit, catalog 409).
-- ⚠ Not verified: the browser UI (layout, dark theme, focus return). Only mocked tests and HTTP checks.
+- Browser check (Playwright in Docker, real backend and MySQL, 2026-10-14): login, create expense (PT-BR amount "1.234,56"), inline error for missing category, toast, list row and day total, void with reason (row struck through, day total drops), Ajustes catalogs. Phone/light and desktop/dark screenshots look right. Found and fixed: focus did not return to the opener after a sheet closed (`components/ui/sheet.tsx`).
+- Not verified: iOS/Android real devices, keyboard-only use, screen reader, Windows mDNS. No Playwright test is committed yet (Phase 4 e2e target).
 
 ## Missing
 
@@ -61,6 +62,8 @@ Post-Phase-2 commits on `dev` (not in the tag): run-as-host-user dev container, 
   - 5 type chips (adds `other_receipt` to the 4 in ui-guidelines §7.1).
   - A bad refund link returns 400 `validation_error` (contract was silent).
   - List ignores `status=planned`; create writes no AuditEvent.
+  - Voided row meta is cut with an ellipsis, so the reason can be hidden on phone (full reason is in the detail).
+  - Void confirm with an empty reason sends nothing, but shows no visible message.
   - No "Parcelado" UI and no way to create planned rows yet (Phase 4).
 - ⚠ Needs a decision: signup is first-come; budget "this period only" with no earlier budget; budget "going forward" next to a P+1 row; edits to past periods.
 - `GET /auth/status` for "vagas livres" hint: skipped.
