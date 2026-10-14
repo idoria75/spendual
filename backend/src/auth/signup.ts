@@ -34,7 +34,8 @@ export function createUser(prisma: PrismaClient, input: NewUser) {
         if ((await tx.user.count()) >= MAX_USERS) {
           throw new AppError(409, "household_full", "Household already has two accounts");
         }
-        // Default tone: first account blue, second rose (first free one if changed meanwhile).
+        // Default tone: first free tone in contract order (blue, then rose, ...). If none is free,
+        // null is fine: tone is optional and the user can pick one later.
         const taken = new Set(
           (await tx.user.findMany({ select: { tonePalette: true } })).map((u) => u.tonePalette),
         );
