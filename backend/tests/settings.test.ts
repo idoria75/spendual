@@ -1,4 +1,4 @@
-import { mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PrismaClient } from "@prisma/client";
@@ -130,18 +130,21 @@ describe("GET /backup/status", () => {
   });
 
   it("reports the newest regular file and ignores sub-directories", async () => {
-    await writeFile(join(dir, "old.sql.gz"), "aa");
-    await writeFile(join(dir, "new.sql.gz"), "bbbbb");
+    await writeFile(join(dir, "spendual-old.sql.gz"), "aa");
+    await writeFile(join(dir, "spendual-new.sql.gz"), "bbbbb");
     await utimes(
-      join(dir, "old.sql.gz"),
+      join(dir, "spendual-old.sql.gz"),
       new Date("2026-01-01T00:00:00Z"),
       new Date("2026-01-01T00:00:00Z"),
     );
     await utimes(
-      join(dir, "new.sql.gz"),
+      join(dir, "spendual-new.sql.gz"),
       new Date("2026-02-01T00:00:00Z"),
       new Date("2026-02-01T00:00:00Z"),
     );
+    // Newer files that backup.sh never writes must not count.
+    await writeFile(join(dir, "notes.txt"), "zzzzzzzzzz");
+    await writeFile(join(dir, ".spendual-x.partial"), "zzzzzzzzzz");
     const res = await ana.get("/api/backup/status");
     expect(res.body).toEqual({
       configured: true,
@@ -156,6 +159,17 @@ describe("GET /backup/status", () => {
       await setup(backupDir);
       const res = await ana.get("/api/backup/status");
       expect(res.body).toEqual({ configured: false, lastBackupAt: null, lastBackupBytes: null });
+    }
+  });
+
+  it("is configured with nulls when the dir exists but is unreadable", async () => {
+    if (process.getuid?.() === 0) return; // root ignores modes
+    await chmod(dir, 0o000);
+    try {
+      const res = await ana.get("/api/backup/status");
+      expect(res.body).toEqual({ configured: true, lastBackupAt: null, lastBackupBytes: null });
+    } finally {
+      await chmod(dir, 0o700);
     }
   });
 
