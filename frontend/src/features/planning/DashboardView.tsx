@@ -8,7 +8,7 @@ import { cn } from "../../lib/cn";
 import { formatMoney, fromCents, toCents } from "../../lib/currency";
 import { useEntry } from "../transactions/entry";
 import { useMonth } from "../transactions/month";
-import { fetchDashboard } from "./api";
+import { fetchBills, fetchDashboard } from "./api";
 import { Bar, formatRate, percentOf } from "./display";
 import { useLoad } from "./use-load";
 
@@ -48,7 +48,7 @@ function ActualCard({ d }: { d: Dashboard }) {
   );
 }
 
-function PlannedCard({ d }: { d: Dashboard }) {
+function PlannedCard({ d, overdueCount }: { d: Dashboard; overdueCount: number }) {
   const { t } = useTranslation();
   return (
     <section
@@ -64,6 +64,11 @@ function PlannedCard({ d }: { d: Dashboard }) {
       {d.plannedBillsUnknownCount > 0 ? (
         <p className="text-[0.82rem] text-muted">
           {t("dashboard.unknownCount", { count: d.plannedBillsUnknownCount })}
+        </p>
+      ) : null}
+      {overdueCount > 0 ? (
+        <p className="text-[0.82rem] font-semibold text-warn">
+          {t("dashboard.overdue", { count: overdueCount })}
         </p>
       ) : null}
       <Link
@@ -117,6 +122,7 @@ export function DashboardView() {
   const { user } = useAuth();
   const { month } = useMonth();
   const { version } = useEntry();
+  const bills = useLoad(() => fetchBills(month), [month, version]);
   const { data, failed, reload } = useLoad(() => fetchDashboard(month), [month, version]);
 
   return (
@@ -141,7 +147,7 @@ export function DashboardView() {
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           <ActualCard d={data} />
-          <PlannedCard d={data} />
+          <PlannedCard d={data} overdueCount={bills.data?.overdue.length ?? 0} />
           <OverallBudget d={data} />
         </div>
       )}

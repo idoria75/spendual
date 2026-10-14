@@ -203,7 +203,9 @@
     "people": "Pessoas",
     "balance": "Saldo",
     "allowanceLine": "Mesada do mês: {{amount}}",
-    "failed": "Não foi possível carregar o painel."
+    "failed": "Não foi possível carregar o painel.",
+    "overdue_one": "{{count}} conta vencida",
+    "overdue_other": "{{count}} contas vencidas"
   },
   "allowance": {
     "set": "Definir mesada de {{name}}",

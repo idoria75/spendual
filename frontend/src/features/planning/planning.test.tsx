@@ -75,6 +75,7 @@ function bill(over: Record<string, unknown>) {
 }
 
 let bills: unknown[] = [];
+let overdue: unknown[] = [];
 const allowances: unknown = {
   month,
   people: [
@@ -96,7 +97,7 @@ function base(extra?: Extra): Handler {
     if (path === "/api/dashboard") return json(200, dashboard);
     if (path === "/api/allowances" && req.method === "GET") return json(200, allowances);
     if (path === "/api/bills")
-      return json(200, { month, items: bills, plannedTotal: "190.00", unknownCount: 1 });
+      return json(200, { month, items: bills, overdue, plannedTotal: "190.00", unknownCount: 1 });
     if (path === "/api/recurrence-rules") return json(200, { items: [] });
     if (path === "/api/budgets" && req.method === "GET")
       return json(200, {
@@ -115,6 +116,7 @@ beforeEach(() => {
   resetCsrfToken();
   localStorage.clear();
   bills = [];
+  overdue = [];
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -280,7 +282,7 @@ describe("A pagar", () => {
     const mock = mockFetch(
       base((req) =>
         req.method === "POST" && req.url === "/api/recurrence-rules"
-          ? json(201, { month, items: [], plannedTotal: "0.00", unknownCount: 0 })
+          ? json(201, { month, items: [], overdue: [], plannedTotal: "0.00", unknownCount: 0 })
           : undefined,
       ),
     );
@@ -584,5 +586,40 @@ describe("review fixes", () => {
     await userEvent.clear(day);
     await userEvent.type(day, "10");
     expect(within(dialog).queryByText(/meses curtos/)).not.toBeInTheDocument();
+  });
+});
+
+describe("overdue bills", () => {
+  const old = () =>
+    bill({ id: 3, description: "Aluguel", dueDate: "2000-01-10", status: "planned" });
+
+  it("shows overdue bills of earlier months in Vencidas and confirms from there", async () => {
+    overdue = [old()];
+    const mock = mockFetch(
+      base((req) =>
+        req.method === "POST" && req.url === "/api/bills/recurrence/3/confirm"
+          ? json(200, bill({ id: 3, status: "confirmed" }))
+          : undefined,
+      ),
+    );
+    renderAt("/a-pagar");
+    await userEvent.click(await screen.findByRole("button", { name: "Próximo mês" }));
+    const row = (await screen.findByText("Aluguel")).closest("button")!;
+    expect(screen.getByText("Vencidas")).toBeInTheDocument();
+    await userEvent.click(row);
+    await userEvent.click(await screen.findByRole("button", { name: "Confirmar pagamento" }));
+    const dialog = await screen.findByRole("dialog", { name: "Confirmar pagamento" });
+    expect(within(dialog).getByLabelText("Data")).toHaveValue("2000-01-10");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Confirmar pagamento" }));
+    await waitFor(() =>
+      expect(callsTo(mock, "/api/bills/recurrence/3/confirm", "POST")).toHaveLength(1),
+    );
+  });
+
+  it("shows the overdue count on Início", async () => {
+    overdue = [old()];
+    mockFetch(base());
+    renderAt("/");
+    expect(await screen.findByText("1 conta vencida")).toBeInTheDocument();
   });
 });

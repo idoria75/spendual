@@ -87,11 +87,14 @@ function Group({
 
 function Upcoming({
   bills,
+  overdue,
   grouped,
   emptyKey,
   onOpen,
 }: {
   bills: Bill[];
+  /** Planned bills of earlier months (from the API). Shown in every month view. */
+  overdue: Bill[];
   /** Group by today only in the current month. Other months: plain list by due date. */
   grouped: boolean;
   emptyKey: "bills.empty" | "bills.emptyInstallments";
@@ -103,14 +106,18 @@ function Upcoming({
   const planned = bills.filter((b) => b.status === "planned");
   const sorted = (list: Bill[]) => [...list].sort((a, b) => (a.dueDate < b.dueDate ? -1 : 1));
   const done = sorted(bills.filter((b) => b.status !== "planned"));
-  if (bills.length === 0) return <p className="text-muted">{t(emptyKey)}</p>;
+  if (bills.length === 0 && overdue.length === 0)
+    return <p className="text-muted">{t(emptyKey)}</p>;
   return (
     <div className="flex flex-col gap-4">
+      {grouped ? null : (
+        <Group title={t("bills.groups.late")} bills={overdue} late onOpen={onOpen} />
+      )}
       {grouped ? (
         <>
           <Group
             title={t("bills.groups.late")}
-            bills={sorted(planned.filter((b) => b.dueDate < now))}
+            bills={[...overdue, ...sorted(planned.filter((b) => b.dueDate < now))]}
             late
             onOpen={onOpen}
           />
@@ -245,6 +252,12 @@ export function BillsView() {
       : tab === "installments"
         ? list.items.filter((b) => b.kind === "installment")
         : list.items;
+  const overdue =
+    list === null
+      ? []
+      : tab === "installments"
+        ? list.overdue.filter((b) => b.kind === "installment")
+        : list.overdue;
   const planned = shown.filter((b) => b.status === "planned");
   const knownTotal = fromCents(
     planned.reduce(
@@ -307,6 +320,7 @@ export function BillsView() {
       ) : tab === "upcoming" ? (
         <Upcoming
           bills={shown}
+          overdue={overdue}
           grouped={month === currentMonth()}
           emptyKey="bills.empty"
           onOpen={setSelected}
@@ -314,6 +328,7 @@ export function BillsView() {
       ) : (
         <Upcoming
           bills={shown}
+          overdue={overdue}
           grouped={month === currentMonth()}
           emptyKey="bills.emptyInstallments"
           onOpen={setSelected}
