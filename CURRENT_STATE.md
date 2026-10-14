@@ -12,7 +12,7 @@
 | 1 Data model | done | `phase-1-data-model` |
 | 2 Auth | done | `phase-2-auth` |
 | 3 Core CRUD + entry flow | done | `phase-3-core-crud` |
-| 4 Dashboard, budgets, bills, installments | not started | — |
+| 4 Dashboard, budgets, bills, installments | done | `phase-4-dashboard` |
 | 5 Settings and backup | not started | — |
 | 6 CI and deployment | not started | — |
 
@@ -32,7 +32,9 @@ Post-Phase-2 commits on `dev` (not in the tag): run-as-host-user dev container, 
 | Lint | `eslint.config.mjs`, `frontend/eslint.i18n.config.js` | `react/jsx-no-literals` blocks hardcoded JSX text. |
 | Catalog + transaction API | `backend/src/routes`, `backend/src/services/{catalog,transactions}.ts`, `backend/src/lib/serialize.ts` | Zod on every route, row locks, AuditEvent on patch/void/cancel. Contract: `packages/shared/src/transactions.ts`. |
 | App shell + Lançamentos | `frontend/src/shell`, `frontend/src/features/{transactions,settings}`, `frontend/src/components/ui` | Entry form, list, void/cancel dialogs, catalog manager. `lib/currency.ts`, `lib/date.ts`. |
-| Tests | `backend/tests`, `frontend/src/**/*.test.*` | 147 backend, 51 frontend, 20 shared. All pass. |
+| Domain + planning API | `backend/src/domain/accounting.ts`, `backend/src/services/{dashboard,bills}.ts`, `backend/src/routes/planning.ts` | Appendix A in integer cents. Dashboard, budgets, allowances, bills (recurring, installments), confirm/cancel, overdue list. Contract: `packages/shared/src/planning.ts`. |
+| Planning UI | `frontend/src/features/planning`, `frontend/src/pages/{Pessoal,Bills,Budgets}Page.tsx` | Início (household only), Orçamentos, A pagar, Pessoal (per-person balances, allowance sheet). |
+| Tests | `backend/tests`, `frontend/src/**/*.test.*` | 194 backend, 81 frontend, 20 shared. All pass. |
 
 ## Verified (2026-10-14)
 
@@ -44,10 +46,18 @@ Post-Phase-2 commits on `dev` (not in the tag): run-as-host-user dev container, 
 
 ## Missing
 
-- Phases 4 to 6 above. Nothing exists yet for: dashboard, budgets UI, bills, installments UI, settings, backup scripts, Dockerfile, `deployment/`, full CI.
+- Phases 5 and 6. Nothing exists yet for: settings, backup scripts, Dockerfile, `deployment/`, full CI, e2e.
 - `.github/workflows/ci.yml` only runs lint.
-- Domain file `backend/src/domain/accounting.ts` (Appendix A formulas) not written.
 - AuditEvent table exists; nothing writes to it yet.
+
+## Phase 4 (2026-10-14)
+
+- Verified: `make lint typecheck test build` exit 0 after merge. Real MySQL in backend tests. Frontend tests mock the API.
+- Not verified: real browser, real frontend-to-backend flow for the new views.
+- Month window: GETs accept 12 months back, 24 ahead. Not applied to `PUT /budgets` period or `POST /allowances` month.
+- Ended rule cancels its planned rows. Paused rule keeps them (still confirmable, excluded from `overdue`).
+- Refund counts in the month of its linked expense.
+- Open: rule create/patch write no AuditEvent; no UI to pause/end a rule; no plans list endpoint; no "Próximas contas" or chart on Início; no "Informar valor" action; budget bar has no planned segment.
 
 ## Open points (details in the memory file)
 
