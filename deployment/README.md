@@ -10,6 +10,7 @@ A corrupt volume then does not take the backups with it.
 - `backup.sh`: dump the database, keep the last N files.
 - `restore.sh`: load a backup file into a database.
 - `test-restore.sh`: backup, restore into a throwaway database, compare row counts of every table.
+- `test-cleanup.sh`: checks that `test-restore.sh` leaves no temp files or throwaway database, on pass and fail.
 - `lib.sh`: shared helpers.
 
 ### Set up on the deploy box
@@ -51,6 +52,18 @@ A corrupt volume then does not take the backups with it.
    new one is complete.
 
 4. Schedule it with a systemd timer on the host (the unit files come in Phase 6).
+
+5. The backend reads `BACKUP_DIR` for the status row in Ajustes. The script makes the folder mode
+   `700`, so the backend user cannot read it by default. Either run the backend with the same UID
+   as the backup user, or set the folder to mode `750` with a group the backend user is in. If
+   the folder exists but is unreadable, Ajustes shows "configured" with no last backup, and the
+   backend logs one warning. Only files named `spendual-*.sql.gz` count.
+
+### Phase 6 list
+
+- The deploy compose must mount `BACKUP_DIR` read-only into the backend container and set the
+  same `BACKUP_DIR` env there.
+- systemd timer units for `backup.sh`.
 
 ### Restore
 
