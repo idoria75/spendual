@@ -1,14 +1,21 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
+import { HOUSEHOLD_ID } from "../lib/household.js";
 import { withRetry } from "../lib/withRetry.js";
 import { AppError } from "./errors.js";
 
-export const HOUSEHOLD_ID = 1;
 export const MAX_USERS = 2;
 
 interface NewUser {
   username: string;
   displayName: string;
   passwordHash: string;
+}
+
+/** Cheap early check. The locked check in createUser stays the one that counts. */
+export async function assertHouseholdHasRoom(prisma: PrismaClient): Promise<void> {
+  if ((await prisma.user.count()) >= MAX_USERS) {
+    throw new AppError(409, "household_full", "Household already has two accounts");
+  }
 }
 
 /**

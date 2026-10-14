@@ -1,4 +1,5 @@
 import { Prisma, type BudgetScope, type PrismaClient } from "@prisma/client";
+import { HOUSEHOLD_ID } from "../lib/household.js";
 import { nextPeriod } from "../lib/period.js";
 import { withRetry } from "../lib/withRetry.js";
 
@@ -45,7 +46,7 @@ export function editBudget(prisma: PrismaClient, input: EditBudgetInput): Promis
       // Edits are rare, so serialize them all on the Household row. This makes
       // "read the prior amount, then write" safe when two edits race.
       const lock = await tx.$queryRaw<{ id: number }[]>(
-        Prisma.sql`SELECT id FROM Household WHERE id = 1 FOR UPDATE`,
+        Prisma.sql`SELECT id FROM Household WHERE id = ${HOUSEHOLD_ID} FOR UPDATE`,
       );
       if (lock.length === 0) throw new Error("Household row missing. Run the seed.");
       const before = await budgetFor(tx, input.categoryId, input.period);
