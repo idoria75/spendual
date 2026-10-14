@@ -30,6 +30,10 @@ model User {
   planPayer    InstallmentPlan[] @relation("PlanPayer")
   planCreated  InstallmentPlan[] @relation("PlanCreatedBy")
   planUpdated  InstallmentPlan[] @relation("PlanUpdatedBy")
+  txPayer      Transaction[]     @relation("TxPayer")
+  txOwner      Transaction[]     @relation("TxOwner")
+  txCreated    Transaction[]     @relation("TxCreatedBy")
+  txUpdated    Transaction[]     @relation("TxUpdatedBy")
 }
 
 model Category {
@@ -40,6 +44,7 @@ model Category {
   updatedAt        DateTime          @updatedAt
   recurrenceRules  RecurrenceRule[]
   installmentPlans InstallmentPlan[]
+  transactions     Transaction[]
 }
 
 enum AccountType {
@@ -59,6 +64,7 @@ model Account {
   updatedAt        DateTime          @updatedAt
   recurrenceRules  RecurrenceRule[]
   installmentPlans InstallmentPlan[]
+  transactions     Transaction[]
 }
 
 model PaymentMethod {
@@ -68,6 +74,7 @@ model PaymentMethod {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   recurrenceRules RecurrenceRule[]
+  transactions    Transaction[]
 }
 
 enum Scope {
@@ -134,7 +141,8 @@ model RecurrenceOccurrence {
   status         OccurrenceStatus @default(planned)
   createdAt      DateTime         @default(now())
 
-  rule RecurrenceRule @relation(fields: [ruleId], references: [id])
+  rule        RecurrenceRule @relation(fields: [ruleId], references: [id])
+  transaction Transaction?
 
   @@unique([ruleId, periodKey])
   @@index([dueDate])
@@ -183,8 +191,80 @@ model InstallmentOccurrence {
   status         OccurrenceStatus @default(planned)
   createdAt      DateTime         @default(now())
 
-  plan InstallmentPlan @relation(fields: [planId], references: [id])
+  plan        InstallmentPlan @relation(fields: [planId], references: [id])
+  transaction Transaction?
 
   @@unique([planId, sequenceNumber])
   @@index([dueDate])
+}
+
+enum TransactionType {
+  expense
+  income
+  other_receipt
+  refund
+  transfer
+}
+
+enum TransactionStatus {
+  planned
+  confirmed
+  cancelled
+  voided
+}
+
+enum TransactionSource {
+  manual
+  import
+}
+
+model Transaction {
+  id                      Int               @id @default(autoincrement())
+  type                    TransactionType
+  status                  TransactionStatus
+  amount                  Decimal           @db.Decimal(12, 2)
+  currency                String            @default("BRL") @db.VarChar(3)
+  description             String            @db.VarChar(200)
+  transactionDate         DateTime          @db.Date
+  expectedDate            DateTime?         @db.Date
+  categoryId              Int?
+  accountId               Int?
+  paymentMethodId         Int?
+  payerId                 Int?
+  scope                   Scope
+  ownerId                 Int?
+  source                  TransactionSource @default(manual)
+  externalRef             String?           @db.VarChar(120)
+  relatedTransactionId    Int?
+  recurrenceOccurrenceId  Int?              @unique
+  installmentOccurrenceId Int?              @unique
+  notes                   String?           @db.VarChar(500)
+  voidReason              String?           @db.VarChar(500)
+  createdById             Int
+  updatedById             Int
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  category              Category?              @relation(fields: [categoryId], references: [id])
+  account               Account?               @relation(fields: [accountId], references: [id])
+  paymentMethod         PaymentMethod?         @relation(fields: [paymentMethodId], references: [id])
+  payer                 User?                  @relation("TxPayer", fields: [payerId], references: [id])
+  owner                 User?                  @relation("TxOwner", fields: [ownerId], references: [id])
+  createdBy             User                   @relation("TxCreatedBy", fields: [createdById], references: [id])
+  updatedBy             User                   @relation("TxUpdatedBy", fields: [updatedById], references: [id])
+  relatedTransaction    Transaction?           @relation("TxRelated", fields: [relatedTransactionId], references: [id])
+  relatedFrom           Transaction[]          @relation("TxRelated")
+  recurrenceOccurrence  RecurrenceOccurrence?  @relation(fields: [recurrenceOccurrenceId], references: [id])
+  installmentOccurrence InstallmentOccurrence? @relation(fields: [installmentOccurrenceId], references: [id])
+
+  @@index([transactionDate])
+  @@index([status])
+  @@index([categoryId])
+  @@index([accountId])
+  @@index([paymentMethodId])
+  @@index([payerId])
+  @@index([ownerId])
+  @@index([createdById])
+  @@index([updatedById])
+  @@index([relatedTransactionId])
 }
