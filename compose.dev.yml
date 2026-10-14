@@ -22,6 +22,28 @@ services:
       mysql:
         condition: service_healthy
 
+  # Browser tests. Keep the image tag equal to the @playwright/test version in e2e/package.json.
+  # Run with: make e2e
+  e2e:
+    profiles: ["e2e"]
+    image: mcr.microsoft.com/playwright:v1.49.1-jammy
+    working_dir: /workspace/e2e
+    command: npx playwright test
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    ipc: host
+    environment:
+      DATABASE_URL: mysql://root:root@mysql:3306/spendual_e2e
+      SESSION_SECRET: e2e-only-secret-0123456789-0123456789
+      TZ: America/Sao_Paulo
+      HOME: /tmp
+      NPM_CONFIG_UPDATE_NOTIFIER: "false"
+      npm_config_cache: /tmp/.npm
+    volumes:
+      - .:/workspace
+    depends_on:
+      mysql:
+        condition: service_healthy
+
   mysql:
     image: mysql:8.4
     environment:
