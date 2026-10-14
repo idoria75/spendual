@@ -18,7 +18,7 @@ import {
   regenerateSession,
   saveSession,
 } from "./session.js";
-import { createUser } from "./signup.js";
+import { assertHouseholdHasRoom, createUser } from "./signup.js";
 
 export interface LoginLimit {
   windowMs: number;
@@ -48,6 +48,7 @@ export function authRouter(prisma: PrismaClient, loginLimit: LoginLimit, maxAgeM
     requireCsrf,
     asyncHandler(async (req, res) => {
       const input = signupRequestSchema.parse(req.body);
+      await assertHouseholdHasRoom(prisma);
       const passwordHash = await hashPassword(input.password);
       const user = await createUser(prisma, {
         username: input.username,
