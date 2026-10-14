@@ -12,8 +12,16 @@ declare module "express-serve-static-core" {
 }
 
 /** Only these fields ever leave the server. Never spread a User row into a response. */
-export function toAuthUser(u: Pick<User, "id" | "username" | "displayName" | "tonePalette">) {
-  return { id: u.id, username: u.username, displayName: u.displayName, tonePalette: u.tonePalette };
+export function toAuthUser(
+  u: Pick<User, "id" | "username" | "displayName" | "tonePalette" | "theme">,
+): AuthUser {
+  return {
+    id: u.id,
+    username: u.username,
+    displayName: u.displayName,
+    tonePalette: u.tonePalette,
+    theme: u.theme as AuthUser["theme"],
+  };
 }
 
 /** 401 unless the session holds a user that still exists and is active. */

@@ -1,4 +1,5 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
+import { TonePalette } from "@spendual/shared";
 import { HOUSEHOLD_ID } from "../lib/household.js";
 import { withRetry } from "../lib/withRetry.js";
 import { AppError } from "./errors.js";
@@ -33,7 +34,12 @@ export function createUser(prisma: PrismaClient, input: NewUser) {
         if ((await tx.user.count()) >= MAX_USERS) {
           throw new AppError(409, "household_full", "Household already has two accounts");
         }
-        return tx.user.create({ data: input });
+        // Default tone: first account blue, second rose (first free one if changed meanwhile).
+        const taken = new Set(
+          (await tx.user.findMany({ select: { tonePalette: true } })).map((u) => u.tonePalette),
+        );
+        const tonePalette = TonePalette.options.find((t) => !taken.has(t)) ?? null;
+        return tx.user.create({ data: { ...input, tonePalette } });
       });
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
