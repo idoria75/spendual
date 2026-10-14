@@ -6,25 +6,29 @@ export interface Loaded<T> {
   reload: () => void;
 }
 
-/** Load data when the deps change. Keeps the old data while it reloads. */
+/**
+ * Load data when the deps change. Data of other deps is never returned (no stale month).
+ * A reload with the same deps keeps the data until the new data arrives.
+ */
 export function useLoad<T>(load: () => Promise<T>, deps: readonly unknown[]): Loaded<T> {
-  const [data, setData] = useState<T | null>(null);
-  const [failed, setFailed] = useState(false);
+  const key = JSON.stringify(deps);
+  const [loaded, setLoaded] = useState<{ key: string; data: T } | null>(null);
+  const [failedKey, setFailedKey] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const reload = useCallback(() => setTick((n) => n + 1), []);
 
   useEffect(() => {
     let active = true;
-    setFailed(false);
+    setFailedKey(null);
     load()
       .then((result) => {
-        if (active) setData(result);
+        if (active) setLoaded({ key, data: result });
       })
       .catch((error: unknown) => {
         console.error(error);
         if (active) {
-          setData(null);
-          setFailed(true);
+          setLoaded(null);
+          setFailedKey(key);
         }
       });
     return () => {
@@ -32,5 +36,9 @@ export function useLoad<T>(load: () => Promise<T>, deps: readonly unknown[]): Lo
     };
   }, [...deps, tick]);
 
-  return { data, failed, reload };
+  return {
+    data: loaded?.key === key ? loaded.data : null,
+    failed: failedKey === key,
+    reload,
+  };
 }
