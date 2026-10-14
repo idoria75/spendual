@@ -19,12 +19,18 @@ import type {
 } from "@spendual/shared";
 import { AppError } from "../auth/errors.js";
 import { centsToMoney, moneyToCents } from "../domain/accounting.js";
-import { dateOnlyToDate, dateToDateOnly, formatPeriod, nextPeriod } from "../lib/period.js";
+import {
+  currentDate,
+  currentPeriod,
+  dateOnlyToDate,
+  dateToDateOnly,
+  nextPeriod,
+} from "../lib/period.js";
 import { parseMoney } from "../lib/serialize.js";
 import { withRetry } from "../lib/withRetry.js";
 import { generateForAllRules } from "./dashboard.js";
 import { buildInstallmentRows } from "./installments.js";
-import { generateOccurrences } from "./recurrence.js";
+import { generateForRules } from "./recurrence.js";
 import { assertActiveUser, assertCatalogActive, invalid } from "./transactions.js";
 
 type Db = Prisma.TransactionClient;
@@ -100,24 +106,31 @@ function ruleDto(r: RecurrenceRule): RuleDto {
   };
 }
 
-/** Today's month in the server time zone. */
-function currentPeriod(): string {
-  const now = new Date();
-  return formatPeriod(now.getFullYear(), now.getMonth() + 1);
-}
+const byDue = (a: Bill, b: Bill) =>
+  a.dueDate.localeCompare(b.dueDate) || a.kind.localeCompare(b.kind) || a.id - b.id;
 
-export async function listBills(db: PrismaClient | Db, month: string): Promise<BillList> {
-  const dueDate = {
-    gte: dateOnlyToDate(`${month}-01`),
-    lt: dateOnlyToDate(`${nextPeriod(month)}-01`),
-  };
-  const [rec, ins] = await Promise.all([
+export async function listBills(
+  db: PrismaClient | Db,
+  month: string,
+  now: Date = new Date(),
+): Promise<BillList> {
+  const first = `${month}-01`;
+  const dueDate = { gte: dateOnlyToDate(first), lt: dateOnlyToDate(`${nextPeriod(month)}-01`) };
+  // Overdue: still planned, due before today and before this month, rule still active.
+  const today = currentDate(now);
+  const overdueDate = { lt: dateOnlyToDate(today < first ? today : first) };
+  const open = { status: "planned" as const, dueDate: overdueDate };
+  const [rec, ins, lateRec, lateIns] = await Promise.all([
     db.recurrenceOccurrence.findMany({ where: { dueDate }, include: recInclude }),
     db.installmentOccurrence.findMany({ where: { dueDate }, include: insInclude }),
+    db.recurrenceOccurrence.findMany({
+      where: { ...open, rule: { state: "active" } },
+      include: recInclude,
+    }),
+    db.installmentOccurrence.findMany({ where: open, include: insInclude }),
   ]);
-  const items = [...rec.map(recurrenceBill), ...ins.map(installmentBill)].sort(
-    (a, b) => a.dueDate.localeCompare(b.dueDate) || a.kind.localeCompare(b.kind) || a.id - b.id,
-  );
+  const items = [...rec.map(recurrenceBill), ...ins.map(installmentBill)].sort(byDue);
+  const overdue = [...lateRec.map(recurrenceBill), ...lateIns.map(installmentBill)].sort(byDue);
   let total = 0n;
   let unknownCount = 0;
   for (const b of items) {
@@ -125,13 +138,17 @@ export async function listBills(db: PrismaClient | Db, month: string): Promise<B
     if (b.expectedAmount === null) unknownCount++;
     else total += moneyToCents(b.expectedAmount);
   }
-  return { month, items, plannedTotal: centsToMoney(total), unknownCount };
+  return { month, items, overdue, plannedTotal: centsToMoney(total), unknownCount };
 }
 
 /** The bills list also tops up recurring occurrences, so "A pagar" works without the dashboard. */
-export async function getBills(prisma: PrismaClient, month: string): Promise<BillList> {
-  await generateForAllRules(prisma, month);
-  return listBills(prisma, month);
+export async function getBills(
+  prisma: PrismaClient,
+  month: string,
+  now: Date = new Date(),
+): Promise<BillList> {
+  await generateForAllRules(prisma, month, now);
+  return listBills(prisma, month, now);
 }
 
 export async function listRules(prisma: PrismaClient): Promise<RuleDto[]> {
@@ -143,10 +160,13 @@ export async function createRule(
   prisma: PrismaClient,
   actorId: number,
   input: RecurrenceRuleCreate,
+  now: Date = new Date(),
 ): Promise<BillList> {
   const startPeriod = input.startDate.slice(0, 7);
-  const from = startPeriod > currentPeriod() ? startPeriod : currentPeriod();
-  const ruleId = await withRetry(() =>
+  const cur = currentPeriod(now);
+  const from = startPeriod > cur ? startPeriod : cur;
+  // The rule and its first occurrences are one transaction: a failure leaves no rule.
+  await withRetry(() =>
     prisma.$transaction(async (tx) => {
       const payerId = input.payerId ?? actorId;
       await assertActiveUser(tx, payerId, "payerId");
@@ -169,11 +189,10 @@ export async function createRule(
           updatedById: actorId,
         },
       });
-      return rule.id;
+      await generateForRules(tx, [rule], from);
     }),
   );
-  await generateOccurrences(prisma, ruleId, from);
-  return listBills(prisma, from);
+  return listBills(prisma, from, now);
 }
 
 export function patchRule(
@@ -215,6 +234,24 @@ export function patchRule(
         await tx.recurrenceOccurrence.updateMany({
           where: { ruleId: id, status: "planned" },
           data: { expectedAmount: amount },
+        });
+      }
+      // Planned rows that the rule no longer covers are cancelled, never deleted:
+      // "ended" cancels all of them; a new end date cancels those in later months.
+      // "paused" keeps them (still confirmable); resuming makes generation continue.
+      if (row.state === "ended") {
+        await tx.recurrenceOccurrence.updateMany({
+          where: { ruleId: id, status: "planned" },
+          data: { status: "cancelled" },
+        });
+      } else if (row.endDate) {
+        await tx.recurrenceOccurrence.updateMany({
+          where: {
+            ruleId: id,
+            status: "planned",
+            periodKey: { gt: dateToDateOnly(row.endDate).slice(0, 7) },
+          },
+          data: { status: "cancelled" },
         });
       }
       return ruleDto(row);
@@ -345,6 +382,15 @@ export function confirmBill(
     prisma.$transaction(async (tx) => {
       const cur = await lockBill(tx, kind, id);
       requirePlanned(cur);
+      if (kind === "recurrence") {
+        const rule = await tx.recurrenceRule.findUnique({
+          where: { id: cur.parentId },
+          select: { state: true },
+        });
+        if (rule?.state === "ended") {
+          throw new AppError(409, "invalid_state", "The recurrence rule has ended");
+        }
+      }
       const amount = input.amount ?? cur.expectedAmount;
       if (amount === null)
         throw invalid("amount", "Amount required: the expected amount is unknown");
@@ -355,10 +401,8 @@ export function confirmBill(
       const paymentMethodId =
         input.paymentMethodId !== undefined ? input.paymentMethodId : cur.paymentMethodId;
       if (input.payerId !== undefined) await assertActiveUser(tx, input.payerId, "payerId");
-      await assertCatalogActive(tx, {
-        ...(input.accountId != null ? { accountId: input.accountId } : {}),
-        ...(input.paymentMethodId != null ? { paymentMethodId: input.paymentMethodId } : {}),
-      });
+      // Check the final values, inherited ones too: an archived account must not be used.
+      await assertCatalogActive(tx, { accountId, paymentMethodId });
 
       const txn = await tx.transaction.create({
         data: {
