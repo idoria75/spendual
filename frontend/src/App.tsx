@@ -7,6 +7,7 @@ import { AjustesPage } from "./pages/AjustesPage";
 import { HomePage } from "./pages/HomePage";
 import { LancamentosPage } from "./pages/LancamentosPage";
 import { LoginPage } from "./pages/LoginPage";
+import { PessoalPage } from "./pages/PessoalPage";
 import { MaisPage } from "./pages/MaisPage";
 import { AppShell } from "./shell/AppShell";
 
@@ -21,6 +22,7 @@ export function App() {
             <Route path="/lancamentos" element={<LancamentosPage />} />
             <Route path="/a-pagar" element={<BillsPage />} />
             <Route path="/orcamentos" element={<BudgetsPage />} />
+            <Route path="/pessoal" element={<PessoalPage />} />
             <Route path="/mais" element={<MaisPage />} />
             <Route path="/ajustes" element={<AjustesPage />} />
           </Route>

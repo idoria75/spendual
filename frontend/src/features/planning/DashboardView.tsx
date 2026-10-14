@@ -1,5 +1,4 @@
-import type { AllowanceOverview, Dashboard } from "@spendual/shared";
-import { useState } from "react";
+import type { Dashboard } from "@spendual/shared";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -7,12 +6,9 @@ import { useAuth } from "../../auth/AuthContext";
 import { Button } from "../../components/ui/button";
 import { cn } from "../../lib/cn";
 import { formatMoney, fromCents, toCents } from "../../lib/currency";
-import { toneColor } from "../transactions/display";
 import { useEntry } from "../transactions/entry";
-import { useLookups } from "../transactions/lookups";
 import { useMonth } from "../transactions/month";
-import { fetchAllowances, fetchDashboard } from "./api";
-import { AllowanceSheet } from "./AllowanceSheet";
+import { fetchDashboard } from "./api";
 import { Bar, formatRate, percentOf } from "./display";
 import { useLoad } from "./use-load";
 
@@ -115,61 +111,6 @@ function OverallBudget({ d }: { d: Dashboard }) {
   );
 }
 
-function PeopleCard({
-  d,
-  allowances,
-  onAllocate,
-}: {
-  d: Dashboard;
-  allowances: AllowanceOverview | null;
-  onAllocate: (p: { id: number; name: string }) => void;
-}) {
-  const { t } = useTranslation();
-  const { data: lookups } = useLookups();
-  return (
-    <section aria-labelledby="dash-people" className="rounded-card bg-surface p-4">
-      <Eyebrow>
-        <span id="dash-people">{t("dashboard.people")}</span>
-      </Eyebrow>
-      <ul className="mt-2 flex flex-col gap-3">
-        {d.people.map((p) => {
-          const u = lookups?.users.find((x) => x.id === p.userId);
-          const name = u?.displayName ?? String(p.userId);
-          const entry = allowances?.people.find((x) => x.ownerId === p.userId);
-          const missing = allowances !== null && entry?.allocation === null;
-          return (
-            <li
-              key={p.userId}
-              style={{ borderLeftColor: toneColor(u?.tonePalette) }}
-              className="flex flex-col gap-1 border-l-[3px] pl-3"
-            >
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="truncate font-semibold">{name}</span>
-                <span className="whitespace-nowrap font-bold tabular-nums">
-                  <span className="sr-only">{t("dashboard.balance")} </span>
-                  {formatMoney(p.closingBalance)}
-                </span>
-              </div>
-              <p className="text-[0.8rem] text-muted tabular-nums">
-                {t("dashboard.allowanceLine", { amount: formatMoney(p.allowanceAllocated) })}
-              </p>
-              {missing ? (
-                <Button
-                  variant="ghost"
-                  className="self-start"
-                  onClick={() => onAllocate({ id: p.userId, name })}
-                >
-                  {t("allowance.set", { name })}
-                </Button>
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  );
-}
-
 /** Início: month numbers from the server (ui-guidelines §7). */
 export function DashboardView() {
   const { t } = useTranslation();
@@ -177,8 +118,6 @@ export function DashboardView() {
   const { month } = useMonth();
   const { version } = useEntry();
   const { data, failed, reload } = useLoad(() => fetchDashboard(month), [month, version]);
-  const [allocating, setAllocating] = useState<{ id: number; name: string } | null>(null);
-  const allowances = useLoad(() => fetchAllowances(month), [month, version]);
 
   return (
     <section className="flex flex-col gap-3">
@@ -204,19 +143,8 @@ export function DashboardView() {
           <ActualCard d={data} />
           <PlannedCard d={data} />
           <OverallBudget d={data} />
-          <PeopleCard d={data} allowances={allowances.data} onAllocate={setAllocating} />
         </div>
       )}
-      <AllowanceSheet
-        person={allocating}
-        month={month}
-        onClose={() => setAllocating(null)}
-        onSaved={() => {
-          setAllocating(null);
-          allowances.reload();
-          reload();
-        }}
-      />
     </section>
   );
 }

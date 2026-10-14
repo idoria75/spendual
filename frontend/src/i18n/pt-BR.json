@@ -64,7 +64,9 @@
     "nextMonth": "Próximo mês",
     "newEntry": "Novo lançamento",
     "newEntryLong": "Novo lançamento",
-    "orcamentosHint": "Limites por categoria e do mês"
+    "orcamentosHint": "Limites por categoria e do mês",
+    "pessoal": "Pessoal",
+    "pessoalHint": "Saldo e mesada de cada pessoa"
   },
   "form": {
     "titleNew": "Novo lançamento",

@@ -1,4 +1,4 @@
-import { ChevronRight, Settings, Wallet } from "lucide-react";
+import { ChevronRight, Settings, User, Wallet } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
@@ -18,6 +18,19 @@ export function MaisPage() {
             <span className="flex-1">
               <span className="block font-semibold">{t("nav.orcamentos")}</span>
               <span className="block text-[12px] text-muted">{t("nav.orcamentosHint")}</span>
+            </span>
+            <ChevronRight size={16} aria-hidden />
+          </Link>
+        </li>
+        <li>
+          <Link
+            to="/pessoal"
+            className="flex min-h-[56px] items-center gap-3 rounded-input bg-surface px-3"
+          >
+            <User size={20} aria-hidden />
+            <span className="flex-1">
+              <span className="block font-semibold">{t("nav.pessoal")}</span>
+              <span className="block text-[12px] text-muted">{t("nav.pessoalHint")}</span>
             </span>
             <ChevronRight size={16} aria-hidden />
           </Link>

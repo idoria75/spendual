@@ -143,9 +143,25 @@ describe("Início", () => {
     const planned = screen.getByRole("region", { name: /Previsão/ });
     expect(within(planned).getByText("R$ 190,00")).toBeInTheDocument();
     expect(within(planned).getByText(/mais 2 contas sem valor \(valor \?\)/)).toBeInTheDocument();
-    const people = screen.getByRole("region", { name: "Pessoas" });
-    expect(within(people).getByText("R$ 800,00")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Pessoas" })).not.toBeInTheDocument();
+    expect(screen.queryByText("R$ 800,00")).not.toBeInTheDocument();
     expect(screen.getByText("▲ R$ 1.000,00 acima")).toBeInTheDocument();
+  });
+
+  it("shows the balance of each person on Pessoal", async () => {
+    mockFetch(base());
+    renderAt("/pessoal");
+    const people = await screen.findByRole("region", { name: "Pessoas" });
+    expect(within(people).getByText("R$ 800,00")).toBeInTheDocument();
+    expect(within(people).getByText("Ana")).toBeInTheDocument();
+  });
+
+  it("links Pessoal from Mais", async () => {
+    mockFetch(base());
+    renderAt("/mais");
+    expect(
+      await within(await screen.findByRole("main")).findByRole("link", { name: /Pessoal/ }),
+    ).toHaveAttribute("href", "/pessoal");
   });
 
   it("shows the allocation error when the month already has one", async () => {
@@ -156,7 +172,7 @@ describe("Início", () => {
           : undefined,
       ),
     );
-    renderAt("/");
+    renderAt("/pessoal");
     await userEvent.click(await screen.findByRole("button", { name: "Definir mesada de Bia" }));
     const dialog = await screen.findByRole("dialog");
     await userEvent.type(within(dialog).getByLabelText("Valor da mesada"), "1.500,00");
@@ -201,6 +217,7 @@ describe("A pagar", () => {
     const dialog = await screen.findByRole("dialog", { name: "Confirmar pagamento" });
     expect(within(dialog).getByLabelText("Valor")).toHaveValue("190,00");
     expect(within(dialog).getByText("Internet")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Data")).toHaveValue(`${month}-20`);
     expect(within(dialog).getByLabelText("Pago por")).toHaveValue("2");
     expect(within(dialog).getByLabelText("Método")).toHaveValue("1");
     expect(within(dialog).queryByLabelText("Descrição")).not.toBeInTheDocument();
