@@ -3,8 +3,8 @@ import { createPrisma } from "./lib/prisma.js";
 
 const port = Number(process.env.PORT ?? 3000);
 const sessionSecret = process.env.SESSION_SECRET;
-if (!sessionSecret) {
-  console.error("SESSION_SECRET is not set. Refusing to start.");
+if (!sessionSecret || sessionSecret.length < 32) {
+  console.error("SESSION_SECRET must be at least 32 characters. Refusing to start.");
   process.exit(1);
 }
 
