@@ -14,26 +14,29 @@ model Household {
 }
 
 model User {
-  id           Int               @id @default(autoincrement())
-  username     String            @unique @db.VarChar(60)
-  passwordHash String            @db.VarChar(255)
-  displayName  String            @db.VarChar(80)
-  tonePalette  String?           @unique @db.VarChar(30)
-  active       Boolean           @default(true)
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-  ruleOwner    RecurrenceRule[]  @relation("RuleOwner")
-  rulePayer    RecurrenceRule[]  @relation("RulePayer")
-  ruleCreated  RecurrenceRule[]  @relation("RuleCreatedBy")
-  ruleUpdated  RecurrenceRule[]  @relation("RuleUpdatedBy")
-  planOwner    InstallmentPlan[] @relation("PlanOwner")
-  planPayer    InstallmentPlan[] @relation("PlanPayer")
-  planCreated  InstallmentPlan[] @relation("PlanCreatedBy")
-  planUpdated  InstallmentPlan[] @relation("PlanUpdatedBy")
-  txPayer      Transaction[]     @relation("TxPayer")
-  txOwner      Transaction[]     @relation("TxOwner")
-  txCreated    Transaction[]     @relation("TxCreatedBy")
-  txUpdated    Transaction[]     @relation("TxUpdatedBy")
+  id             Int                      @id @default(autoincrement())
+  username       String                   @unique @db.VarChar(60)
+  passwordHash   String                   @db.VarChar(255)
+  displayName    String                   @db.VarChar(80)
+  tonePalette    String?                  @unique @db.VarChar(30)
+  active         Boolean                  @default(true)
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  ruleOwner      RecurrenceRule[]         @relation("RuleOwner")
+  rulePayer      RecurrenceRule[]         @relation("RulePayer")
+  ruleCreated    RecurrenceRule[]         @relation("RuleCreatedBy")
+  ruleUpdated    RecurrenceRule[]         @relation("RuleUpdatedBy")
+  planOwner      InstallmentPlan[]        @relation("PlanOwner")
+  planPayer      InstallmentPlan[]        @relation("PlanPayer")
+  planCreated    InstallmentPlan[]        @relation("PlanCreatedBy")
+  planUpdated    InstallmentPlan[]        @relation("PlanUpdatedBy")
+  txPayer        Transaction[]            @relation("TxPayer")
+  txOwner        Transaction[]            @relation("TxOwner")
+  txCreated      Transaction[]            @relation("TxCreatedBy")
+  txUpdated      Transaction[]            @relation("TxUpdatedBy")
+  allowanceOwned PersonalAllowanceEntry[] @relation("AllowanceOwner")
+  allowanceActed PersonalAllowanceEntry[] @relation("AllowanceActor")
+  budgetsUpdated MonthlyBudget[]          @relation("BudgetUpdatedBy")
 }
 
 model Category {
@@ -45,6 +48,7 @@ model Category {
   recurrenceRules  RecurrenceRule[]
   installmentPlans InstallmentPlan[]
   transactions     Transaction[]
+  budgets          MonthlyBudget[]
 }
 
 enum AccountType {
@@ -267,4 +271,57 @@ model Transaction {
   @@index([createdById])
   @@index([updatedById])
   @@index([relatedTransactionId])
+}
+
+enum AllowanceKind {
+  ALLOCATION
+  ADJUSTMENT
+  CORRECTION
+}
+
+// Append-only ledger. Balance is always the sum of rows.
+// "One ALLOCATION per owner and period" is enforced in the service layer, not here.
+model PersonalAllowanceEntry {
+  id        Int           @id @default(autoincrement())
+  ownerId   Int
+  periodKey String        @db.VarChar(7)
+  kind      AllowanceKind
+  amount    Decimal       @db.Decimal(12, 2)
+  currency  String        @default("BRL") @db.VarChar(3)
+  notes     String?       @db.VarChar(500)
+  actorId   Int
+  createdAt DateTime      @default(now())
+
+  owner User @relation("AllowanceOwner", fields: [ownerId], references: [id])
+  actor User @relation("AllowanceActor", fields: [actorId], references: [id])
+
+  @@index([ownerId, periodKey])
+  @@index([actorId])
+}
+
+enum BudgetScope {
+  OVERALL
+  CATEGORY
+}
+
+model MonthlyBudget {
+  id            Int         @id @default(autoincrement())
+  scope         BudgetScope
+  categoryId    Int?
+  // "overall" or the category id as a string. Needed because UNIQUE allows many NULLs.
+  categoryKey   String      @db.VarChar(20)
+  // Period key YYYY-MM. The row applies from this month until a later row exists.
+  effectiveFrom String      @db.VarChar(7)
+  amount        Decimal     @db.Decimal(12, 2)
+  currency      String      @default("BRL") @db.VarChar(3)
+  updatedById   Int?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  category  Category? @relation(fields: [categoryId], references: [id])
+  updatedBy User?     @relation("BudgetUpdatedBy", fields: [updatedById], references: [id])
+
+  @@unique([categoryKey, effectiveFrom])
+  @@index([categoryId])
+  @@index([updatedById])
 }
