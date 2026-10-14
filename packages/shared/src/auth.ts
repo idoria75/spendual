@@ -49,6 +49,7 @@ export const ApiErrorCode = z.enum([
   "csrf_invalid",
   "household_full",
   "username_taken",
+  "name_taken",
   "rate_limited",
   "not_found",
   "invalid_state",

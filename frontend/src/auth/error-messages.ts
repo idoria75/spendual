@@ -9,6 +9,7 @@ export const errorMessageKey = {
   csrf_invalid: "errors.csrf_invalid",
   household_full: "errors.household_full",
   username_taken: "errors.username_taken",
+  name_taken: "errors.name_taken",
   rate_limited: "errors.rate_limited",
   not_found: "errors.not_found",
   invalid_state: "errors.invalid_state",

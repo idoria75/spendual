@@ -39,6 +39,7 @@
     "csrf_invalid": "Não foi possível validar o pedido. Tente de novo.",
     "household_full": "Esta casa já tem 2 contas. O cadastro está fechado.",
     "username_taken": "Este usuário já existe. Escolha outro.",
+    "name_taken": "Já existe um item com este nome.",
     "rate_limited": "Muitas tentativas. Espere um pouco e tente de novo.",
     "not_found": "Registro não encontrado.",
     "invalid_state": "Este registro não pode mais ser alterado assim.",
