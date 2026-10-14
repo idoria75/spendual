@@ -1,13 +1,13 @@
-import i18next from "eslint-plugin-i18next";
+import react from "eslint-plugin-react";
 
-/** Flat config block. Track A's root config can spread this in. */
+/** Flat config block: no hardcoded UI text in JSX. Spread into the root config. */
 export default [
   {
     files: ["frontend/src/**/*.{ts,tsx}"],
     ignores: ["**/*.test.{ts,tsx}"],
-    plugins: { i18next },
+    plugins: { react },
     rules: {
-      "i18next/no-literal-string": ["error", { mode: "jsx-text-only" }],
+      "react/jsx-no-literals": ["error", { noStrings: true, ignoreProps: true }],
     },
   },
 ];
