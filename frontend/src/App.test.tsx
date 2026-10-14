@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { App } from "./App";
 import { resetCsrfToken } from "./lib/api-client";
-import { apiError, json, mockFetch, user } from "./test/fetch-mock";
+import { apiError, json, mockFetch, shellStubs, user } from "./test/fetch-mock";
 
 beforeEach(() => resetCsrfToken());
 afterEach(() => vi.unstubAllGlobals());
@@ -33,7 +33,7 @@ it("redirects to /entrar when /me returns 401", async () => {
 });
 
 it("shows the home page when /me returns the user", async () => {
-  mockFetch(() => json(200, user));
+  mockFetch(({ url }) => shellStubs(url) ?? json(200, user));
   renderAt("/");
   expect(await screen.findByText("Olá, Ana")).toBeInTheDocument();
 });
@@ -43,7 +43,7 @@ it("login success sends the CSRF header and goes home", async () => {
     if (url === "/api/auth/me") return apiError(401, "unauthenticated");
     if (url === "/api/auth/csrf") return json(200, { csrfToken: "tok" });
     if (url === "/api/auth/login") return json(200, user);
-    return json(404, {});
+    return shellStubs(url) ?? json(404, {});
   });
   renderAt("/entrar");
   await fill("Usuário", "ana");

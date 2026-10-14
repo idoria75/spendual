@@ -36,3 +36,30 @@ export function mockFetch(handler: Handler) {
   vi.stubGlobal("fetch", mock);
   return mock;
 }
+
+/** Empty but valid answers for the endpoints the signed-in shell and Início call. */
+export function shellStubs(url: string): Response | null {
+  const path = url.split("?")[0];
+  if (path === "/api/lookups")
+    return json(200, { users: [user], categories: [], accounts: [], paymentMethods: [] });
+  if (path === "/api/dashboard") {
+    const zero = "0.00";
+    return json(200, {
+      month: "2026-10",
+      householdIncome: zero,
+      sharedExpensesNet: zero,
+      allowanceAllocations: zero,
+      savingsBeforeGoals: zero,
+      goalAllocationsNet: zero,
+      unallocatedSavings: zero,
+      savingsRate: null,
+      plannedBillsTotal: zero,
+      plannedBillsUnknownCount: 0,
+      overallBudget: { budget: null, spent: zero },
+      people: [],
+    });
+  }
+  if (path === "/api/bills")
+    return json(200, { month: "2026-10", items: [], overdue: [], plannedTotal: "0.00", unknownCount: 0 });
+  return null;
+}
