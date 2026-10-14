@@ -1,4 +1,4 @@
-RUN = docker compose -f compose.dev.yml run --rm app
+RUN = mkdir -p node_modules && docker compose -f compose.dev.yml run --rm app
 
 .PHONY: install dev lint typecheck test build migrate down
 
