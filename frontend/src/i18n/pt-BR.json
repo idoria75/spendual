@@ -4,7 +4,9 @@
     "tagline": "Finanças da casa"
   },
   "common": {
-    "loading": "Carregando…"
+    "loading": "Carregando…",
+    "close": "Fechar",
+    "retry": "Tentar de novo"
   },
   "home": {
     "title": "Início",
@@ -46,6 +48,144 @@
     "has_refunds": "Este lançamento tem reembolsos. Anule os reembolsos primeiro.",
     "refund_exceeds": "O reembolso passa do valor da despesa.",
     "internal_error": "Algo deu errado. Tente de novo em instantes.",
-    "network": "Sem conexão com o servidor. Tente de novo."
+    "network": "Sem conexão com o servidor. Tente de novo.",
+    "name_taken": "Já existe um item com este nome."
+  },
+  "nav": {
+    "main": "Navegação",
+    "tabs": "Abas",
+    "inicio": "Início",
+    "lancamentos": "Lançamentos",
+    "aPagar": "A pagar",
+    "orcamentos": "Orçamentos",
+    "mais": "Mais",
+    "ajustes": "Ajustes",
+    "ajustesHint": "Categorias, contas e métodos",
+    "prevMonth": "Mês anterior",
+    "nextMonth": "Próximo mês",
+    "newEntry": "Novo lançamento",
+    "newEntryLong": "Novo lançamento"
+  },
+  "placeholder": {
+    "soon": "Esta tela chega em breve."
+  },
+  "form": {
+    "titleNew": "Novo lançamento",
+    "titleEdit": "Editar lançamento",
+    "typeLabel": "Tipo",
+    "type": {
+      "label": "Tipo",
+      "expense": "Despesa",
+      "income": "Receita",
+      "other_receipt": "Outro recebimento",
+      "transfer": "Transferência",
+      "refund": "Reembolso"
+    },
+    "amount": "Valor",
+    "amountPlaceholder": "0,00",
+    "description": "Descrição",
+    "scopeLabel": "Escopo",
+    "scope": {
+      "household": "Casa",
+      "personal": "Pessoal"
+    },
+    "owner": "De quem",
+    "related": "Despesa reembolsada",
+    "choose": "Escolher…",
+    "none": "Nenhum",
+    "account": "Conta",
+    "category": "Categoria",
+    "categoryAll": "todas ›",
+    "categoryFewer": "‹ menos",
+    "payer": "Pago por",
+    "date": "Data",
+    "method": "Método",
+    "moreDetails": "Mais detalhes",
+    "notes": "Observações",
+    "save": "Salvar",
+    "saving": "Salvando…",
+    "saved": "Lançamento salvo",
+    "savedEdit": "Lançamento atualizado",
+    "errors": {
+      "amount": "Informe um valor maior que zero, como 12,50.",
+      "description": "Informe a descrição (até 200 caracteres).",
+      "owner": "Escolha de quem é o lançamento.",
+      "related": "Escolha a despesa reembolsada.",
+      "account": "Escolha a conta.",
+      "category": "Escolha a categoria.",
+      "date": "Informe uma data válida.",
+      "notes": "Use até 500 caracteres."
+    }
+  },
+  "list": {
+    "filters": "Filtros",
+    "scope": {
+      "all": "Tudo",
+      "household": "Casa",
+      "personal": "Pessoal"
+    },
+    "status": {
+      "all": "Todos",
+      "confirmed": "Confirmados",
+      "voided": "Anulados"
+    },
+    "person": "Pessoa",
+    "allPeople": "Todas as pessoas",
+    "category": "Categoria",
+    "allCategories": "Todas as categorias",
+    "empty": "Os lançamentos do mês aparecem aqui.",
+    "emptyAction": "Adicionar o primeiro",
+    "transferNote": "não conta como gasto",
+    "noCategory": "Sem categoria",
+    "voided": "Anulado · {{reason}}",
+    "cancelled": "Cancelado · {{reason}}",
+    "voidedToast": "Lançamento anulado",
+    "cancelledToast": "Lançamento cancelado"
+  },
+  "detail": {
+    "edit": "Editar",
+    "void": "Anular",
+    "cancel": "Cancelar",
+    "voidReason": "Motivo"
+  },
+  "confirm": {
+    "back": "Voltar",
+    "reason": "Motivo",
+    "reasonRequired": "Informe o motivo.",
+    "voidTitle": "Anular lançamento?",
+    "voidBody": "O lançamento continua na lista, riscado, e deixa de contar nos totais. Isso não pode ser desfeito.",
+    "voidAction": "Anular lançamento",
+    "cancelTitle": "Cancelar lançamento?",
+    "cancelBody": "O lançamento previsto deixa de valer. Isso não pode ser desfeito.",
+    "cancelAction": "Cancelar lançamento"
+  },
+  "settings": {
+    "catalogLabel": "O que gerenciar",
+    "add": "Adicionar",
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "rename": "Renomear",
+    "archive": "Arquivar",
+    "unarchive": "Reativar",
+    "archived": "Arquivada",
+    "accountType": "Tipo de conta",
+    "accountTypes": {
+      "bank": "Banco",
+      "cash": "Dinheiro",
+      "credit_card": "Cartão de crédito",
+      "other": "Outro"
+    },
+    "categories": {
+      "title": "Categorias",
+      "newLabel": "Nova categoria"
+    },
+    "accounts": {
+      "title": "Contas",
+      "newLabel": "Nova conta"
+    },
+    "paymentMethods": {
+      "title": "Métodos",
+      "newLabel": "Novo método"
+    }
   }
 }
