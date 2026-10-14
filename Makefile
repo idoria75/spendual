@@ -1,4 +1,7 @@
-RUN = mkdir -p node_modules && docker compose -f compose.dev.yml run --rm app
+export HOST_UID := $(shell id -u)
+export HOST_GID := $(shell id -g)
+COMPOSE = docker compose -f compose.dev.yml
+RUN = mkdir -p node_modules && $(COMPOSE) run --rm app
 
 .PHONY: install dev lint typecheck test build migrate down
 
@@ -6,7 +9,7 @@ install:
 	$(RUN) npm install
 
 dev:
-	docker compose -f compose.dev.yml run --rm --service-ports app npm run dev
+	mkdir -p node_modules && $(COMPOSE) run --rm --service-ports app npm run dev
 
 lint:
 	$(RUN) npm run lint
@@ -24,4 +27,4 @@ migrate:
 	$(RUN) npm run migrate --workspace backend
 
 down:
-	docker compose -f compose.dev.yml down
+	$(COMPOSE) down
