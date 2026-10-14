@@ -2,6 +2,7 @@ import type { AuthUser, LoginRequest, SignupRequest } from "@spendual/shared";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { ApiError } from "../lib/api-client";
+import { applyTheme } from "../lib/theme";
 import * as authApi from "./auth-api";
 
 export type AuthStatus = "loading" | "authenticated" | "anonymous";
@@ -12,6 +13,8 @@ interface AuthValue {
   login: (body: LoginRequest) => Promise<void>;
   signup: (body: SignupRequest) => Promise<void>;
   logout: () => Promise<void>;
+  /** Replace the signed-in user, for example after PATCH /me. */
+  setUser: (user: AuthUser) => void;
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
@@ -19,6 +22,10 @@ const AuthContext = createContext<AuthValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [user, setUser] = useState<AuthUser | null>(null);
+
+  // The saved theme follows the user: applied on load and login, cleared on logout.
+  const theme = user?.theme ?? "system";
+  useEffect(() => applyTheme(theme), [theme]);
 
   useEffect(() => {
     let active = true;
@@ -63,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ status, user, login, signup, logout }),
+    () => ({ status, user, login, signup, logout, setUser }),
     [status, user, login, signup, logout],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
