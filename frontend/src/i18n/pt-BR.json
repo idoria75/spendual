@@ -180,7 +180,9 @@
       "loading": "Carregando...",
       "notConfigured": "Backup não configurado",
       "none": "Nenhum backup ainda",
-      "last": "Último backup: {{date}}{{size}}"
+      "last": "Último backup: {{date}} · {{size}}",
+      "lastNoSize": "Último backup: {{date}} · tamanho desconhecido",
+      "failed": "Não foi possível ler o backup"
     },
     "catalogLabel": "O que gerenciar",
     "add": "Adicionar",
