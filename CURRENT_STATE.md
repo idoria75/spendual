@@ -13,7 +13,7 @@
 | 2 Auth | done | `phase-2-auth` |
 | 3 Core CRUD + entry flow | done | `phase-3-core-crud` |
 | 4 Dashboard, budgets, bills, installments | done | `phase-4-dashboard` |
-| 5 Settings and backup | not started | — |
+| 5 Settings and backup | done | `phase-5-settings-backup` |
 | 6 CI and deployment | not started | — |
 
 Post-Phase-2 commits on `dev` (not in the tag): run-as-host-user dev container, review fixes
@@ -34,7 +34,9 @@ Post-Phase-2 commits on `dev` (not in the tag): run-as-host-user dev container, 
 | App shell + Lançamentos | `frontend/src/shell`, `frontend/src/features/{transactions,settings}`, `frontend/src/components/ui` | Entry form, list, void/cancel dialogs, catalog manager. `lib/currency.ts`, `lib/date.ts`. |
 | Domain + planning API | `backend/src/domain/accounting.ts`, `backend/src/services/{dashboard,bills}.ts`, `backend/src/routes/planning.ts` | Appendix A in integer cents. Dashboard, budgets, allowances, bills (recurring, installments), confirm/cancel, overdue list. Contract: `packages/shared/src/planning.ts`. |
 | Planning UI | `frontend/src/features/planning`, `frontend/src/pages/{Pessoal,Bills,Budgets}Page.tsx` | Início (household only), Orçamentos, A pagar, Pessoal (per-person balances, allowance sheet). |
-| Tests | `backend/tests`, `frontend/src/**/*.test.*` | 194 backend, 81 frontend, 20 shared. All pass. |
+| Settings + backup | `backend/src/routes/settings.ts`, `backend/src/services/backup.ts`, `deployment/`, `frontend/src/features/settings` | `PATCH /me` (name, tone key, theme), tone_taken 409, `GET /backup/status`, backup/restore scripts + `make test-restore`, Ajustes UI. Contract: `packages/shared/src/settings.ts`. |
+| E2E | `e2e/`, `make e2e` | Playwright 1.49.1 pinned (image tag in compose and CI), own DB `spendual_e2e`. One flow: recurring bill confirmed once. `SCREENSHOTS=1` takes the matrix. |
+| Tests | `backend/tests`, `frontend/src/**/*.test.*` | 209 backend, 108 frontend, 20 shared, 1 e2e. All pass. |
 
 ## Verified (2026-10-14)
 
@@ -46,8 +48,7 @@ Post-Phase-2 commits on `dev` (not in the tag): run-as-host-user dev container, 
 
 ## Missing
 
-- Phases 5 and 6. Nothing exists yet for: settings, backup scripts, Dockerfile, `deployment/`, full CI, e2e.
-- `.github/workflows/ci.yml` only runs lint.
+- Phase 6: production Dockerfile, deploy compose (mount `BACKUP_DIR` read-only into backend), systemd timer, mDNS, secret scan. CI already runs lint, typecheck, test, build and e2e (e2e job never run on GitHub).
 - AuditEvent table exists; nothing writes to it yet.
 
 ## Phase 4 (2026-10-14)
