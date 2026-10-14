@@ -1,4 +1,4 @@
-# Household Finance App — Product & Implementation Reference Guide
+# spendual — Product & Implementation Reference Guide
 
 **Document purpose:** Single source of truth for product requirements, accounting rules, architecture, implementation priorities, testing, security, and deployment.
 
@@ -108,7 +108,7 @@ The app initially serves two people in one household. Each person has their own 
 - Provide logout and server-side session revocation.
 - Set appropriate session expiry; a persistent session of up to seven days is a reasonable initial default.
 - Support password managers with correct `autocomplete` attributes.
-- Never store passwords in plaintext; use Django’s password hashing.
+- Never store passwords in plaintext; use a vetted password hash (argon2).
 - Do not put long-lived authentication tokens in browser local storage.
 - Rate-limit or otherwise protect login attempts where practical.
 
@@ -891,7 +891,7 @@ Recommended order:
 
 ### Phase 0 — Foundations
 - Create repository, README, `.gitignore`, `.env.example`, and coding standards.
-- Set up Django, React/TypeScript/Vite, MySQL, migrations, and local development environment.
+- Set up Express/Prisma, React/TypeScript/Vite, MySQL, migrations, and local development environment.
 - Set up CI and tests immediately.
 - Implement users, authentication, sessions, and locale/timezone configuration.
 
