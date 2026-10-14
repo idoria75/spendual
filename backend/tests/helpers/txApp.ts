@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
+import type { AppOptions } from "../../src/app.js";
 import { csrfToken, makeApp, newAgent, seedHousehold, signup, type Agent } from "./authApp.js";
 
 export interface Ctx {
@@ -13,9 +14,9 @@ export interface Ctx {
 }
 
 /** Two signed-in users plus one category, account and payment method. */
-export async function setup(prisma: PrismaClient): Promise<Ctx> {
+export async function setup(prisma: PrismaClient, opts: Partial<AppOptions> = {}): Promise<Ctx> {
   await seedHousehold(prisma);
-  const app = makeApp(prisma);
+  const app = makeApp(prisma, opts);
   const ana = newAgent(app);
   const beto = newAgent(app);
   const a = await signup(ana, "ana");

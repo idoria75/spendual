@@ -8,8 +8,11 @@ import {
   dashboardSchema,
   installmentPlanDetailSchema,
   allowanceOverviewSchema,
+  recurrenceRuleCreateSchema,
   recurrenceRuleSchema,
 } from "@spendual/shared";
+import { createRule } from "../src/services/bills.js";
+import { currentPeriod } from "../src/lib/period.js";
 import { makeApp } from "./helpers/authApp.js";
 import { resetDb, testPrisma } from "./helpers/testDb.js";
 import { send, setup, type Ctx } from "./helpers/txApp.js";
@@ -22,7 +25,7 @@ beforeAll(() => {
 afterAll(() => prisma.$disconnect());
 beforeEach(async () => {
   await resetDb(prisma);
-  ctx = await setup(prisma);
+  ctx = await setup(prisma, { now: () => new Date("2027-03-15T12:00:00Z") });
 });
 
 const M = "2027-03";
@@ -242,7 +245,7 @@ describe("recurrence generation", () => {
       },
     });
     for (let round = 0; round < 3; round++) {
-      const month = `2027-0${2 + round}`;
+      const month = `2027-0${3 + round}`;
       const res = await Promise.all([
         ctx.ana.get(`/api/dashboard?month=${month}`),
         ctx.beto.get(`/api/dashboard?month=${month}`),
@@ -253,7 +256,7 @@ describe("recurrence generation", () => {
     }
     const rows = await prisma.recurrenceOccurrence.findMany({ where: { ruleId: r.id } });
     const keys = rows.map((x) => x.periodKey).sort();
-    expect(keys).toEqual(["2027-02", "2027-03", "2027-04", "2027-05", "2027-06", "2027-07"]);
+    expect(keys).toEqual(["2027-03", "2027-04", "2027-05", "2027-06", "2027-07", "2027-08"]);
     expect(new Set(keys).size).toBe(keys.length);
   });
 
@@ -269,12 +272,12 @@ describe("recurrence generation", () => {
   });
 
   it("month-end matrix: day 31 clamps in short months, leap year too", async () => {
-    await rule({ dayOfMonth: 31, startDate: "2027-01-01" });
+    await rule({ dayOfMonth: 31, startDate: "2027-03-01" });
     const days: string[] = [];
-    for (const m of ["2027-01", "2027-02", "2027-03", "2027-04"]) {
+    for (const m of ["2027-03", "2027-04", "2027-05", "2027-06"]) {
       days.push(...(await bills(m)).items.map((b) => b.dueDate));
     }
-    expect(days).toEqual(["2027-01-31", "2027-02-28", "2027-03-31", "2027-04-30"]);
+    expect(days).toEqual(["2027-03-31", "2027-04-30", "2027-05-31", "2027-06-30"]);
 
     await rule({ dayOfMonth: 30, startDate: "2028-02-01", description: "Leap" });
     const leap = (await bills("2028-02")).items.filter((b) => b.description === "Leap");
@@ -519,5 +522,264 @@ describe("confirm and cancel", () => {
     });
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe("invalid_state");
+  });
+});
+
+describe("month window", () => {
+  const ruleInDb = (startDate: string) =>
+    prisma.recurrenceRule.create({
+      data: {
+        description: "Luz",
+        expectedAmount: "50.00",
+        dayOfMonth: 5,
+        startDate: new Date(`${startDate}T00:00:00Z`),
+        scope: "household",
+        categoryId: ctx.categoryId,
+        createdById: ctx.anaId,
+        updatedById: ctx.anaId,
+      },
+    });
+
+  it("rejects far months with 400 and writes no rows", async () => {
+    await ruleInDb("2026-01-01");
+    for (const month of ["2031-01", "9999-12", "2026-02", "2000-01"]) {
+      for (const path of ["dashboard", "bills", "budgets", "allowances"]) {
+        const res = await ctx.ana.get(`/api/${path}?month=${month}`);
+        expect(res.status, `${path} ${month}`).toBe(400);
+        expect(res.body.error.code).toBe("validation_error");
+      }
+    }
+    expect(await prisma.recurrenceOccurrence.count()).toBe(0);
+    expect((await ctx.ana.get("/api/dashboard?month=2026-03")).status).toBe(200);
+    expect((await ctx.ana.get("/api/dashboard?month=2029-03")).status).toBe(200);
+  });
+
+  it("a past month generates only from the current month", async () => {
+    await ruleInDb("2026-01-01");
+    await dash("2026-06");
+    const keys = (await prisma.recurrenceOccurrence.findMany()).map((o) => o.periodKey).sort();
+    expect(keys).toEqual(["2027-03", "2027-04", "2027-05", "2027-06"]);
+  });
+});
+
+describe("period helper", () => {
+  it("uses the Sao Paulo month, not the UTC month", () => {
+    expect(currentPeriod(new Date("2027-04-01T01:30:00Z"))).toBe("2027-03");
+    expect(currentPeriod(new Date("2027-04-01T03:00:00Z"))).toBe("2027-04");
+    expect(currentPeriod(new Date("2027-01-01T02:59:00Z"))).toBe("2026-12");
+  });
+
+  it("a new rule starts at the injected clock's month", async () => {
+    const list = await createRule(
+      prisma,
+      ctx.anaId,
+      recurrenceRuleCreateSchema.parse({
+        description: "Aluguel",
+        expectedAmount: "100.00",
+        dayOfMonth: 10,
+        startDate: "2026-01-01",
+        scope: "household",
+        categoryId: ctx.categoryId,
+      }),
+      new Date("2027-04-01T01:30:00Z"), // still March in Sao Paulo
+    );
+    expect(list.month).toBe("2027-03");
+  });
+});
+
+describe("rule state and confirm guards", () => {
+  const firstRuleId = async () =>
+    (await ctx.ana.get("/api/recurrence-rules")).body.items[0].id as number;
+  const planned = (ruleId: number) =>
+    prisma.recurrenceOccurrence.count({ where: { ruleId, status: "planned" } });
+
+  it("ended cancels all planned rows but keeps confirmed ones", async () => {
+    await rule();
+    const list = await bills();
+    await confirm("recurrence", list.items[0]!.id);
+    const id = await firstRuleId();
+    expect(await planned(id)).toBe(3);
+    const res = await send(ctx.ana, "patch", `/api/recurrence-rules/${id}`, { state: "ended" });
+    expect(res.status).toBe(200);
+    expect(await planned(id)).toBe(0);
+    const rows = await prisma.recurrenceOccurrence.findMany({ where: { ruleId: id } });
+    expect(rows.filter((r) => r.status === "cancelled")).toHaveLength(3);
+    expect(rows.filter((r) => r.status === "confirmed")).toHaveLength(1);
+    await dash("2027-05");
+    expect(await prisma.recurrenceOccurrence.count()).toBe(4);
+  });
+
+  it("an earlier end date cancels planned rows after it", async () => {
+    await rule();
+    const id = await firstRuleId();
+    await send(ctx.ana, "patch", `/api/recurrence-rules/${id}`, { endDate: "2027-04-30" });
+    const rows = await prisma.recurrenceOccurrence.findMany({
+      where: { ruleId: id },
+      orderBy: { periodKey: "asc" },
+    });
+    expect(rows.map((r) => r.status)).toEqual(["planned", "planned", "cancelled", "cancelled"]);
+  });
+
+  it("paused keeps planned rows confirmable and stops new ones; resume continues", async () => {
+    await rule();
+    const id = await firstRuleId();
+    await send(ctx.ana, "patch", `/api/recurrence-rules/${id}`, { state: "paused" });
+    expect(await planned(id)).toBe(4);
+    const occ = (await bills()).items[0]!;
+    expect((await confirm("recurrence", occ.id)).status).toBe(200);
+    await dash("2027-07");
+    expect(await prisma.recurrenceOccurrence.count()).toBe(4);
+    await send(ctx.ana, "patch", `/api/recurrence-rules/${id}`, { state: "active" });
+    await dash("2027-07");
+    expect(await prisma.recurrenceOccurrence.count()).toBe(8);
+  });
+
+  it("refuses to confirm a planned row of an ended rule", async () => {
+    await rule();
+    const id = await firstRuleId();
+    const occ = (await bills()).items[0]!;
+    await prisma.recurrenceRule.update({ where: { id }, data: { state: "ended" } });
+    const res = await confirm("recurrence", occ.id);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe("invalid_state");
+    expect(await prisma.transaction.count()).toBe(0);
+  });
+
+  it("checks the final account and payment method, inherited ones too", async () => {
+    await rule({ accountId: ctx.accountId, paymentMethodId: ctx.paymentMethodId });
+    const occ = (await bills()).items[0]!;
+    await prisma.account.update({ where: { id: ctx.accountId }, data: { active: false } });
+    const bad = await confirm("recurrence", occ.id);
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.fields.accountId).toBeTruthy();
+    await prisma.paymentMethod.update({
+      where: { id: ctx.paymentMethodId },
+      data: { active: false },
+    });
+    const bad2 = await confirm("recurrence", occ.id, { accountId: null });
+    expect(bad2.status).toBe(400);
+    expect(bad2.body.error.fields.paymentMethodId).toBeTruthy();
+    expect(await prisma.transaction.count()).toBe(0);
+    const ok = await confirm("recurrence", occ.id, { accountId: null, paymentMethodId: null });
+    expect(ok.status).toBe(200);
+  });
+});
+
+describe("allocations of inactive users", () => {
+  it("still count in the household allocation total", async () => {
+    await tx({ type: "income", amount: "1000.00" });
+    for (const ownerId of [ctx.anaId, ctx.betoId]) {
+      await send(ctx.ana, "post", "/api/allowances", { ownerId, month: M, amount: "100.00" });
+    }
+    await prisma.user.update({ where: { id: ctx.betoId }, data: { active: false } });
+    const d = await dash();
+    expect(d.allowanceAllocations).toBe("200.00");
+    expect(d.savingsBeforeGoals).toBe("800.00");
+    expect(d.people.map((p) => p.userId)).toEqual([ctx.anaId]);
+  });
+});
+
+describe("installment dates", () => {
+  it("rejects a date that does not exist", async () => {
+    const res = await send(ctx.ana, "post", "/api/installment-plans", {
+      description: "Sofa",
+      totalAmount: "100.00",
+      installmentCount: 2,
+      firstDueDate: "2026-02-30",
+      scope: "household",
+      categoryId: ctx.categoryId,
+    });
+    expect(res.status).toBe(400);
+    expect(await prisma.installmentPlan.count()).toBe(0);
+  });
+});
+
+describe("overdue bills", () => {
+  // Clock is 2027-03-15. Occurrences are inserted directly so they can be in the past.
+  const ruleRow = (state: "active" | "paused" | "ended" = "active") =>
+    prisma.recurrenceRule.create({
+      data: {
+        description: "Luz",
+        expectedAmount: "50.00",
+        dayOfMonth: 5,
+        startDate: new Date("2026-01-01T00:00:00Z"),
+        state,
+        scope: "household",
+        categoryId: ctx.categoryId,
+        createdById: ctx.anaId,
+        updatedById: ctx.anaId,
+      },
+    });
+  const occ = (ruleId: number, periodKey: string, status: "planned" | "confirmed" | "cancelled") =>
+    prisma.recurrenceOccurrence.create({
+      data: {
+        ruleId,
+        periodKey,
+        dueDate: new Date(`${periodKey}-05T00:00:00Z`),
+        expectedAmount: "50.00",
+        status,
+      },
+    });
+
+  it("lists planned bills from earlier months, apart from the month items", async () => {
+    const r = await ruleRow();
+    await occ(r.id, "2027-01", "planned");
+    await occ(r.id, "2027-02", "planned");
+    const list = await bills("2027-03");
+    expect(list.overdue.map((b) => b.dueDate)).toEqual(["2027-01-05", "2027-02-05"]);
+    expect(list.items.map((b) => b.dueDate)).toEqual(["2027-03-05"]);
+    expect(list.plannedTotal).toBe("50.00");
+    const apr = await bills("2027-04");
+    // Today is 2027-03-15, so March 5 is overdue too; April items stay out.
+    expect(apr.overdue.map((b) => b.dueDate)).toEqual(["2027-01-05", "2027-02-05", "2027-03-05"]);
+    expect(apr.items.map((b) => b.dueDate)).toEqual(["2027-04-05"]);
+  });
+
+  it("skips confirmed, cancelled, and rows of ended or paused rules", async () => {
+    const r = await ruleRow();
+    await occ(r.id, "2027-01", "confirmed");
+    await occ(r.id, "2027-02", "cancelled");
+    expect((await bills("2027-03")).overdue).toEqual([]);
+    const ended = await ruleRow("ended");
+    await occ(ended.id, "2027-01", "planned");
+    const paused = await ruleRow("paused");
+    await occ(paused.id, "2027-02", "planned");
+    expect((await bills("2027-03")).overdue).toEqual([]);
+  });
+
+  it("includes late installments", async () => {
+    const plan = await prisma.installmentPlan.create({
+      data: {
+        description: "Sofa",
+        totalAmount: "100.00",
+        installmentCount: 2,
+        firstDueDate: new Date("2027-01-10T00:00:00Z"),
+        scope: "household",
+        categoryId: ctx.categoryId,
+        createdById: ctx.anaId,
+        updatedById: ctx.anaId,
+      },
+    });
+    await prisma.installmentOccurrence.createMany({
+      data: [
+        {
+          planId: plan.id,
+          sequenceNumber: 1,
+          dueDate: new Date("2027-01-10T00:00:00Z"),
+          expectedAmount: "50.00",
+        },
+        {
+          planId: plan.id,
+          sequenceNumber: 2,
+          dueDate: new Date("2027-02-10T00:00:00Z"),
+          expectedAmount: "50.00",
+        },
+      ],
+    });
+    const list = await bills("2027-03");
+    expect(list.overdue.map((b) => [b.kind, b.sequenceNumber])).toEqual([
+      ["installment", 1],
+      ["installment", 2],
+    ]);
   });
 });
