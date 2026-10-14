@@ -1,0 +1,320 @@
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
+import { App } from "../../App";
+import { resetCsrfToken } from "../../lib/api-client";
+import { apiError, json, mockFetch, user, type Handler } from "../../test/fetch-mock";
+
+const lookups = {
+  users: [
+    { id: 1, displayName: "Ana", tonePalette: "blue" },
+    { id: 2, displayName: "Bia", tonePalette: "rose" },
+  ],
+  categories: [
+    { id: 1, name: "Mercado", active: true },
+    { id: 2, name: "Transporte", active: true },
+    { id: 3, name: "Saúde", active: true },
+    { id: 4, name: "Lazer", active: true },
+    { id: 5, name: "Viagem", active: true },
+    { id: 6, name: "Antiga", active: false },
+  ],
+  accounts: [{ id: 1, name: "Nubank", type: "bank", active: true }],
+  paymentMethods: [{ id: 1, name: "Pix", active: true }],
+};
+
+function tx(over: Record<string, unknown>) {
+  return {
+    id: 10,
+    type: "expense",
+    status: "confirmed",
+    amount: "64.50",
+    currency: "BRL",
+    description: "iFood",
+    transactionDate: "2026-10-02",
+    scope: "household",
+    ownerId: null,
+    payerId: 1,
+    categoryId: 1,
+    accountId: null,
+    paymentMethodId: null,
+    relatedTransactionId: null,
+    notes: null,
+    voidReason: null,
+    createdById: 1,
+    updatedById: 1,
+    createdAt: "2026-10-02T10:00:00.000Z",
+    updatedAt: "2026-10-02T10:00:00.000Z",
+    ...over,
+  };
+}
+
+let list: unknown[] = [];
+
+type Extra = (req: Parameters<Handler>[0]) => Response | undefined;
+
+function base(extra?: Extra): Handler {
+  return (req) => {
+    const path = new URL(req.url, "http://x").pathname;
+    if (path === "/api/auth/me") return json(200, user);
+    if (path === "/api/auth/csrf") return json(200, { csrfToken: "tok" });
+    if (path === "/api/lookups") return json(200, lookups);
+    if (path === "/api/transactions" && req.method === "GET") return json(200, { items: list });
+    return extra?.(req) ?? json(404, {});
+  };
+}
+
+beforeEach(() => {
+  resetCsrfToken();
+  list = [];
+  localStorage.clear();
+});
+afterEach(() => vi.unstubAllGlobals());
+
+function renderAt(path: string) {
+  return render(
+    <MemoryRouter
+      initialEntries={[path]}
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
+      <App />
+    </MemoryRouter>,
+  );
+}
+
+async function openForm() {
+  await userEvent.click((await screen.findAllByRole("button", { name: "Novo lançamento" }))[0]!);
+  return screen.findByRole("dialog", { name: "Novo lançamento" });
+}
+
+const posts = (mock: ReturnType<typeof mockFetch>) =>
+  mock.mock.calls.filter(([u, init]) => u === "/api/transactions" && init?.method === "POST");
+
+describe("Novo lançamento fields", () => {
+  it("shows fields by type and scope", async () => {
+    mockFetch(base());
+    renderAt("/lancamentos");
+    const dialog = await openForm();
+    await within(dialog).findByRole("button", { name: /Mercado/ });
+    // Expense, household: category yes, owner no, account (main) no, related no.
+    expect(within(dialog).getByText("Categoria")).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("De quem")).not.toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("Despesa reembolsada")).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Valor")).toHaveAttribute("inputmode", "decimal");
+    expect(within(dialog).getByLabelText("Valor")).toHaveFocus();
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Pessoal" }));
+    expect(within(dialog).getByLabelText("De quem")).toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Transferência" }));
+    expect(within(dialog).queryByText("Categoria")).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Conta")).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("Método")).not.toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Reembolso" }));
+    expect(within(dialog).getByLabelText("Despesa reembolsada")).toBeInTheDocument();
+    expect(within(dialog).queryByText("Categoria")).not.toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Receita" }));
+    expect(within(dialog).getByText("Categoria")).toBeInTheDocument();
+  });
+
+  it("shows 4 categories and all on request, without archived ones", async () => {
+    mockFetch(base());
+    renderAt("/lancamentos");
+    const dialog = await openForm();
+    await within(dialog).findByRole("button", { name: /Mercado/ });
+    expect(within(dialog).queryByRole("button", { name: /Viagem/ })).not.toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "todas ›" }));
+    expect(within(dialog).getByRole("button", { name: /Viagem/ })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: /Antiga/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("Novo lançamento submit", () => {
+  async function fillValid(dialog: HTMLElement, amount: string) {
+    await userEvent.type(within(dialog).getByLabelText("Valor"), amount);
+    await userEvent.type(within(dialog).getByLabelText("Descrição"), "Feira");
+    await userEvent.click(await within(dialog).findByRole("button", { name: /Mercado/ }));
+  }
+
+  it("sends the PT-BR amount as an API string", async () => {
+    const mock = mockFetch(
+      base((req) => (req.method === "POST" ? json(201, tx({ amount: "1234.56" })) : undefined)),
+    );
+    renderAt("/lancamentos");
+    const dialog = await openForm();
+    await fillValid(dialog, "1.234,56");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(posts(mock)).toHaveLength(1));
+    const body = JSON.parse(posts(mock)[0]![1]!.body as string) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      type: "expense",
+      amount: "1234.56",
+      description: "Feira",
+      scope: "household",
+      ownerId: null,
+      categoryId: 1,
+      payerId: 1,
+    });
+    expect(await screen.findByText("Lançamento salvo")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Novo lançamento" })).not.toBeInTheDocument();
+  });
+
+  it("does not submit twice while the request runs", async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((r) => (release = r));
+    const mock = mockFetch(base());
+    const inner = mock.getMockImplementation()!;
+    mock.mockImplementation(async (input, init) => {
+      if (init?.method === "POST" && String(input) === "/api/transactions") await gate;
+      return inner(input, init);
+    });
+    renderAt("/lancamentos");
+    const dialog = await openForm();
+    await fillValid(dialog, "10");
+    const save = within(dialog).getByRole("button", { name: "Salvar" });
+    await userEvent.dblClick(save);
+    await waitFor(() =>
+      expect(within(dialog).getByRole("button", { name: "Salvando…" })).toBeDisabled(),
+    );
+    await userEvent.click(within(dialog).getByRole("button", { name: "Salvando…" }));
+    release();
+    await waitFor(() => expect(mock.mock.calls.length).toBeGreaterThan(0));
+    expect(posts(mock)).toHaveLength(1);
+  });
+
+  it("blocks an invalid amount and sends nothing", async () => {
+    const mock = mockFetch(base());
+    renderAt("/lancamentos");
+    const dialog = await openForm();
+    await fillValid(dialog, "1,234");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
+    expect(await within(dialog).findByText(/Informe um valor maior que zero/)).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Valor")).toHaveAttribute("aria-invalid", "true");
+    expect(posts(mock)).toHaveLength(0);
+  });
+
+  it("keeps the inputs and shows an inline error when the save fails", async () => {
+    mockFetch(
+      base((req) => (req.method === "POST" ? apiError(400, "validation_error") : undefined)),
+    );
+    renderAt("/lancamentos");
+    const dialog = await openForm();
+    await fillValid(dialog, "25,90");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "Confira os campos e tente de novo.",
+    );
+    expect(within(dialog).getByLabelText("Valor")).toHaveValue("25,90");
+    expect(within(dialog).getByLabelText("Descrição")).toHaveValue("Feira");
+    expect(within(dialog).getByRole("button", { name: "Salvar" })).toBeEnabled();
+  });
+});
+
+describe("Lançamentos list", () => {
+  it("renders voided rows struck through with the reason, and transfers as neutral", async () => {
+    list = [
+      tx({ id: 1, status: "voided", voidReason: "lançado em dobro", description: "Cinema" }),
+      tx({
+        id: 2,
+        type: "transfer",
+        amount: "500.00",
+        description: "Para poupança",
+        categoryId: null,
+      }),
+      tx({ id: 3, type: "income", amount: "7100.00", description: "Salário", categoryId: null }),
+    ];
+    mockFetch(base());
+    renderAt("/lancamentos");
+    const voided = await screen.findByText("Cinema");
+    expect(voided).toHaveClass("line-through");
+    expect(screen.getByText(/Anulado · lançado em dobro/)).toBeInTheDocument();
+    expect(screen.getByText(/⇄/)).toBeInTheDocument();
+    expect(screen.getByText(/não conta como gasto/)).toBeInTheDocument();
+    expect(screen.getAllByText("+R$ 7.100,00")[1]).toHaveClass("text-pos");
+    // Day total ignores the voided expense and the transfer.
+    expect(screen.getByText("Sex, 02/10").nextElementSibling).toHaveTextContent("+R$ 7.100,00");
+  });
+
+  it("shows the empty state", async () => {
+    mockFetch(base());
+    renderAt("/lancamentos");
+    expect(await screen.findByText("Os lançamentos do mês aparecem aqui.")).toBeInTheDocument();
+  });
+
+  it("requires a reason to void, then voids", async () => {
+    list = [tx({})];
+    const mock = mockFetch(
+      base((req) =>
+        req.url.endsWith("/void")
+          ? json(200, tx({ status: "voided", voidReason: "erro" }))
+          : undefined,
+      ),
+    );
+    renderAt("/lancamentos");
+    await userEvent.click(await screen.findByText("iFood"));
+    await userEvent.click(await screen.findByRole("button", { name: /Anular/ }));
+    const confirm = await screen.findByRole("dialog", { name: "Anular lançamento?" });
+    expect(within(confirm).getByText(/iFood · .*64,50 · 02\/10/)).toBeInTheDocument();
+    await userEvent.click(within(confirm).getByRole("button", { name: /Anular lançamento/ }));
+    expect(await within(confirm).findByText("Informe o motivo.")).toBeInTheDocument();
+    expect(mock.mock.calls.some(([u]) => String(u).endsWith("/void"))).toBe(false);
+
+    await userEvent.type(within(confirm).getByLabelText("Motivo"), "erro");
+    await userEvent.click(within(confirm).getByRole("button", { name: /Anular lançamento/ }));
+    await waitFor(() => {
+      const call = mock.mock.calls.find(([u]) => String(u) === "/api/transactions/10/void");
+      expect(JSON.parse(call![1]!.body as string)).toEqual({ reason: "erro" });
+    });
+  });
+
+  it("edits with PATCH-able fields only, sending only what changed", async () => {
+    list = [tx({})];
+    const mock = mockFetch(
+      base((req) => (req.method === "PATCH" ? json(200, tx({ amount: "70.00" })) : undefined)),
+    );
+    renderAt("/lancamentos");
+    await userEvent.click(await screen.findByText("iFood"));
+    await userEvent.click(await screen.findByRole("button", { name: "Editar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar lançamento" });
+    expect(within(dialog).queryByRole("button", { name: "Despesa" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Pessoal" })).not.toBeInTheDocument();
+    const amount = within(dialog).getByLabelText("Valor");
+    expect(amount).toHaveValue("64,50");
+    await userEvent.clear(amount);
+    await userEvent.type(amount, "70");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await waitFor(() => {
+      const call = mock.mock.calls.find(
+        ([u, i]) => u === "/api/transactions/10" && i?.method === "PATCH",
+      );
+      expect(JSON.parse(call![1]!.body as string)).toEqual({ amount: "70.00" });
+    });
+  });
+});
+
+describe("Ajustes", () => {
+  it("archives a category with PATCH, never deletes", async () => {
+    const mock = mockFetch(
+      base((req) =>
+        req.method === "PATCH" ? json(200, { id: 1, name: "Mercado", active: false }) : undefined,
+      ),
+    );
+    renderAt("/ajustes");
+    await userEvent.click(await screen.findByRole("button", { name: "Arquivar: Mercado" }));
+    await waitFor(() => {
+      const call = mock.mock.calls.find(([u]) => u === "/api/categories/1");
+      expect(call![1]!.method).toBe("PATCH");
+      expect(JSON.parse(call![1]!.body as string)).toEqual({ active: false });
+    });
+    expect(mock.mock.calls.some(([, i]) => i?.method === "DELETE")).toBe(false);
+  });
+
+  it("shows the name_taken message on a duplicate", async () => {
+    mockFetch(base((req) => (req.method === "POST" ? apiError(409, "name_taken") : undefined)));
+    renderAt("/ajustes");
+    await userEvent.type(await screen.findByLabelText("Nova categoria"), "Mercado");
+    await userEvent.click(screen.getByRole("button", { name: "Adicionar" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Já existe um item com este nome.");
+  });
+});
