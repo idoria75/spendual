@@ -1,5 +1,46 @@
 {
   "app": {
-    "title": "Spendual"
+    "title": "Spendual",
+    "tagline": "Finanças da casa"
+  },
+  "common": {
+    "loading": "Carregando…"
+  },
+  "home": {
+    "title": "Início",
+    "welcome": "Olá, {{name}}",
+    "placeholder": "O painel aparece aqui em breve.",
+    "logout": "Sair"
+  },
+  "auth": {
+    "modeLabel": "Modo de acesso",
+    "login": "Entrar",
+    "signup": "Criar conta",
+    "displayName": "Nome",
+    "username": "Usuário",
+    "password": "Senha",
+    "submitLogin": "Entrar",
+    "submitSignup": "Criar conta",
+    "submitting": "Aguarde…",
+    "householdHint": "O cadastro fecha depois de 2 contas."
+  },
+  "fieldErrors": {
+    "displayName": "Informe seu nome (até 80 caracteres).",
+    "username": "Use de 3 a 60 caracteres: letras, números, ponto, hífen ou sublinhado.",
+    "usernameRequired": "Informe o usuário.",
+    "password": "A senha deve ter de 10 a 200 caracteres.",
+    "passwordRequired": "Informe a senha.",
+    "invalid": "Valor inválido."
+  },
+  "errors": {
+    "validation_error": "Confira os campos e tente de novo.",
+    "unauthenticated": "Sua sessão expirou. Entre de novo.",
+    "invalid_credentials": "Usuário ou senha incorretos.",
+    "csrf_invalid": "Não foi possível validar o pedido. Tente de novo.",
+    "household_full": "Esta casa já tem 2 contas. O cadastro está fechado.",
+    "username_taken": "Este usuário já existe. Escolha outro.",
+    "rate_limited": "Muitas tentativas. Espere um pouco e tente de novo.",
+    "internal_error": "Algo deu errado. Tente de novo em instantes.",
+    "network": "Sem conexão com o servidor. Tente de novo."
   }
 }
