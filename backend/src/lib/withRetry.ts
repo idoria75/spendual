@@ -25,7 +25,9 @@ export function isRetryableDbError(err: unknown): boolean {
   const text = `${typeof e.message === "string" ? e.message : ""} ${
     typeof e.meta?.message === "string" ? e.meta.message : ""
   }`;
-  return /Deadlock found|Lock wait timeout exceeded|\b(?:code|error|errno):? ?(?:1213|1205)\b/i.test(text);
+  return /Deadlock found|Lock wait timeout exceeded|\b(?:code|error|errno):? ?(?:1213|1205)\b/i.test(
+    text,
+  );
 }
 
 /** Run fn. Retry on deadlock or lock timeout. Rethrow the last error after the last try. */

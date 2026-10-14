@@ -40,7 +40,11 @@ export interface InstallmentRow {
 }
 
 /** Build the rows for a plan. Due day follows the first due date, clamped in short months. */
-export function buildInstallmentRows(total: string, count: number, firstDueDate: string): InstallmentRow[] {
+export function buildInstallmentRows(
+  total: string,
+  count: number,
+  firstDueDate: string,
+): InstallmentRow[] {
   const amounts = splitInstallments(total, count);
   const startPeriod = firstDueDate.slice(0, 7);
   const day = Number(firstDueDate.slice(8, 10));
