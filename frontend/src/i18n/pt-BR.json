@@ -11,7 +11,6 @@
   "home": {
     "title": "Início",
     "welcome": "Olá, {{name}}",
-    "placeholder": "O painel aparece aqui em breve.",
     "logout": "Sair"
   },
   "auth": {
@@ -49,8 +48,7 @@
     "refund_exceeds": "O reembolso passa do valor da despesa.",
     "allocation_exists": "Já existe uma mesada deste mês para esta pessoa.",
     "internal_error": "Algo deu errado. Tente de novo em instantes.",
-    "network": "Sem conexão com o servidor. Tente de novo.",
-    "name_taken": "Já existe um item com este nome."
+    "network": "Sem conexão com o servidor. Tente de novo."
   },
   "nav": {
     "main": "Navegação",
@@ -65,10 +63,8 @@
     "prevMonth": "Mês anterior",
     "nextMonth": "Próximo mês",
     "newEntry": "Novo lançamento",
-    "newEntryLong": "Novo lançamento"
-  },
-  "placeholder": {
-    "soon": "Esta tela chega em breve."
+    "newEntryLong": "Novo lançamento",
+    "orcamentosHint": "Limites por categoria e do mês"
   },
   "form": {
     "titleNew": "Novo lançamento",
@@ -187,6 +183,113 @@
     "paymentMethods": {
       "title": "Métodos",
       "newLabel": "Novo método"
+    }
+  },
+  "dashboard": {
+    "actual": "Realizado",
+    "planned": "Previsão · inclui planejados",
+    "income": "Receitas da casa",
+    "sharedExpenses": "Despesas da casa",
+    "allowances": "Mesadas",
+    "savings": "Poupança do mês",
+    "unallocated": "Poupança sem destino",
+    "savingsRate": "Taxa de poupança",
+    "unknownCount_one": "mais {{count}} conta sem valor (valor ?)",
+    "unknownCount_other": "mais {{count}} contas sem valor (valor ?)",
+    "seeBills": "Ver contas a pagar",
+    "overallBudget": "Orçamento do mês",
+    "people": "Pessoas",
+    "balance": "Saldo",
+    "allowanceLine": "Mesada do mês: {{amount}}",
+    "failed": "Não foi possível carregar o painel."
+  },
+  "allowance": {
+    "set": "Definir mesada de {{name}}",
+    "amount": "Valor da mesada",
+    "save": "Salvar mesada"
+  },
+  "budgets": {
+    "overall": "Orçamento geral",
+    "none": "sem orçamento",
+    "of": "de {{amount}}",
+    "over": "▲ {{amount}} acima",
+    "edit": "Editar orçamento: {{name}}",
+    "amount": "Valor do orçamento",
+    "modeLabel": "Vale para",
+    "modeOnly": "Só {{month}}",
+    "modeForward": "De {{month}} em diante",
+    "pastNote": "Meses passados não mudam.",
+    "empty": "As categorias aparecem aqui.",
+    "failed": "Não foi possível carregar os orçamentos.",
+    "errors": {
+      "amount": "Informe um valor de zero ou mais, como 800,00."
+    }
+  },
+  "bills": {
+    "unknown": "valor ?",
+    "unknownHint": "Valor ainda não informado. Digite o valor pago.",
+    "confirm": "Confirmar pagamento",
+    "confirmTitle": "Confirmar pagamento",
+    "confirmed": "Pagamento confirmado",
+    "cancel": "Cancelar conta",
+    "cancelTitle": "Cancelar conta?",
+    "cancelBody": "A conta prevista deixa de valer e não vira lançamento. Isso não pode ser desfeito.",
+    "cancelAction": "Cancelar conta",
+    "cancelled": "Conta cancelada",
+    "created": "Conta criada",
+    "tabsLabel": "Visão",
+    "tabs": {
+      "upcoming": "Próximas",
+      "recurring": "Recorrentes",
+      "installments": "Parcelas"
+    },
+    "groups": {
+      "late": "Vencidas",
+      "week": "Esta semana",
+      "later": "Depois",
+      "done": "Pagas e canceladas"
+    },
+    "due": "vence {{date}}",
+    "dueLabel": "Vencimento",
+    "late": "vencida",
+    "status": {
+      "planned": "Prevista",
+      "confirmed": "Paga",
+      "cancelled": "Cancelada"
+    },
+    "ruleState": {
+      "active": "Ativa",
+      "paused": "Pausada",
+      "ended": "Encerrada"
+    },
+    "everyDay": "todo dia {{day}}",
+    "empty": "As contas do mês aparecem aqui.",
+    "noRules": "Nenhuma conta recorrente ainda.",
+    "plannedTotal": "Previsto: {{amount}}",
+    "unknownCount_one": "{{count}} sem valor",
+    "unknownCount_other": "{{count}} sem valor",
+    "failed": "Não foi possível carregar as contas.",
+    "create": {
+      "rule": {
+        "button": "Recorrente",
+        "title": "Nova conta recorrente",
+        "amount": "Valor mensal",
+        "unknown": "Ainda não sei o valor",
+        "day": "Dia do mês",
+        "dayError": "Informe um dia de 1 a 31.",
+        "start": "Começa em",
+        "end": "Termina em (opcional)"
+      },
+      "plan": {
+        "button": "Parcelado",
+        "title": "Nova compra parcelada",
+        "total": "Valor total",
+        "count": "Parcelas",
+        "countError": "Informe de 2 a 60 parcelas.",
+        "first": "1ª parcela",
+        "preview": "{{n}}x {{each}} · soma {{total}}",
+        "previewLast": "{{n}}x {{each}} + última {{last}} · soma {{total}}"
+      }
     }
   }
 }

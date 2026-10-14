@@ -5,6 +5,7 @@ import {
   formatDayMonth,
   formatMonth,
   parseDateInput,
+  addDays,
   shiftMonth,
   today,
 } from "./date";
@@ -32,4 +33,9 @@ it("shifts and formats months", () => {
   expect(shiftMonth("2026-12", 1)).toBe("2027-01");
   expect(shiftMonth("2026-01", -1)).toBe("2025-12");
   expect(formatMonth("2026-10")).toBe("Outubro 2026");
+});
+
+it("adds days across month and year ends", () => {
+  expect(addDays("2026-10-28", 6)).toBe("2026-11-03");
+  expect(addDays("2026-12-30", 3)).toBe("2027-01-02");
 });

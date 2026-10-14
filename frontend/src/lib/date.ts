@@ -73,3 +73,10 @@ export function formatMonth(month: string): string {
   const text = monthFmt.format(new Date(Date.UTC(Number(y), Number(m) - 1, 1)));
   return `${text.charAt(0).toUpperCase()}${text.slice(1)}`.replace(" de ", " ");
 }
+
+/** Add days to a "YYYY-MM-DD" date. */
+export function addDays(date: DateOnly, days: number): DateOnly {
+  const [y = "0", m = "1", d = "1"] = date.split("-");
+  const next = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d) + days));
+  return next.toISOString().slice(0, 10);
+}
