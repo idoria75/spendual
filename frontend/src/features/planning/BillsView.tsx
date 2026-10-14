@@ -39,7 +39,11 @@ function BillRow({ bill, onOpen, late }: { bill: Bill; onOpen: () => void; late:
         type="button"
         onClick={onOpen}
         style={{ borderLeftColor: toneColor(person?.tonePalette) }}
-        className="grid min-h-[56px] w-full grid-cols-[28px_1fr_auto] items-center gap-3 rounded-input border-l-[3px] border-dashed border-y border-r border-y-line border-r-line bg-transparent px-3 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className={cn(
+          "grid min-h-[56px] w-full grid-cols-[28px_1fr_auto] items-center gap-3 rounded-input border-l-[3px] border-y border-r border-y-line border-r-line bg-transparent px-3 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+          // Planned is dashed (not yet real). Paid or cancelled is solid.
+          !done && "border-dashed",
+        )}
       >
         <CategoryTile id={bill.categoryId} />
         <span className="min-w-0">
