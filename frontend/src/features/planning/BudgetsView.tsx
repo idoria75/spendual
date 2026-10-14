@@ -4,6 +4,7 @@ import type { BudgetLine } from "@spendual/shared";
 import { Button } from "../../components/ui/button";
 import { formatMoney, fromCents, toCents } from "../../lib/currency";
 import { CategoryTile } from "../transactions/CategoryTile";
+import { useEntry } from "../transactions/entry";
 import { useLookups } from "../transactions/lookups";
 import { useMonth } from "../transactions/month";
 import { fetchBudgets } from "./api";
@@ -64,8 +65,9 @@ function BudgetRow({
 export function BudgetsView() {
   const { t } = useTranslation();
   const { month } = useMonth();
+  const { version } = useEntry();
   const { data: lookups } = useLookups();
-  const { data, failed, reload } = useLoad(() => fetchBudgets(month), [month]);
+  const { data, failed, reload } = useLoad(() => fetchBudgets(month), [month, version]);
   const [target, setTarget] = useState<BudgetTarget | null>(null);
 
   const nameOf = (id: number | null) =>
