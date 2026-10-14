@@ -14,22 +14,27 @@ model Household {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  username     String   @unique @db.VarChar(60)
-  passwordHash String   @db.VarChar(255)
-  displayName  String   @db.VarChar(80)
-  tonePalette  String?  @unique @db.VarChar(30)
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id           Int              @id @default(autoincrement())
+  username     String           @unique @db.VarChar(60)
+  passwordHash String           @db.VarChar(255)
+  displayName  String           @db.VarChar(80)
+  tonePalette  String?          @unique @db.VarChar(30)
+  active       Boolean          @default(true)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  ruleOwner    RecurrenceRule[] @relation("RuleOwner")
+  rulePayer    RecurrenceRule[] @relation("RulePayer")
+  ruleCreated  RecurrenceRule[] @relation("RuleCreatedBy")
+  ruleUpdated  RecurrenceRule[] @relation("RuleUpdatedBy")
 }
 
 model Category {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique @db.VarChar(80)
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              Int              @id @default(autoincrement())
+  name            String           @unique @db.VarChar(80)
+  active          Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  recurrenceRules RecurrenceRule[]
 }
 
 enum AccountType {
@@ -40,19 +45,91 @@ enum AccountType {
 }
 
 model Account {
-  id        Int         @id @default(autoincrement())
-  name      String      @unique @db.VarChar(80)
-  type      AccountType
-  currency  String      @default("BRL") @db.VarChar(3)
-  active    Boolean     @default(true)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id              Int              @id @default(autoincrement())
+  name            String           @unique @db.VarChar(80)
+  type            AccountType
+  currency        String           @default("BRL") @db.VarChar(3)
+  active          Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  recurrenceRules RecurrenceRule[]
 }
 
 model PaymentMethod {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique @db.VarChar(80)
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              Int              @id @default(autoincrement())
+  name            String           @unique @db.VarChar(80)
+  active          Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  recurrenceRules RecurrenceRule[]
+}
+
+enum Scope {
+  household
+  personal
+}
+
+enum RecurrenceState {
+  active
+  paused
+  ended
+}
+
+enum OccurrenceStatus {
+  planned
+  confirmed
+  cancelled
+}
+
+model RecurrenceRule {
+  id              Int             @id @default(autoincrement())
+  description     String          @db.VarChar(200)
+  expectedAmount  Decimal?        @db.Decimal(12, 2)
+  currency        String          @default("BRL") @db.VarChar(3)
+  dayOfMonth      Int             @db.TinyInt
+  startDate       DateTime        @db.Date
+  endDate         DateTime?       @db.Date
+  state           RecurrenceState @default(active)
+  scope           Scope
+  ownerId         Int?
+  payerId         Int?
+  categoryId      Int?
+  accountId       Int?
+  paymentMethodId Int?
+  createdById     Int
+  updatedById     Int
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  owner         User?                  @relation("RuleOwner", fields: [ownerId], references: [id])
+  payer         User?                  @relation("RulePayer", fields: [payerId], references: [id])
+  createdBy     User                   @relation("RuleCreatedBy", fields: [createdById], references: [id])
+  updatedBy     User                   @relation("RuleUpdatedBy", fields: [updatedById], references: [id])
+  category      Category?              @relation(fields: [categoryId], references: [id])
+  account       Account?               @relation(fields: [accountId], references: [id])
+  paymentMethod PaymentMethod?         @relation(fields: [paymentMethodId], references: [id])
+  occurrences   RecurrenceOccurrence[]
+
+  @@index([ownerId])
+  @@index([payerId])
+  @@index([categoryId])
+  @@index([accountId])
+  @@index([paymentMethodId])
+  @@index([createdById])
+  @@index([updatedById])
+}
+
+model RecurrenceOccurrence {
+  id             Int              @id @default(autoincrement())
+  ruleId         Int
+  periodKey      String           @db.VarChar(7)
+  dueDate        DateTime         @db.Date
+  expectedAmount Decimal?         @db.Decimal(12, 2)
+  status         OccurrenceStatus @default(planned)
+  createdAt      DateTime         @default(now())
+
+  rule RecurrenceRule @relation(fields: [ruleId], references: [id])
+
+  @@unique([ruleId, periodKey])
+  @@index([dueDate])
 }
