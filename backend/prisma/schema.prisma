@@ -398,3 +398,13 @@ model AuditEvent {
   @@index([entityType, entityId])
   @@index([actorId])
 }
+
+// Used by @quixo3/prisma-session-store. Field names are what the store expects.
+model Session {
+  id        String   @id @db.VarChar(255)
+  sid       String   @unique @db.VarChar(255)
+  data      String   @db.MediumText
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
