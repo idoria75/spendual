@@ -65,7 +65,7 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
 
   const [values, setValues] = useState<FormValues>(() =>
     bill
-      ? valuesFromBill(bill, user?.id ?? null, today())
+      ? valuesFromBill(bill, user?.id ?? null, bill.dueDate)
       : editing
         ? valuesFromTransaction(editing)
         : {
