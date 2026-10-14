@@ -247,7 +247,8 @@
       "late": "Vencidas",
       "week": "Esta semana",
       "later": "Depois",
-      "done": "Pagas e canceladas"
+      "done": "Pagas e canceladas",
+      "planned": "A pagar"
     },
     "due": "vence {{date}}",
     "dueLabel": "Vencimento",
@@ -278,7 +279,8 @@
         "day": "Dia do mês",
         "dayError": "Informe um dia de 1 a 31.",
         "start": "Começa em",
-        "end": "Termina em (opcional)"
+        "end": "Termina em (opcional)",
+        "dayHint": "Em meses curtos, vale o último dia do mês."
       },
       "plan": {
         "button": "Parcelado",
@@ -290,6 +292,7 @@
         "preview": "{{n}}x {{each}} · soma {{total}}",
         "previewLast": "{{n}}x {{each}} + última {{last}} · soma {{total}}"
       }
-    }
+    },
+    "emptyInstallments": "As parcelas do mês aparecem aqui."
   }
 }

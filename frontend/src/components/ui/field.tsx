@@ -15,10 +15,11 @@ export function Label({ className = "", ...props }: LabelPrimitive.LabelProps) {
 interface FieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "id"> {
   label: string;
   error?: string | undefined;
+  hint?: string | undefined;
 }
 
 /** Label + input + error text, linked with aria-describedby. */
-export function Field({ label, error, ...inputProps }: FieldProps) {
+export function Field({ label, error, hint, ...inputProps }: FieldProps) {
   const id = useId();
   const errorId = `${id}-error`;
   return (
@@ -30,6 +31,7 @@ export function Field({ label, error, ...inputProps }: FieldProps) {
         aria-describedby={error ? errorId : undefined}
         {...inputProps}
       />
+      {hint && !error ? <p className="text-[0.75rem] text-muted">{hint}</p> : null}
       {error ? (
         <p id={errorId} className="text-[0.75rem] text-err">
           {error}

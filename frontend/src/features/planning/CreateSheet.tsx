@@ -166,6 +166,7 @@ function CreateForm({ kind, onSaved }: { kind: CreateKind; onSaved: () => void }
       )}
       {isRule ? (
         <Field
+          hint={Number(v.day) > 28 ? t("bills.create.rule.dayHint") : undefined}
           label={t("bills.create.rule.day")}
           inputMode="numeric"
           autoComplete="off"
