@@ -186,8 +186,8 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
     setSubmitting(true);
     try {
       await run();
-      if (values.categoryId !== null && f.category) rememberCategory(values.categoryId);
-      if (!editing) rememberMethod(values.paymentMethodId);
+      if (!bill && values.categoryId !== null && f.category) rememberCategory(values.categoryId);
+      if (!editing && !bill) rememberMethod(values.paymentMethodId);
       showToast(t(bill ? "bills.confirmed" : editing ? "form.savedEdit" : "form.saved"));
       onSaved();
     } catch (error) {
