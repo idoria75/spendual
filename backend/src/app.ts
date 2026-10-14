@@ -1,7 +1,11 @@
-import express from "express";
+import express, { Router } from "express";
 import type { PrismaClient } from "@prisma/client";
 import { authRouter, type LoginLimit } from "./auth/routes.js";
+import { requireCsrf } from "./auth/csrf.js";
 import { errorHandler } from "./auth/errors.js";
+import { requireAuth } from "./auth/requireAuth.js";
+import { catalogRouter } from "./routes/catalog.js";
+import { transactionsRouter } from "./routes/transactions.js";
 import { SESSION_MAX_AGE_MS, sessionMiddleware } from "./auth/session.js";
 
 export interface AppOptions {
@@ -36,6 +40,12 @@ export function createApp(opts: AppOptions) {
     "/auth",
     authRouter(opts.prisma, opts.loginLimit ?? { windowMs: 15 * 60 * 1000, max: 10 }, maxAgeMs),
   );
+  // Everything below needs a session. State-changing requests also need the CSRF token.
+  const protectedApi = Router();
+  protectedApi.use(requireAuth(opts.prisma), requireCsrf);
+  protectedApi.use(catalogRouter(opts.prisma));
+  protectedApi.use("/transactions", transactionsRouter(opts.prisma));
+  api.use(protectedApi);
   app.use("/api", api);
 
   app.use(errorHandler);
