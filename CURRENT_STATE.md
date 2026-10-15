@@ -60,6 +60,13 @@ Post-Phase-2 commits on `dev` (not in the tag): run-as-host-user dev container, 
 - Refund counts in the month of its linked expense.
 - Open: rule create/patch write no AuditEvent; no UI to pause/end a rule; no plans list endpoint; no "Próximas contas" or chart on Início; no "Informar valor" action; budget bar has no planned segment.
 
+## Feedback round 1 (2026-10-14, tag `feedback-round-1`)
+
+- From phone testing. Done: income vs expense categories (`Category.kind`, seeded income set), full category names, live BRL amount input, "Recebido por" for income, "Parcelado" in the entry form for credit-card method or account (creates an installment plan), first-run setup page (`/configuracao`, `GET/POST /setup`), stacked category bar and "Próximas contas" on Início, password minimum 4.
+- Dev safety: fixed compose project name `spendual`, `make backup-dev` (also automatic on `make dev`), `make restore-dev`/`reset-dev` need `CONFIRM=yes`, `make dev` exits 0 on Ctrl-C, `make mdns-install` and `make backup-timer-install` print sudo commands (not run).
+- Migration `add_category_kind` and `add_setup_completed` tested on a copy of the real dev DB: data kept (6 transactions). The real dev DB migrates on the next `make dev`.
+- Open: setup page shows once for existing households; a zero amount cannot be typed in the amount field (empty = none); installment plan does not store the card; `spendual.local` not published until the user runs `make mdns-install`; Android may not resolve `.local`.
+
 ## Open points (details in the memory file)
 
 - Decided (2026-10-14): both users may read and edit each other's personal records.
