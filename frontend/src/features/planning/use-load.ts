@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface Loaded<T> {
   data: T | null;
@@ -15,12 +15,16 @@ export function useLoad<T>(load: () => Promise<T>, deps: readonly unknown[]): Lo
   const [loaded, setLoaded] = useState<{ key: string; data: T } | null>(null);
   const [failedKey, setFailedKey] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  // The caller passes a new closure each render; only the deps (as `key`) decide when to load.
+  const loadRef = useRef(load);
+  loadRef.current = load;
   const reload = useCallback(() => setTick((n) => n + 1), []);
 
   useEffect(() => {
     let active = true;
     setFailedKey(null);
-    load()
+    loadRef
+      .current()
       .then((result) => {
         if (active) setLoaded({ key, data: result });
       })
@@ -34,7 +38,7 @@ export function useLoad<T>(load: () => Promise<T>, deps: readonly unknown[]): Lo
     return () => {
       active = false;
     };
-  }, [...deps, tick]);
+  }, [key, tick]);
 
   return {
     data: loaded?.key === key ? loaded.data : null,

@@ -1,6 +1,8 @@
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 import prettier from "eslint-config-prettier";
+import reactHooks from "eslint-plugin-react-hooks";
+import jsxA11y from "eslint-plugin-jsx-a11y";
 import i18n from "./frontend/eslint.i18n.config.js";
 
 // Type-aware rules run on source only. Tests are looser (mocks, supertest bodies are `any`).
@@ -37,5 +39,14 @@ export default tseslint.config(
     ...tseslint.configs.disableTypeChecked,
   },
   ...i18n,
+  {
+    files: ["frontend/src/**/*.{ts,tsx}"],
+    plugins: { "react-hooks": reactHooks },
+    rules: {
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "error",
+    },
+  },
+  { ...jsxA11y.flatConfigs.recommended, files: ["frontend/src/**/*.{ts,tsx}"] },
   prettier,
 );
