@@ -1,3 +1,7 @@
+# Fixed project name: the MySQL data lives in the volume "spendual_mysql_data", whatever the
+# folder or worktree you run from. COMPOSE_PROJECT_NAME still overrides this (parallel agents).
+name: spendual
+
 services:
   app:
     build:
@@ -11,6 +15,8 @@ services:
       SESSION_SECRET: dev-only-secret-change-for-real-use-0123456789
       TZ: America/Sao_Paulo
       HOME: /tmp
+      # Extra host names Vite accepts, comma separated. Example: VITE_ALLOWED_HOSTS=mybox.lan
+      VITE_ALLOWED_HOSTS: "${VITE_ALLOWED_HOSTS:-}"
       BACKUP_DIR: /workspace/backups
       NPM_CONFIG_UPDATE_NOTIFIER: "false"
       npm_config_cache: /tmp/.npm
@@ -64,4 +70,4 @@ services:
       retries: 20
 
 volumes:
-  mysql_data:
+  mysql_data: # real name: <project>_mysql_data, so spendual_mysql_data by default

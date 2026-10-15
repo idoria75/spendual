@@ -1,5 +1,65 @@
 # Deployment
 
+## Your data (dev)
+
+Dev data lives in one Docker volume: `spendual_mysql_data`. `compose.dev.yml` fixes the project
+name to `spendual`, so every folder and worktree uses the same volume.
+
+- Why it matters: Docker names the volume after the compose project. Before this fix the name came
+  from the folder or from `COMPOSE_PROJECT_NAME`. A run from another folder, or with another
+  project name, got a new EMPTY volume. The old login then "did not work", but the old data was
+  still in the old volume. (On 2026-10-14 this happened: data from the project `spendual_main`
+  sits in the volume `spendual_main_mysql_data`.)
+- Parallel agents set their own `COMPOSE_PROJECT_NAME` on purpose, to stay apart from your data.
+  Do not set it for your own work.
+- Commands that keep data: `make dev`, `make down`, Ctrl-C, restart of Docker or the machine.
+- Commands that delete data: `make reset-dev CONFIRM=yes` (takes a backup first),
+  `make restore-dev FILE=... CONFIRM=yes` (replaces the database, takes a backup first),
+  `docker compose down -v`, `docker volume rm`, `prisma migrate reset`. Never run the last three
+  by hand on the `spendual` project.
+- `make e2e` and `make test` use other databases on the same server (`spendual_e2e`,
+  `spendual_test`) and never touch `spendual`. The e2e run uses `migrate reset` on `spendual_e2e` only.
+- Backups: `make backup-dev` writes `./backups/spendual-dev-YYYYMMDD-HHMMSS.sql.gz` (mode 600,
+  last 14 kept, git ignores the folder). `make dev` takes one automatically before it starts
+  (skipped when MySQL is not up yet or the database is empty). The backups are plain files on
+  your disk, so they survive a lost volume. Copy them to another disk now and then.
+- Restore: `make restore-dev FILE=backups/spendual-dev-....sql.gz CONFIRM=yes`.
+- A failed automatic backup only prints a warning; `make dev` goes on.
+- Ctrl-C on `make dev` exits 0. Both servers are stopped, including node.
+- Daily backup at 03:00: `make backup-timer-install` prints the sudo commands.
+
+### Find old data
+
+`make dev` lists other `*_mysql_data` volumes at start (read-only look). To move data from an old
+volume into the main one:
+
+1. Start MySQL on the old project: `COMPOSE_PROJECT_NAME=spendual_main docker compose -f compose.dev.yml up -d mysql`
+   (the project name is the volume name without `_mysql_data`).
+2. Back it up: `COMPOSE_PROJECT_NAME=spendual_main make backup-dev`.
+3. Stop it: `COMPOSE_PROJECT_NAME=spendual_main docker compose -f compose.dev.yml stop mysql`.
+4. Start the main one (`make dev`, then Ctrl-C is fine) and restore:
+   `make restore-dev FILE=backups/spendual-dev-....sql.gz CONFIRM=yes`.
+
+Never mount an old volume read-write by hand.
+
+## Dev: open the app from a phone or by name
+
+- Vite listens on `0.0.0.0:5173` and proxies `/api` to the backend, so the browser talks to one
+  origin. There is no CORS. The session cookie has no domain and `Secure` is off, so login works
+  on `http://localhost:5173`, `http://192.168.0.66:5173` (your LAN IP) and
+  `http://spendual.local:5173`.
+- `spendual.local` needs something to publish the name. Nothing did before. `make mdns-install`
+  prints the sudo commands (it does not run them). It needs `avahi-daemon` running on the dev
+  machine. The name points to the machine's LAN IP.
+- How a phone resolves `.local`: it sends an mDNS question to the LAN (UDP 5353) and avahi on the
+  dev machine answers. iPhone and most Linux and macOS devices do this. Android Chrome often
+  does NOT resolve `.local` on some networks or versions. Windows may need the Private network
+  profile. This is not tested on your phone.
+- Fallback: use the IP, `http://192.168.0.66:5173`. Make it stable with a DHCP reservation in the
+  router (bind the machine's MAC address to that IP).
+- Production stack: the name is published by `deployment/avahi/spendual.service` on the deploy box
+  (port 80, or `APP_PORT`, see "mDNS" below). The dev name uses port 5173.
+
 ## Backup and restore
 
 Backups are `mysqldump` files, gzipped, in a host folder **outside** the MySQL data volume.
