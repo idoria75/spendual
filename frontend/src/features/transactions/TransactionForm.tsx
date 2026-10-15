@@ -5,6 +5,7 @@ import type { FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../auth/AuthContext";
 import { messageKeyFor } from "../../auth/error-messages";
+import { AmountInput } from "../../components/ui/amount-input";
 import { Button } from "../../components/ui/button";
 import { Chip } from "../../components/ui/chip";
 import { Field, Label } from "../../components/ui/field";
@@ -215,14 +216,12 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
 
       <div className="flex flex-col gap-[3px]">
         <Label htmlFor="tx-amount">{t("form.amount")}</Label>
-        <Input
+        <AmountInput
           id="tx-amount"
           ref={amountRef}
-          inputMode="decimal"
-          autoComplete="off"
           placeholder={t("form.amountPlaceholder")}
           value={values.amount}
-          onChange={(e) => set("amount", e.target.value)}
+          onValueChange={(v) => set("amount", v)}
           aria-invalid={errors.amount ? true : undefined}
           aria-describedby={errors.amount ? "tx-amount-error" : undefined}
           className="min-h-[56px] text-[34px] font-bold"

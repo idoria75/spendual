@@ -61,3 +61,29 @@ export function parseAmountInput(input: string): Money | null {
   if (int.length > 10) return null;
   return `${int}.${fracRaw.padEnd(2, "0")}`;
 }
+
+const MAX_AMOUNT_DIGITS = 12;
+
+function groupThousands(int: string): string {
+  return int.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+/** API money ("1234.50") to the text shown in an amount field ("1.234,50"). */
+export function formatAmountInput(amount: Money): string {
+  const match = MONEY.exec(amount);
+  if (!match || match[1]) return "";
+  const int = (match[2] as string).replace(/^0+(?=\d)/, "");
+  if (int === "0" && match[3] === "00") return "";
+  return `${groupThousands(int)},${match[3] as string}`;
+}
+
+/**
+ * Live mask for an amount field: digits fill from the right ("123456" -> "1.234,56").
+ * Any non-digit is dropped, so backspace over a separator still works. Zero gives "".
+ */
+export function maskAmountInput(raw: string): string {
+  const digits = raw.replace(/\D/g, "").replace(/^0+/, "").slice(0, MAX_AMOUNT_DIGITS);
+  if (digits === "") return "";
+  const padded = digits.padStart(3, "0");
+  return `${groupThousands(padded.slice(0, -2))},${padded.slice(-2)}`;
+}

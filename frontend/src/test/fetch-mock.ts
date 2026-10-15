@@ -62,9 +62,13 @@ export function shellStubs(url: string): Response | null {
       plannedBillsTotal: zero,
       plannedBillsUnknownCount: 0,
       overallBudget: { budget: null, spent: zero },
+      categorySpending: [],
+      upcoming: [],
       people: [],
     });
   }
+  if (path === "/api/setup" || path === "/api/setup/complete")
+    return json(200, { completed: true });
   if (path === "/api/bills")
     return json(200, {
       month: "2026-10",

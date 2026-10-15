@@ -11,15 +11,17 @@ const lookups = {
     { id: 2, displayName: "Bia", tonePalette: "rose" },
   ],
   categories: [
-    { id: 1, name: "Mercado", active: true },
-    { id: 2, name: "Transporte", active: true },
-    { id: 3, name: "Saúde", active: true },
-    { id: 4, name: "Lazer", active: true },
-    { id: 5, name: "Viagem", active: true },
-    { id: 6, name: "Antiga", active: false },
+    { id: 1, name: "Mercado", kind: "expense", active: true },
+    { id: 2, name: "Transporte", kind: "expense", active: true },
+    { id: 3, name: "Saúde", kind: "expense", active: true },
+    { id: 4, name: "Lazer", kind: "expense", active: true },
+    { id: 5, name: "Viagem", kind: "expense", active: true },
+    { id: 6, name: "Antiga", kind: "expense", active: false },
+    { id: 7, name: "Salário", kind: "income", active: true },
+    { id: 8, name: "Presente", kind: "income", active: true },
   ],
   accounts: [{ id: 1, name: "Nubank", type: "bank", active: true }],
-  paymentMethods: [{ id: 1, name: "Pix", active: true }],
+  paymentMethods: [{ id: 1, name: "Pix", kind: "expense", active: true }],
 };
 
 function tx(over: Record<string, unknown>) {
@@ -101,7 +103,7 @@ describe("Novo lançamento fields", () => {
     expect(within(dialog).getByText("Categoria")).toBeInTheDocument();
     expect(within(dialog).queryByLabelText("De quem")).not.toBeInTheDocument();
     expect(within(dialog).queryByLabelText("Despesa reembolsada")).not.toBeInTheDocument();
-    expect(within(dialog).getByLabelText("Valor")).toHaveAttribute("inputmode", "decimal");
+    expect(within(dialog).getByLabelText("Valor")).toHaveAttribute("inputmode", "numeric");
     expect(within(dialog).getByLabelText("Valor")).toHaveFocus();
 
     await userEvent.click(within(dialog).getByRole("radio", { name: "Pessoal" }));
@@ -189,7 +191,7 @@ describe("Novo lançamento submit", () => {
     const mock = mockFetch(base());
     renderAt("/lancamentos");
     const dialog = await openForm();
-    await fillValid(dialog, "1,234");
+    await fillValid(dialog, "0");
     await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
     expect(await within(dialog).findByText(/Informe um valor maior que zero/)).toBeInTheDocument();
     expect(within(dialog).getByLabelText("Valor")).toHaveAttribute("aria-invalid", "true");
@@ -284,7 +286,7 @@ describe("Lançamentos list", () => {
     const amount = within(dialog).getByLabelText("Valor");
     expect(amount).toHaveValue("64,50");
     await userEvent.clear(amount);
-    await userEvent.type(amount, "70");
+    await userEvent.type(amount, "7000");
     await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
     await waitFor(() => {
       const call = mock.mock.calls.find(
@@ -299,7 +301,7 @@ describe("Ajustes", () => {
   it("archives a category with PATCH, never deletes", async () => {
     const mock = mockFetch(
       base((req) =>
-        req.method === "PATCH" ? json(200, { id: 1, name: "Mercado", active: false }) : undefined,
+        req.method === "PATCH" ? json(200, { id: 1, name: "Mercado", kind: "expense", active: false }) : undefined,
       ),
     );
     renderAt("/ajustes");

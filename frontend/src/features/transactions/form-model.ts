@@ -11,7 +11,7 @@ import {
   type TransactionPatch,
   type TransactionType,
 } from "@spendual/shared";
-import { parseAmountInput } from "../../lib/currency";
+import { formatAmountInput, parseAmountInput } from "../../lib/currency";
 
 export interface FormValues {
   type: TransactionType;
@@ -57,7 +57,7 @@ export function visibleFields(type: TransactionType, scope: Scope) {
 export function valuesFromTransaction(tx: Transaction): FormValues {
   return {
     type: tx.type,
-    amount: tx.amount.replace(".", ","),
+    amount: formatAmountInput(tx.amount),
     description: tx.description,
     scope: tx.scope,
     ownerId: tx.ownerId,
@@ -164,7 +164,7 @@ export function valuesFromBill(
 ): FormValues {
   return {
     type: "expense",
-    amount: bill.expectedAmount === null ? "" : bill.expectedAmount.replace(".", ","),
+    amount: bill.expectedAmount === null ? "" : formatAmountInput(bill.expectedAmount),
     description: bill.description,
     scope: bill.scope,
     ownerId: bill.ownerId,

@@ -15,11 +15,11 @@ const lookups = {
     { id: 2, displayName: "Bia", tonePalette: "rose" },
   ],
   categories: [
-    { id: 1, name: "Mercado", active: true },
-    { id: 2, name: "Casa e contas", active: true },
+    { id: 1, name: "Mercado", kind: "expense", active: true },
+    { id: 2, name: "Casa e contas", kind: "expense", active: true },
   ],
   accounts: [{ id: 1, name: "Nubank", type: "bank", active: true }],
-  paymentMethods: [{ id: 1, name: "Pix", active: true }],
+  paymentMethods: [{ id: 1, name: "Pix", kind: "expense", active: true }],
 };
 
 const dashboard = {
@@ -34,6 +34,11 @@ const dashboard = {
   plannedBillsTotal: "190.00",
   plannedBillsUnknownCount: 2,
   overallBudget: { budget: "4000.00", spent: "5000.00" },
+  categorySpending: [
+    { categoryId: 2, amount: "3400.00" },
+    { categoryId: 1, amount: "1600.00" },
+  ],
+  upcoming: [],
   people: [
     {
       userId: 1,
@@ -351,7 +356,7 @@ describe("A pagar", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Parcelado" }));
     const dialog = await screen.findByRole("dialog", { name: "Nova compra parcelada" });
     await userEvent.type(within(dialog).getByLabelText("Descrição"), "TV");
-    await userEvent.type(within(dialog).getByLabelText("Valor total"), "100");
+    await userEvent.type(within(dialog).getByLabelText("Valor total"), "10000");
     await userEvent.type(within(dialog).getByLabelText("Parcelas"), "3");
     expect(
       within(dialog).getByText(/2x R\$ 33,33 \+ última R\$ 33,34 · soma R\$ 100,00/),
@@ -399,7 +404,7 @@ describe("Orçamentos", () => {
     ).toBeChecked();
     const field = within(dialog).getByLabelText("Valor do orçamento");
     await userEvent.clear(field);
-    await userEvent.type(field, "1.250,5");
+    await userEvent.type(field, "125050");
     await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
     await waitFor(() => expect(callsTo(mock, "/api/budgets", "PUT")).toHaveLength(1));
     expect(JSON.parse(callsTo(mock, "/api/budgets", "PUT")[0]![1]!.body as string)).toEqual({
@@ -441,7 +446,7 @@ describe("Orçamentos", () => {
     const dialog = await openEdit("Mercado");
     const field = within(dialog).getByLabelText("Valor do orçamento");
     await userEvent.clear(field);
-    await userEvent.type(field, "1,234");
+    await userEvent.type(field, "0");
     await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
     expect(await within(dialog).findByText(/Informe um valor de zero ou mais/)).toBeInTheDocument();
     expect(callsTo(mock, "/api/budgets", "PUT")).toHaveLength(0);
