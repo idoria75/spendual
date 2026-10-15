@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   DEFAULT_ACCOUNTS,
   DEFAULT_CATEGORIES,
+  DEFAULT_INCOME_CATEGORIES,
   DEFAULT_PAYMENT_METHODS,
   seedBase,
 } from "../src/seed/seedData.js";
@@ -20,7 +21,12 @@ describe("seedBase", () => {
     await seedBase(prisma);
     await seedBase(prisma);
     expect(await prisma.household.count()).toBe(1);
-    expect(await prisma.category.count()).toBe(DEFAULT_CATEGORIES.length);
+    expect(await prisma.category.count()).toBe(
+      DEFAULT_CATEGORIES.length + DEFAULT_INCOME_CATEGORIES.length,
+    );
+    expect(await prisma.category.count({ where: { kind: "income" } })).toBe(
+      DEFAULT_INCOME_CATEGORIES.length,
+    );
     expect(await prisma.account.count()).toBe(DEFAULT_ACCOUNTS.length);
     expect(await prisma.paymentMethod.count()).toBe(DEFAULT_PAYMENT_METHODS.length);
   });
@@ -32,5 +38,13 @@ describe("seedBase", () => {
     expect((await prisma.category.findUniqueOrThrow({ where: { name: "Viagens" } })).active).toBe(
       false,
     );
+  });
+
+  it("keeps a user category with an income name as it is", async () => {
+    await prisma.category.create({ data: { name: "Venda", kind: "expense", active: false } });
+    await seedBase(prisma);
+    const c = await prisma.category.findUniqueOrThrow({ where: { name: "Venda" } });
+    expect(c.kind).toBe("expense");
+    expect(c.active).toBe(false);
   });
 });

@@ -15,6 +15,15 @@ export const DEFAULT_CATEGORIES = [
   "Diversos",
 ];
 
+export const DEFAULT_INCOME_CATEGORIES = [
+  "Salário",
+  "Reembolso",
+  "Rendimentos",
+  "Presente recebido",
+  "Venda",
+  "Outras receitas",
+];
+
 export const DEFAULT_ACCOUNTS: { name: string; type: AccountType }[] = [
   { name: "Conta corrente", type: "bank" },
   { name: "Dinheiro", type: "cash" },
@@ -36,6 +45,10 @@ export async function seedBase(prisma: PrismaClient): Promise<void> {
   await prisma.household.upsert({ where: { id: 1 }, update: {}, create: { id: 1, name: "Casa" } });
   for (const name of DEFAULT_CATEGORIES) {
     await prisma.category.upsert({ where: { name }, update: {}, create: { name } });
+  }
+  // Name is unique across kinds. A user row with the same name is left as it is.
+  for (const name of DEFAULT_INCOME_CATEGORIES) {
+    await prisma.category.upsert({ where: { name }, update: {}, create: { name, kind: "income" } });
   }
   for (const a of DEFAULT_ACCOUNTS) {
     await prisma.account.upsert({ where: { name: a.name }, update: {}, create: a });
