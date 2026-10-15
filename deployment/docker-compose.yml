@@ -1,0 +1,65 @@
+# Production stack: app (API + built frontend) and MySQL.
+# Run from this folder:  docker compose up -d --build
+# Needs a .env file next to this file (copy .env.example). Never commit it.
+name: spendual
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: spendual:latest
+    restart: unless-stopped
+    init: true
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: mysql://spendual:${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}@mysql:3306/spendual
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
+      BACKUP_DIR: /backups
+      TZ: ${TZ:-America/Sao_Paulo}
+    volumes:
+      # Backup folder from the host, read-only. The app only reads it for the status row.
+      - ${BACKUP_DIR:?set BACKUP_DIR in .env}:/backups:ro
+    ports:
+      - "${APP_PORT:-80}:3000"
+    networks: [frontend, backend]
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+      MYSQL_DATABASE: spendual
+      MYSQL_USER: spendual
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
+      TZ: ${TZ:-America/Sao_Paulo}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    # No "ports" on purpose. Only the backend network reaches MySQL.
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\""]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  # Optional: announce spendual.local from a container. Use it only when the host has no
+  # avahi-daemon (see README). Untested. Start with: docker compose --profile mdns up -d
+  avahi:
+    profiles: ["mdns"]
+    image: ydkn/avahi:latest
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./avahi/spendual.service:/etc/avahi/services/spendual.service:ro
+
+networks:
+  frontend:
+  backend:
+    # No route to the outside or to the LAN. MySQL and the app talk here.
+    internal: true
+
+volumes:
+  mysql_data:
