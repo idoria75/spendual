@@ -12,7 +12,9 @@
     "migrate": "prisma migrate deploy",
     "migrate:dev": "prisma migrate dev",
     "generate": "prisma generate",
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts",
+    "start": "node --conditions=production dist/index.js",
+    "seed:prod": "node --conditions=production dist/seed/run.js"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.2.2",
@@ -22,6 +24,7 @@
     "express": "^4.21.2",
     "express-rate-limit": "^8.7.1",
     "express-session": "^1.19.0",
+    "prisma": "^6.19.3",
     "zod": "^3.25.0"
   },
   "devDependencies": {
@@ -29,7 +32,6 @@
     "@types/express-session": "^1.19.0",
     "@types/node": "^22.10.0",
     "@types/supertest": "^6.0.2",
-    "prisma": "^6.19.3",
     "supertest": "^7.0.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",

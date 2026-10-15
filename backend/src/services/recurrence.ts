@@ -21,15 +21,20 @@ export async function generateForRules(
   const data: Prisma.RecurrenceOccurrenceCreateManyInput[] = [];
   for (const rule of rules) {
     if (rule.state !== "active") continue;
-    const startPeriod = dateToDateOnly(rule.startDate).slice(0, 7);
-    const endPeriod = rule.endDate ? dateToDateOnly(rule.endDate).slice(0, 7) : null;
+    const startDate = dateToDateOnly(rule.startDate);
+    const endDate = rule.endDate ? dateToDateOnly(rule.endDate) : null;
+    const startPeriod = startDate.slice(0, 7);
+    const endPeriod = endDate ? endDate.slice(0, 7) : null;
     for (let i = 0; i < months; i++) {
       const periodKey = addPeriods(fromPeriod, i);
       if (periodKey < startPeriod || (endPeriod !== null && periodKey > endPeriod)) continue;
+      // The first and last month can start after the due day or end before it: skip those.
+      const due = resolveDueDate(periodKey, rule.dayOfMonth);
+      if (due < startDate || (endDate !== null && due > endDate)) continue;
       data.push({
         ruleId: rule.id,
         periodKey,
-        dueDate: dateOnlyToDate(resolveDueDate(periodKey, rule.dayOfMonth)),
+        dueDate: dateOnlyToDate(due),
         expectedAmount: rule.expectedAmount, // null stays null, it is not 0
       });
     }

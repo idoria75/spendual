@@ -61,6 +61,11 @@ export function planningRouter(prisma: PrismaClient, clock: () => Date = () => n
     "/budgets",
     asyncHandler(async (req, res) => {
       const input = budgetEditSchema.parse(req.body);
+      if (!isMonthInWindow(input.period, clock())) {
+        throw new AppError(400, "validation_error", "Invalid request", {
+          period: `Must be within ${MONTHS_BACK} months back and ${MONTHS_AHEAD} ahead`,
+        });
+      }
       await dash.assertBudgetCategory(prisma, input.categoryId);
       await editBudget(prisma, { ...input, actorId: actorId(req) });
       res.json(await dash.getBudgetOverview(prisma, input.period));
