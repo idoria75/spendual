@@ -3,6 +3,7 @@ import tseslint from "typescript-eslint";
 import prettier from "eslint-config-prettier";
 import reactHooks from "eslint-plugin-react-hooks";
 import jsxA11y from "eslint-plugin-jsx-a11y";
+import { moneySelectors } from "./eslint.money.mjs";
 import i18n from "./frontend/eslint.i18n.config.js";
 
 // Type-aware rules run on source only. Tests are looser (mocks, supertest bodies are `any`).
@@ -39,6 +40,11 @@ export default tseslint.config(
     ...tseslint.configs.disableTypeChecked,
   },
   ...i18n,
+  {
+    files: ["{backend,frontend,packages/shared}/src/**/*.{ts,tsx}"],
+    ignores: TESTS,
+    rules: { "no-restricted-syntax": ["error", ...moneySelectors] },
+  },
   {
     files: ["frontend/src/**/*.{ts,tsx}"],
     plugins: { "react-hooks": reactHooks },
