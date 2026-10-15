@@ -254,6 +254,19 @@
     "overdue_one": "{{count}} conta vencida",
     "overdue_other": "{{count}} contas vencidas"
   },
+  "setup": {
+    "title": "Configuração inicial",
+    "intro": "Defina os limites do mês. Você pode mudar tudo depois em Orçamentos e Pessoal.",
+    "overallTitle": "Orçamento do mês",
+    "overallLabel": "Orçamento mensal da casa",
+    "categoriesTitle": "Orçamento por categoria",
+    "optional": "Opcional. Deixe em branco para não definir.",
+    "allowancesTitle": "Mesada mensal",
+    "allowanceLabel": "Mesada de {{name}}",
+    "finish": "Concluir",
+    "skip": "Pular por agora",
+    "done": "Configuração salva"
+  },
   "allowance": {
     "set": "Definir mesada de {{name}}",
     "amount": "Valor da mesada",
