@@ -5,6 +5,7 @@ import type { FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../auth/AuthContext";
 import { messageKeyFor } from "../../auth/error-messages";
+import { AmountInput } from "../../components/ui/amount-input";
 import { Button } from "../../components/ui/button";
 import { Chip } from "../../components/ui/chip";
 import { Field, Label } from "../../components/ui/field";
@@ -21,12 +22,17 @@ import {
   rememberMethod,
 } from "../../lib/recent";
 import { cn } from "../../lib/cn";
-import { confirmBill } from "../planning/api";
+import { confirmBill, createPlan } from "../planning/api";
+import { splitPreview } from "../planning/form-model";
 import { createTransaction, listTransactions, patchTransaction } from "./api";
 import { CategoryTile } from "./CategoryTile";
 import {
   buildConfirm,
   buildCreate,
+  buildInstallment,
+  categoryKindFor,
+  isCreditCardMethod,
+  isReceipt,
   buildPatch,
   valuesFromBill,
   valuesFromTransaction,
@@ -41,7 +47,8 @@ type ErrKey =
   | "form.errors.owner"
   | "form.errors.related"
   | "form.errors.account"
-  | "form.errors.notes";
+  | "form.errors.notes"
+  | "form.errors.installmentCount";
 
 function relatedLabel(x: Transaction): string {
   return `${formatDayMonth(x.transactionDate)} · ${x.description} · ${formatMoney(x.amount)}`;
@@ -88,8 +95,11 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
   const [submitting, setSubmitting] = useState(false);
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [showMore, setShowMore] = useState(false);
+  const [installment, setInstallment] = useState<"no" | "yes">("no");
+  const [installmentCount, setInstallmentCount] = useState("2");
   const [expenses, setExpenses] = useState<Transaction[]>([]);
   const locked = useRef(false);
+  const dropped = useRef(new Map<string, number>());
 
   const set = <K extends keyof FormValues>(key: K, value: FormValues[K]) =>
     setValues((v) => ({ ...v, [key]: value }));
@@ -113,9 +123,15 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
     };
   }, [editing, type, month]);
 
+  const categoryKind = categoryKindFor(type);
   const activeCategories = useMemo(
-    () => (lookups?.categories ?? []).filter((c) => c.active || c.id === values.categoryId),
-    [lookups, values.categoryId],
+    () =>
+      (lookups?.categories ?? []).filter(
+        (c) =>
+          c.id === values.categoryId ||
+          ((categoryKind === null || c.kind === categoryKind) && c.active),
+      ),
+    [lookups, values.categoryId, categoryKind],
   );
   const visibleCategories = useMemo(() => {
     if (showAllCategories) return activeCategories;
@@ -146,6 +162,25 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
   const users = lookups.users;
   const activeAccounts = lookups.accounts.filter((a) => a.active || a.id === values.accountId);
   const methods = lookups.paymentMethods.filter((m) => m.active || m.id === values.paymentMethodId);
+  const method = methods.find((m) => m.id === values.paymentMethodId);
+  const account = lookups.accounts.find((a) => a.id === values.accountId);
+  const canInstall =
+    !editing &&
+    !bill &&
+    type === "expense" &&
+    (isCreditCardMethod(method?.name) || account?.type === "credit_card");
+  const installing = canInstall && installment === "yes";
+  const preview = installing ? splitPreview(values.amount, installmentCount) : null;
+
+  // A category dropped by a type change comes back when the type goes back to its kind.
+  const changeType = (ty: TransactionType) => {
+    const kind = categoryKindFor(ty);
+    const current = lookups.categories.find((c) => c.id === values.categoryId);
+    if (current) dropped.current.set(current.kind, current.id);
+    const keep = current !== undefined && current.kind === kind;
+    const restored = kind === null ? undefined : dropped.current.get(kind);
+    setValues((v) => ({ ...v, type: ty, categoryId: keep ? v.categoryId : (restored ?? null) }));
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -168,6 +203,14 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
       }
       const body = built.body;
       run = body === null ? null : () => patchTransaction(editing.id, body);
+    } else if (installing) {
+      const built = buildInstallment(values, installmentCount);
+      if (!built.ok) {
+        setErrors(built.errors);
+        return;
+      }
+      const body = built.body;
+      run = () => createPlan(body);
     } else {
       const built = buildCreate(values);
       if (!built.ok) {
@@ -188,7 +231,17 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
       await run();
       if (!bill && values.categoryId !== null && f.category) rememberCategory(values.categoryId);
       if (!editing && !bill) rememberMethod(values.paymentMethodId);
-      showToast(t(bill ? "bills.confirmed" : editing ? "form.savedEdit" : "form.saved"));
+      showToast(
+        t(
+          bill
+            ? "bills.confirmed"
+            : editing
+              ? "form.savedEdit"
+              : installing
+                ? "form.installment.saved"
+                : "form.saved",
+        ),
+      );
       onSaved();
     } catch (error) {
       setFormError(messageKeyFor(error));
@@ -206,7 +259,7 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
       {editing || bill ? null : (
         <div role="group" aria-label={t("form.typeLabel")} className="flex flex-wrap gap-2">
           {TYPES.map((ty) => (
-            <Chip key={ty} active={values.type === ty} onClick={() => set("type", ty)}>
+            <Chip key={ty} active={values.type === ty} onClick={() => changeType(ty)}>
               {t(`form.type.${ty}`)}
             </Chip>
           ))}
@@ -215,14 +268,12 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
 
       <div className="flex flex-col gap-[3px]">
         <Label htmlFor="tx-amount">{t("form.amount")}</Label>
-        <Input
+        <AmountInput
           id="tx-amount"
           ref={amountRef}
-          inputMode="decimal"
-          autoComplete="off"
           placeholder={t("form.amountPlaceholder")}
           value={values.amount}
-          onChange={(e) => set("amount", e.target.value)}
+          onValueChange={(v) => set("amount", v)}
           aria-invalid={errors.amount ? true : undefined}
           aria-describedby={errors.amount ? "tx-amount-error" : undefined}
           className="min-h-[56px] text-[34px] font-bold"
@@ -327,7 +378,7 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
                   set("categoryId", values.categoryId === c.id && !f.categoryRequired ? null : c.id)
                 }
                 className={cn(
-                  "flex min-h-[64px] flex-col items-center justify-center gap-1 rounded-input border px-1 text-[0.72rem]",
+                  "flex min-h-[72px] flex-col items-center justify-center gap-1 rounded-input border px-1 py-1 text-center text-[0.72rem] leading-tight",
                   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
                   values.categoryId === c.id
                     ? "border-accent bg-surface-2 font-semibold"
@@ -335,7 +386,7 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
                 )}
               >
                 <CategoryTile id={c.id} size={40} />
-                <span className="max-w-full truncate">{c.name}</span>
+                <span className="max-w-full [overflow-wrap:anywhere]">{c.name}</span>
               </button>
             ))}
           </div>
@@ -354,7 +405,7 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
 
       <div className="grid grid-cols-2 gap-2">
         <Select
-          label={t("form.payer")}
+          label={t(isReceipt(type) ? "form.receiver" : "form.payer")}
           value={values.payerId ?? ""}
           onChange={(e) => set("payerId", idOrNull(e.target.value))}
         >
@@ -365,7 +416,7 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
           ))}
         </Select>
         <div className="flex flex-col gap-[3px]">
-          <Label htmlFor="tx-date">{t("form.date")}</Label>
+          <Label htmlFor="tx-date">{t(installing ? "form.installment.first" : "form.date")}</Label>
           <Input
             id="tx-date"
             type="date"
@@ -390,6 +441,46 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
             </option>
           ))}
         </Select>
+      ) : null}
+
+      {canInstall ? (
+        <div className="flex flex-col gap-2">
+          <Segmented
+            label={t("form.installment.label")}
+            value={installment}
+            onChange={setInstallment}
+            options={[
+              { value: "no", label: t("form.installment.no") },
+              { value: "yes", label: t("form.installment.yes") },
+            ]}
+          />
+          {installing ? (
+            <>
+              <Field
+                label={t("form.installment.count")}
+                inputMode="numeric"
+                autoComplete="off"
+                value={installmentCount}
+                onChange={(e) => setInstallmentCount(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                error={err("installmentCount", "form.errors.installmentCount")}
+              />
+              {preview ? (
+                <p className="text-[0.85rem] tabular-nums text-muted">
+                  {preview.each === preview.last
+                    ? t("form.installment.preview", {
+                        n: preview.n,
+                        each: formatMoney(preview.each),
+                      })
+                    : t("form.installment.previewLast", {
+                        n: preview.n,
+                        each: formatMoney(preview.each),
+                        last: formatMoney(preview.last),
+                      })}
+                </p>
+              ) : null}
+            </>
+          ) : null}
+        </div>
       ) : null}
 
       <div className="flex flex-col gap-2">

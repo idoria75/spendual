@@ -29,7 +29,7 @@
     "displayName": "Informe seu nome (até 80 caracteres).",
     "username": "Use de 3 a 60 caracteres: letras, números, ponto, hífen ou sublinhado.",
     "usernameRequired": "Informe o usuário.",
-    "password": "A senha deve ter de 10 a 200 caracteres.",
+    "password": "A senha deve ter de 4 a 200 caracteres.",
     "passwordRequired": "Informe a senha.",
     "invalid": "Valor inválido."
   },
@@ -98,6 +98,17 @@
     "categoryAll": "todas ›",
     "categoryFewer": "‹ menos",
     "payer": "Pago por",
+    "receiver": "Recebido por",
+    "installment": {
+      "label": "Parcelado",
+      "no": "Não",
+      "yes": "Sim",
+      "count": "Parcelas",
+      "first": "1ª parcela",
+      "preview": "{{n}}x de {{each}}",
+      "previewLast": "{{n}}x de {{each}} (última {{last}})",
+      "saved": "Compra parcelada criada. Veja em A pagar."
+    },
     "date": "Data",
     "method": "Método",
     "moreDetails": "Mais detalhes",
@@ -114,7 +125,8 @@
       "account": "Escolha a conta.",
       "category": "Escolha a categoria.",
       "date": "Informe uma data válida.",
-      "notes": "Use até 500 caracteres."
+      "notes": "Use até 500 caracteres.",
+      "installmentCount": "Informe de 2 a 60 parcelas."
     }
   },
   "list": {
@@ -203,6 +215,11 @@
       "title": "Categorias",
       "newLabel": "Nova categoria"
     },
+    "categoryKind": "Tipo de categoria",
+    "categoryKinds": {
+      "expense": "Despesas",
+      "income": "Receitas"
+    },
     "accounts": {
       "title": "Contas",
       "newLabel": "Nova conta"
@@ -229,8 +246,26 @@
     "balance": "Saldo",
     "allowanceLine": "Mesada do mês: {{amount}}",
     "failed": "Não foi possível carregar o painel.",
+    "spending": "Gastos por categoria",
+    "spendingEmpty": "Os gastos do mês por categoria aparecem aqui.",
+    "others": "Outras ({{count}})",
+    "upcoming": "Próximas contas",
+    "upcomingEmpty": "Nenhuma conta prevista para os próximos dias.",
     "overdue_one": "{{count}} conta vencida",
     "overdue_other": "{{count}} contas vencidas"
+  },
+  "setup": {
+    "title": "Configuração inicial",
+    "intro": "Defina os limites do mês. Você pode mudar tudo depois em Orçamentos e Pessoal.",
+    "overallTitle": "Orçamento do mês",
+    "overallLabel": "Orçamento mensal da casa",
+    "categoriesTitle": "Orçamento por categoria",
+    "optional": "Opcional. Deixe em branco para não definir.",
+    "allowancesTitle": "Mesada mensal",
+    "allowanceLabel": "Mesada de {{name}}",
+    "finish": "Concluir",
+    "skip": "Pular por agora",
+    "done": "Configuração salva"
   },
   "allowance": {
     "set": "Definir mesada de {{name}}",

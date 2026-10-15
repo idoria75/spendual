@@ -11,15 +11,24 @@ const lookups = {
     { id: 2, displayName: "Bia", tonePalette: "rose" },
   ],
   categories: [
-    { id: 1, name: "Mercado", active: true },
-    { id: 2, name: "Transporte", active: true },
-    { id: 3, name: "Saúde", active: true },
-    { id: 4, name: "Lazer", active: true },
-    { id: 5, name: "Viagem", active: true },
-    { id: 6, name: "Antiga", active: false },
+    { id: 1, name: "Mercado", kind: "expense", active: true },
+    { id: 2, name: "Transporte", kind: "expense", active: true },
+    { id: 3, name: "Saúde", kind: "expense", active: true },
+    { id: 4, name: "Lazer", kind: "expense", active: true },
+    { id: 5, name: "Viagem", kind: "expense", active: true },
+    { id: 6, name: "Antiga", kind: "expense", active: false },
+    { id: 9, name: "Casa e suprimentos", kind: "expense", active: true },
+    { id: 7, name: "Salário", kind: "income", active: true },
+    { id: 8, name: "Presente", kind: "income", active: true },
   ],
-  accounts: [{ id: 1, name: "Nubank", type: "bank", active: true }],
-  paymentMethods: [{ id: 1, name: "Pix", active: true }],
+  accounts: [
+    { id: 1, name: "Nubank", type: "bank", active: true },
+    { id: 2, name: "Visa", type: "credit_card", active: true },
+  ],
+  paymentMethods: [
+    { id: 1, name: "Pix", active: true },
+    { id: 2, name: "Cartão de crédito", active: true },
+  ],
 };
 
 function tx(over: Record<string, unknown>) {
@@ -101,7 +110,7 @@ describe("Novo lançamento fields", () => {
     expect(within(dialog).getByText("Categoria")).toBeInTheDocument();
     expect(within(dialog).queryByLabelText("De quem")).not.toBeInTheDocument();
     expect(within(dialog).queryByLabelText("Despesa reembolsada")).not.toBeInTheDocument();
-    expect(within(dialog).getByLabelText("Valor")).toHaveAttribute("inputmode", "decimal");
+    expect(within(dialog).getByLabelText("Valor")).toHaveAttribute("inputmode", "numeric");
     expect(within(dialog).getByLabelText("Valor")).toHaveFocus();
 
     await userEvent.click(within(dialog).getByRole("radio", { name: "Pessoal" }));
@@ -189,7 +198,7 @@ describe("Novo lançamento submit", () => {
     const mock = mockFetch(base());
     renderAt("/lancamentos");
     const dialog = await openForm();
-    await fillValid(dialog, "1,234");
+    await fillValid(dialog, "0");
     await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
     expect(await within(dialog).findByText(/Informe um valor maior que zero/)).toBeInTheDocument();
     expect(within(dialog).getByLabelText("Valor")).toHaveAttribute("aria-invalid", "true");
@@ -284,7 +293,7 @@ describe("Lançamentos list", () => {
     const amount = within(dialog).getByLabelText("Valor");
     expect(amount).toHaveValue("64,50");
     await userEvent.clear(amount);
-    await userEvent.type(amount, "70");
+    await userEvent.type(amount, "7000");
     await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
     await waitFor(() => {
       const call = mock.mock.calls.find(
@@ -299,7 +308,9 @@ describe("Ajustes", () => {
   it("archives a category with PATCH, never deletes", async () => {
     const mock = mockFetch(
       base((req) =>
-        req.method === "PATCH" ? json(200, { id: 1, name: "Mercado", active: false }) : undefined,
+        req.method === "PATCH"
+          ? json(200, { id: 1, name: "Mercado", kind: "expense", active: false })
+          : undefined,
       ),
     );
     renderAt("/ajustes");
@@ -318,5 +329,241 @@ describe("Ajustes", () => {
     await userEvent.type(await screen.findByLabelText("Nova categoria"), "Mercado");
     await userEvent.click(screen.getByRole("button", { name: "Adicionar" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Já existe um item com este nome.");
+  });
+});
+
+describe("Categories by kind", () => {
+  it("shows income categories for income and expense ones for expenses", async () => {
+    mockFetch(base());
+    renderAt("/lancamentos");
+    const dialog = await openForm();
+    await within(dialog).findByRole("button", { name: /Mercado/ });
+    expect(within(dialog).getByText("Pago por")).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: /Mercado/ }));
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Receita" }));
+    expect(within(dialog).getByRole("button", { name: /Salário/ })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: /Mercado/ })).not.toBeInTheDocument();
+    expect(within(dialog).getByText("Recebido por")).toBeInTheDocument();
+    expect(within(dialog).queryByText("Pago por")).not.toBeInTheDocument();
+    // The expense category was dropped when the type changed.
+    expect(within(dialog).getByRole("button", { name: /Salário/ })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Outro recebimento" }));
+    expect(within(dialog).getByText("Recebido por")).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Despesa" }));
+    expect(within(dialog).queryByRole("button", { name: /Salário/ })).not.toBeInTheDocument();
+    expect(within(dialog).getByText("Pago por")).toBeInTheDocument();
+  });
+
+  it("lets an income have no category and sends the income category when chosen", async () => {
+    const mock = mockFetch(
+      base((req) => (req.method === "POST" ? json(201, tx({ type: "income" })) : undefined)),
+    );
+    renderAt("/lancamentos");
+    const dialog = await openForm();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Receita" }));
+    await userEvent.type(within(dialog).getByLabelText("Valor"), "500000");
+    await userEvent.type(within(dialog).getByLabelText("Descrição"), "Pagamento");
+    await userEvent.click(await within(dialog).findByRole("button", { name: /Salário/ }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(posts(mock)).toHaveLength(1));
+    expect(JSON.parse(posts(mock)[0]![1]!.body as string)).toMatchObject({
+      type: "income",
+      amount: "5000.00",
+      categoryId: 7,
+    });
+  });
+
+  it("filters the list by a category grouped under its kind", async () => {
+    mockFetch(base());
+    renderAt("/lancamentos");
+    const select = await screen.findByLabelText("Categoria");
+    expect(within(select).getByRole("group", { name: "Receitas" })).toBeInTheDocument();
+    expect(within(select).getByRole("group", { name: "Despesas" })).toBeInTheDocument();
+  });
+
+  it("wraps a long category name in the tile instead of cutting it", async () => {
+    mockFetch(base());
+    renderAt("/lancamentos");
+    const dialog = await openForm();
+    await userEvent.click(await within(dialog).findByRole("button", { name: "todas ›" }));
+    const label = within(dialog).getByText("Casa e suprimentos");
+    expect(label).not.toHaveClass("truncate");
+    expect(label.className).not.toMatch(/ellipsis|truncate/);
+  });
+
+  it("adds a category with a kind in Ajustes and groups the list", async () => {
+    const mock = mockFetch(
+      base((req) =>
+        req.method === "POST"
+          ? json(201, { id: 20, name: "Freelance", kind: "income", active: true })
+          : undefined,
+      ),
+    );
+    renderAt("/ajustes");
+    await userEvent.type(await screen.findByLabelText("Nova categoria"), "Freelance");
+    await userEvent.selectOptions(screen.getByLabelText("Tipo de categoria"), "income");
+    await userEvent.click(screen.getByRole("button", { name: "Adicionar" }));
+    await waitFor(() => {
+      const call = mock.mock.calls.find(
+        ([u, i]) => u === "/api/categories" && i?.method === "POST",
+      );
+      expect(JSON.parse(call![1]!.body as string)).toEqual({ name: "Freelance", kind: "income" });
+    });
+    expect(screen.getByRole("heading", { name: "Receitas" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Despesas" })).toBeInTheDocument();
+  });
+});
+
+describe("Parcelado in the entry form", () => {
+  const plans = (mock: ReturnType<typeof mockFetch>) =>
+    mock.mock.calls.filter(([u, i]) => u === "/api/installment-plans" && i?.method === "POST");
+
+  it("shows only for a credit card method", async () => {
+    mockFetch(base());
+    renderAt("/lancamentos");
+    const dialog = await openForm();
+    expect(within(dialog).queryByRole("radiogroup", { name: "Parcelado" })).not.toBeInTheDocument();
+    await userEvent.selectOptions(within(dialog).getByLabelText("Método"), "1");
+    expect(within(dialog).queryByRole("radiogroup", { name: "Parcelado" })).not.toBeInTheDocument();
+    await userEvent.selectOptions(within(dialog).getByLabelText("Método"), "2");
+    expect(within(dialog).getByRole("radiogroup", { name: "Parcelado" })).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Receita" }));
+    expect(within(dialog).queryByRole("radiogroup", { name: "Parcelado" })).not.toBeInTheDocument();
+  });
+
+  it("previews the split and saves a plan instead of a transaction", async () => {
+    const mock = mockFetch(
+      base((req) =>
+        req.url === "/api/installment-plans"
+          ? json(201, {
+              id: 1,
+              description: "TV",
+              totalAmount: "1000.00",
+              installmentCount: 12,
+              firstDueDate: "2026-10-14",
+              items: [],
+            })
+          : undefined,
+      ),
+    );
+    renderAt("/lancamentos");
+    const dialog = await openForm();
+    await userEvent.type(within(dialog).getByLabelText("Valor"), "100000");
+    await userEvent.type(within(dialog).getByLabelText("Descrição"), "TV");
+    await userEvent.click(await within(dialog).findByRole("button", { name: /Mercado/ }));
+    await userEvent.selectOptions(within(dialog).getByLabelText("Método"), "2");
+    await userEvent.click(within(dialog).getByRole("radio", { name: "Sim" }));
+    const count = within(dialog).getByLabelText("Parcelas");
+    await userEvent.clear(count);
+    await userEvent.type(count, "12");
+    expect(within(dialog).getByText("12x de R$ 83,33 (última R$ 83,37)")).toBeInTheDocument();
+    expect(within(dialog).getByText("1ª parcela")).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(plans(mock)).toHaveLength(1));
+    expect(JSON.parse(plans(mock)[0]![1]!.body as string)).toMatchObject({
+      description: "TV",
+      totalAmount: "1000.00",
+      installmentCount: 12,
+      scope: "household",
+      ownerId: null,
+      payerId: 1,
+      categoryId: 1,
+    });
+    expect(posts(mock)).toHaveLength(0);
+    expect(await screen.findByText(/Compra parcelada criada/)).toBeInTheDocument();
+  });
+
+  it("needs the owner for a personal plan and a count from 2 to 60", async () => {
+    const mock = mockFetch(base());
+    renderAt("/lancamentos");
+    const dialog = await openForm();
+    await userEvent.type(within(dialog).getByLabelText("Valor"), "100000");
+    await userEvent.type(within(dialog).getByLabelText("Descrição"), "TV");
+    await userEvent.click(await within(dialog).findByRole("button", { name: /Mercado/ }));
+    await userEvent.selectOptions(within(dialog).getByLabelText("Método"), "2");
+    await userEvent.click(within(dialog).getByRole("radio", { name: "Pessoal" }));
+    await userEvent.click(within(dialog).getByRole("radio", { name: "Sim" }));
+    await userEvent.selectOptions(within(dialog).getByLabelText("De quem"), "");
+    const count = within(dialog).getByLabelText("Parcelas");
+    await userEvent.clear(count);
+    await userEvent.type(count, "1");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
+    expect(await within(dialog).findByText("Escolha de quem é o lançamento.")).toBeInTheDocument();
+    expect(within(dialog).getByText("Informe de 2 a 60 parcelas.")).toBeInTheDocument();
+    expect(plans(mock)).toHaveLength(0);
+  });
+});
+
+describe("Review fixes", () => {
+  it("offers Parcelado when the account is a credit card", async () => {
+    mockFetch(base());
+    renderAt("/lancamentos");
+    const dialog = await openForm();
+    expect(within(dialog).queryByRole("radiogroup", { name: "Parcelado" })).not.toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Mais detalhes" }));
+    await userEvent.selectOptions(within(dialog).getByLabelText("Conta"), "2");
+    expect(within(dialog).getByRole("radiogroup", { name: "Parcelado" })).toBeInTheDocument();
+  });
+
+  it("blocks a plan without a category and never sends categoryId 0", async () => {
+    const mock = mockFetch(base());
+    renderAt("/lancamentos");
+    const dialog = await openForm();
+    await userEvent.type(within(dialog).getByLabelText("Valor"), "100000");
+    await userEvent.type(within(dialog).getByLabelText("Descrição"), "TV");
+    await userEvent.selectOptions(within(dialog).getByLabelText("Método"), "2");
+    await userEvent.click(within(dialog).getByRole("radio", { name: "Sim" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
+    expect(await within(dialog).findByText("Escolha a categoria.")).toBeInTheDocument();
+    expect(
+      mock.mock.calls.filter(([u, i]) => u === "/api/installment-plans" && i?.method === "POST"),
+    ).toHaveLength(0);
+  });
+
+  it("brings the category back when the type returns to its kind", async () => {
+    mockFetch(base());
+    renderAt("/lancamentos");
+    const dialog = await openForm();
+    await userEvent.click(await within(dialog).findByRole("button", { name: /Mercado/ }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Receita" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Despesa" }));
+    expect(within(dialog).getByRole("button", { name: /Mercado/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("keeps the selected category visible when editing, even with another kind", async () => {
+    list = [tx({ categoryId: 7 })];
+    mockFetch(base());
+    renderAt("/lancamentos");
+    await userEvent.click(await screen.findByText("iFood"));
+    await userEvent.click(await screen.findByRole("button", { name: "Editar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar lançamento" });
+    expect(within(dialog).getByRole("button", { name: /Salário/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("does not render an empty category group in the filter", async () => {
+    const inner = base();
+    mockFetch((req) =>
+      req.url === "/api/lookups"
+        ? json(200, {
+            ...lookups,
+            categories: lookups.categories.filter((c) => c.kind === "expense"),
+          })
+        : inner(req),
+    );
+    renderAt("/lancamentos");
+    const select = await screen.findByLabelText("Categoria");
+    await within(select).findByRole("group", { name: "Despesas" });
+    expect(within(select).queryByRole("group", { name: "Receitas" })).not.toBeInTheDocument();
   });
 });

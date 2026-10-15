@@ -9,6 +9,8 @@ import { LancamentosPage } from "./pages/LancamentosPage";
 import { LoginPage } from "./pages/LoginPage";
 import { PessoalPage } from "./pages/PessoalPage";
 import { MaisPage } from "./pages/MaisPage";
+import { SetupGate } from "./features/setup/SetupGate";
+import { SetupPage } from "./features/setup/SetupPage";
 import { AppShell } from "./shell/AppShell";
 
 export function App() {
@@ -17,14 +19,17 @@ export function App() {
       <Routes>
         <Route path="/entrar" element={<LoginPage />} />
         <Route element={<ProtectedRoute />}>
-          <Route element={<AppShell />}>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/lancamentos" element={<LancamentosPage />} />
-            <Route path="/a-pagar" element={<BillsPage />} />
-            <Route path="/orcamentos" element={<BudgetsPage />} />
-            <Route path="/pessoal" element={<PessoalPage />} />
-            <Route path="/mais" element={<MaisPage />} />
-            <Route path="/ajustes" element={<AjustesPage />} />
+          <Route element={<SetupGate />}>
+            <Route path="/configuracao" element={<SetupPage />} />
+            <Route element={<AppShell />}>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/lancamentos" element={<LancamentosPage />} />
+              <Route path="/a-pagar" element={<BillsPage />} />
+              <Route path="/orcamentos" element={<BudgetsPage />} />
+              <Route path="/pessoal" element={<PessoalPage />} />
+              <Route path="/mais" element={<MaisPage />} />
+              <Route path="/ajustes" element={<AjustesPage />} />
+            </Route>
           </Route>
         </Route>
       </Routes>

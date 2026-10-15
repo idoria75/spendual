@@ -1,5 +1,8 @@
 import {
   billConfirmSchema,
+  installmentPlanCreateSchema,
+  type InstallmentPlanCreate,
+  type CategoryKind,
   positiveMoneySchema,
   type Bill,
   type BillConfirm,
@@ -11,7 +14,7 @@ import {
   type TransactionPatch,
   type TransactionType,
 } from "@spendual/shared";
-import { parseAmountInput } from "../../lib/currency";
+import { formatAmountInput, parseAmountInput } from "../../lib/currency";
 
 export interface FormValues {
   type: TransactionType;
@@ -37,6 +40,7 @@ export type FieldName =
   | "date"
   | "accountId"
   | "relatedTransactionId"
+  | "installmentCount"
   | "notes";
 
 export type FieldErrors = Partial<Record<FieldName, true>>;
@@ -54,10 +58,33 @@ export function visibleFields(type: TransactionType, scope: Scope) {
   };
 }
 
+/** Income and other receipts use income categories; expenses use expense categories. */
+export function categoryKindFor(type: TransactionType): CategoryKind | null {
+  if (type === "expense") return "expense";
+  if (type === "income" || type === "other_receipt") return "income";
+  return null;
+}
+
+/** Money comes in: the person "received" it, instead of "paid" it. */
+export function isReceipt(type: TransactionType): boolean {
+  return type === "income" || type === "other_receipt" || type === "refund";
+}
+
+const fold = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+/** A payment method counts as a credit card when its name says "Cartão de crédito". */
+export function isCreditCardMethod(name: string | null | undefined): boolean {
+  return name != null && fold(name).includes("cartao de credito");
+}
+
 export function valuesFromTransaction(tx: Transaction): FormValues {
   return {
     type: tx.type,
-    amount: tx.amount.replace(".", ","),
+    amount: formatAmountInput(tx.amount),
     description: tx.description,
     scope: tx.scope,
     ownerId: tx.ownerId,
@@ -81,6 +108,9 @@ const PATH_TO_FIELD: Record<string, FieldName> = {
   accountId: "accountId",
   relatedTransactionId: "relatedTransactionId",
   notes: "notes",
+  totalAmount: "amount",
+  firstDueDate: "date",
+  installmentCount: "installmentCount",
 };
 
 function errorsFromIssues(issues: { path: PropertyKey[] }[]): FieldErrors {
@@ -126,6 +156,37 @@ export function buildCreate(v: FormValues): Built<TransactionCreate> {
   return { ok: true, body: parsed.data };
 }
 
+/** Body of POST /installment-plans from the entry form (expense paid with a credit card). */
+export function buildInstallment(v: FormValues, count: string): Built<InstallmentPlanCreate> {
+  const amount = parseAmountInput(v.amount);
+  const parsed = installmentPlanCreateSchema.safeParse({
+    description: v.description,
+    totalAmount: amount ?? "",
+    installmentCount: /^\d+$/.test(count) ? Number(count) : 0,
+    firstDueDate: v.date,
+    scope: v.scope,
+    ownerId: v.scope === "personal" ? v.ownerId : null,
+    ...(v.payerId !== null ? { payerId: v.payerId } : {}),
+    // Placeholder only to validate the other fields. A missing category is rejected below.
+    categoryId: v.categoryId ?? 1,
+    accountId: v.accountId,
+    ...(v.notes.trim() !== "" ? { notes: v.notes } : {}),
+  });
+  const missing: FieldErrors = v.categoryId === null ? { categoryId: true } : {};
+  if (!parsed.success) {
+    return {
+      ok: false,
+      errors: {
+        ...errorsFromIssues(parsed.error.issues),
+        ...fallbackAmountError(amount),
+        ...missing,
+      },
+    };
+  }
+  if (v.categoryId === null) return { ok: false, errors: missing };
+  return { ok: true, body: parsed.data };
+}
+
 /** Build the PATCH body: only the PATCH-able fields that changed. */
 export function buildPatch(v: FormValues, original: Transaction): Built<TransactionPatch | null> {
   const f = visibleFields(original.type, original.scope);
@@ -164,7 +225,7 @@ export function valuesFromBill(
 ): FormValues {
   return {
     type: "expense",
-    amount: bill.expectedAmount === null ? "" : bill.expectedAmount.replace(".", ","),
+    amount: bill.expectedAmount === null ? "" : formatAmountInput(bill.expectedAmount),
     description: bill.description,
     scope: bill.scope,
     ownerId: bill.ownerId,

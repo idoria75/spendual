@@ -4,10 +4,10 @@ import type { FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { messageKeyFor } from "../../auth/error-messages";
 import { Button } from "../../components/ui/button";
-import { Field } from "../../components/ui/field";
+import { AmountField } from "../../components/ui/amount-input";
 import { Segmented } from "../../components/ui/segmented";
 import { Sheet } from "../../components/ui/sheet";
-import { parseAmountInput } from "../../lib/currency";
+import { formatAmountInput, parseAmountInput } from "../../lib/currency";
 import { formatMonth } from "../../lib/date";
 import { putBudget } from "./api";
 
@@ -46,7 +46,9 @@ function BudgetForm({
   onSaved: () => void;
 }) {
   const { t } = useTranslation();
-  const [amount, setAmount] = useState(target.line.amount?.replace(".", ",") ?? "");
+  const [amount, setAmount] = useState(
+    target.line.amount ? formatAmountInput(target.line.amount) : "",
+  );
   const [mode, setMode] = useState<BudgetEditMode>("going_forward");
   const [amountError, setAmountError] = useState(false);
   const [formError, setFormError] = useState<ReturnType<typeof messageKeyFor> | null>(null);
@@ -84,13 +86,11 @@ function BudgetForm({
 
   return (
     <form onSubmit={(e) => void submit(e)} noValidate className="flex flex-col gap-3">
-      <Field
+      <AmountField
         label={t("budgets.amount")}
-        inputMode="decimal"
-        autoComplete="off"
         placeholder={t("form.amountPlaceholder")}
         value={amount}
-        onChange={(e) => setAmount(e.target.value)}
+        onValueChange={setAmount}
         error={amountError ? t("budgets.errors.amount") : undefined}
       />
       <Segmented

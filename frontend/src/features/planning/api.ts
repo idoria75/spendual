@@ -6,6 +6,7 @@ import {
   dashboardSchema,
   installmentPlanDetailSchema,
   recurrenceRuleListSchema,
+  setupStatusSchema,
   type AllowanceCreate,
   type AllowanceOverview,
   type Bill,
@@ -19,6 +20,7 @@ import {
   type InstallmentPlanDetail,
   type RecurrenceRuleCreate,
   type RecurrenceRuleList,
+  type SetupStatus,
 } from "@spendual/shared";
 import { api } from "../../lib/api-client";
 
@@ -47,3 +49,7 @@ export const confirmBill = (kind: BillKind, id: number, body: BillConfirm): Prom
   api.post(`/bills/${kind}/${id}/confirm`, body, billSchema);
 export const cancelBill = (kind: BillKind, id: number, reason: string): Promise<Bill> =>
   api.post(`/bills/${kind}/${id}/cancel`, { reason }, billSchema);
+
+export const fetchSetup = (): Promise<SetupStatus> => api.get("/setup", setupStatusSchema);
+export const completeSetup = (): Promise<SetupStatus> =>
+  api.post("/setup/complete", {}, setupStatusSchema);

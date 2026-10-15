@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../../auth/AuthContext";
 import { messageKeyFor } from "../../auth/error-messages";
 import { Button } from "../../components/ui/button";
+import { AmountField } from "../../components/ui/amount-input";
 import { Field, Label } from "../../components/ui/field";
 import { Input } from "../../components/ui/input";
 import { Segmented } from "../../components/ui/segmented";
@@ -101,7 +102,9 @@ function CreateForm({ kind, onSaved }: { kind: CreateKind; onSaved: () => void }
     }
   };
 
-  const categories = (lookups?.categories ?? []).filter((c) => c.active);
+  const categories = (lookups?.categories ?? []).filter(
+    (c) => c.id === v.categoryId || (c.active && c.kind === "expense"),
+  );
   const accounts = (lookups?.accounts ?? []).filter((a) => a.active);
   const methods = (lookups?.paymentMethods ?? []).filter((m) => m.active);
   const users = lookups?.users ?? [];
@@ -116,14 +119,12 @@ function CreateForm({ kind, onSaved }: { kind: CreateKind; onSaved: () => void }
         maxLength={200}
         autoComplete="off"
       />
-      <Field
+      <AmountField
         label={t(isRule ? "bills.create.rule.amount" : "bills.create.plan.total")}
-        inputMode="decimal"
-        autoComplete="off"
         placeholder={t("form.amountPlaceholder")}
         value={v.amount}
         disabled={isRule && v.unknown}
-        onChange={(e) => set("amount", e.target.value)}
+        onValueChange={(a) => set("amount", a)}
         error={errors.amount ? t("form.errors.amount") : undefined}
       />
       {isRule ? (

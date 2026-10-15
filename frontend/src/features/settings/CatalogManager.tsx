@@ -1,4 +1,4 @@
-import type { Account, AccountType, Category, PaymentMethod } from "@spendual/shared";
+import type { Account, AccountType, Category, CategoryKind, PaymentMethod } from "@spendual/shared";
 import { Archive, ArchiveRestore, Pencil } from "lucide-react";
 import { useRef, useState } from "react";
 import type { FormEvent } from "react";
@@ -19,6 +19,7 @@ import {
 import { useLookups } from "../transactions/lookups";
 
 export type CatalogKind = "categories" | "accounts" | "paymentMethods";
+const CATEGORY_KINDS: CategoryKind[] = ["expense", "income"];
 const ACCOUNT_TYPES: AccountType[] = ["bank", "cash", "credit_card", "other"];
 
 type Item = Category | Account | PaymentMethod;
@@ -28,6 +29,7 @@ export function CatalogManager({ kind }: { kind: CatalogKind }) {
   const { data, reload } = useLookups();
   const [name, setName] = useState("");
   const [accountType, setAccountType] = useState<AccountType>("bank");
+  const [categoryKind, setCategoryKind] = useState<CategoryKind>("expense");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [error, setError] = useState<ReturnType<typeof messageKeyFor> | null>(null);
@@ -35,6 +37,15 @@ export function CatalogManager({ kind }: { kind: CatalogKind }) {
   const locked = useRef(false);
 
   const items: Item[] = data?.[kind] ?? [];
+
+  const groups: { key: string; title: string | null; items: Item[] }[] =
+    kind === "categories"
+      ? CATEGORY_KINDS.map((k) => ({
+          key: k,
+          title: t(`settings.categoryKinds.${k}`),
+          items: items.filter((i) => (i as Category).kind === k),
+        }))
+      : [{ key: kind, title: null, items }];
 
   const run = async (action: () => Promise<unknown>): Promise<boolean> => {
     if (locked.current) return false;
@@ -59,7 +70,7 @@ export function CatalogManager({ kind }: { kind: CatalogKind }) {
     const trimmed = name.trim();
     if (trimmed === "") return;
     const ok = await run(() => {
-      if (kind === "categories") return createCategory({ name: trimmed });
+      if (kind === "categories") return createCategory({ name: trimmed, kind: categoryKind });
       if (kind === "accounts") return createAccount({ name: trimmed, type: accountType });
       return createPaymentMethod({ name: trimmed });
     });
@@ -89,6 +100,19 @@ export function CatalogManager({ kind }: { kind: CatalogKind }) {
           maxLength={80}
           autoComplete="off"
         />
+        {kind === "categories" ? (
+          <Select
+            label={t("settings.categoryKind")}
+            value={categoryKind}
+            onChange={(e) => setCategoryKind(e.target.value as CategoryKind)}
+          >
+            {CATEGORY_KINDS.map((k) => (
+              <option key={k} value={k}>
+                {t(`settings.categoryKinds.${k}`)}
+              </option>
+            ))}
+          </Select>
+        ) : null}
         {kind === "accounts" ? (
           <Select
             label={t("settings.accountType")}
@@ -113,68 +137,82 @@ export function CatalogManager({ kind }: { kind: CatalogKind }) {
         </p>
       ) : null}
 
-      <ul className="flex flex-col gap-2">
-        {items.map((item) => (
-          <li
-            key={item.id}
-            className="flex min-h-[48px] items-center gap-2 rounded-input bg-surface px-3"
-          >
-            {editingId === item.id ? (
-              <form
-                onSubmit={(e) => void rename(e, item.id)}
-                className="flex flex-1 items-end gap-2"
+      {groups.map((group) => (
+        <section key={group.key} className="flex flex-col gap-2">
+          {group.title ? (
+            <h3 className="text-[0.72rem] font-semibold uppercase tracking-[0.07em] text-muted">
+              {group.title}
+            </h3>
+          ) : null}
+          <ul className="flex flex-col gap-2">
+            {group.items.map((item) => (
+              <li
+                key={item.id}
+                className="flex min-h-[48px] items-center gap-2 rounded-input bg-surface px-3"
               >
-                <div className="flex-1">
-                  <Field
-                    label={t("settings.rename")}
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    maxLength={80}
-                  />
-                </div>
-                <Button type="submit" disabled={busy}>
-                  {t("settings.save")}
-                </Button>
-                <Button variant="ghost" onClick={() => setEditingId(null)}>
-                  {t("settings.cancel")}
-                </Button>
-              </form>
-            ) : (
-              <>
-                <span className={cn("flex-1 truncate", !item.active && "text-muted")}>
-                  {item.name}
-                  {item.active ? "" : ` · ${t("settings.archived")}`}
-                </span>
-                <button
-                  type="button"
-                  aria-label={`${t("settings.rename")}: ${item.name}`}
-                  disabled={busy}
-                  onClick={() => {
-                    setEditingId(item.id);
-                    setEditName(item.name);
-                  }}
-                  className="flex h-11 w-11 items-center justify-center text-muted"
-                >
-                  <Pencil size={16} aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  aria-label={`${t(item.active ? "settings.archive" : "settings.unarchive")}: ${item.name}`}
-                  disabled={busy}
-                  onClick={() => void run(() => patch(item.id, { active: !item.active }))}
-                  className="flex h-11 w-11 items-center justify-center text-muted"
-                >
-                  {item.active ? (
-                    <Archive size={16} aria-hidden />
-                  ) : (
-                    <ArchiveRestore size={16} aria-hidden />
-                  )}
-                </button>
-              </>
-            )}
-          </li>
-        ))}
-      </ul>
+                {editingId === item.id ? (
+                  <form
+                    onSubmit={(e) => void rename(e, item.id)}
+                    className="flex flex-1 items-end gap-2"
+                  >
+                    <div className="flex-1">
+                      <Field
+                        label={t("settings.rename")}
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        maxLength={80}
+                      />
+                    </div>
+                    <Button type="submit" disabled={busy}>
+                      {t("settings.save")}
+                    </Button>
+                    <Button variant="ghost" onClick={() => setEditingId(null)}>
+                      {t("settings.cancel")}
+                    </Button>
+                  </form>
+                ) : (
+                  <>
+                    <span
+                      className={cn(
+                        "flex-1 py-2 leading-tight [overflow-wrap:anywhere]",
+                        !item.active && "text-muted",
+                      )}
+                    >
+                      {item.name}
+                      {item.active ? "" : ` · ${t("settings.archived")}`}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label={`${t("settings.rename")}: ${item.name}`}
+                      disabled={busy}
+                      onClick={() => {
+                        setEditingId(item.id);
+                        setEditName(item.name);
+                      }}
+                      className="flex h-11 w-11 items-center justify-center text-muted"
+                    >
+                      <Pencil size={16} aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`${t(item.active ? "settings.archive" : "settings.unarchive")}: ${item.name}`}
+                      disabled={busy}
+                      onClick={() => void run(() => patch(item.id, { active: !item.active }))}
+                      className="flex h-11 w-11 items-center justify-center text-muted"
+                    >
+                      {item.active ? (
+                        <Archive size={16} aria-hidden />
+                      ) : (
+                        <ArchiveRestore size={16} aria-hidden />
+                      )}
+                    </button>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
     </div>
   );
 }

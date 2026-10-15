@@ -38,7 +38,7 @@ function BudgetRow({
       >
         <span className="grid grid-cols-[28px_1fr_auto] items-center gap-3">
           <CategoryTile id={categoryId} />
-          <span className="truncate font-semibold">{name}</span>
+          <span className="font-semibold leading-tight [overflow-wrap:anywhere]">{name}</span>
           <span className="whitespace-nowrap text-[0.88rem] tabular-nums">
             {formatMoney(line.spent)}
             {line.amount !== null ? <span className="text-muted">{budgetText}</span> : null}

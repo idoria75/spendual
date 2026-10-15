@@ -6,10 +6,13 @@ import { useAuth } from "../../auth/AuthContext";
 import { Button } from "../../components/ui/button";
 import { cn } from "../../lib/cn";
 import { formatMoney, fromCents, toCents } from "../../lib/currency";
+import { CategoryTile, categoryColor } from "../transactions/CategoryTile";
 import { useEntry } from "../transactions/entry";
+import { useLookups } from "../transactions/lookups";
 import { useMonth } from "../transactions/month";
 import { fetchBills, fetchDashboard } from "./api";
 import { Bar, formatRate, percentOf } from "./display";
+import { BillRow } from "./BillsView";
 import { useLoad } from "./use-load";
 
 function Row({
@@ -143,6 +146,114 @@ function OverallBudget({ d }: { d: Dashboard }) {
   );
 }
 
+const LEGEND_TOP = 4;
+
+/** One stacked bar of household spending by category, biggest first (ui-guidelines §6.5). */
+function SpendingChart({ d }: { d: Dashboard }) {
+  const { t } = useTranslation();
+  const { data: lookups } = useLookups();
+  const items = d.categorySpending
+    .map((s) => ({ ...s, cents: toCents(s.amount) }))
+    .filter((s) => s.cents > 0n)
+    .sort((a, b) => (a.cents === b.cents ? 0 : a.cents > b.cents ? -1 : 1));
+  const total = items.reduce((sum, s) => sum + s.cents, 0n);
+  const nameOf = (id: number | null) =>
+    id === null
+      ? t("list.noCategory")
+      : (lookups?.categories.find((c) => c.id === id)?.name ?? t("list.noCategory"));
+  const top = items.slice(0, LEGEND_TOP);
+  const rest = items.slice(LEGEND_TOP);
+  const restCents = rest.reduce((sum, s) => sum + s.cents, 0n);
+  const pct = (cents: bigint) => `${Math.round(percentOf(cents, total))}%`;
+
+  return (
+    <section aria-labelledby="dash-spending" className="rounded-card bg-surface p-4">
+      <Eyebrow>
+        <span id="dash-spending">{t("dashboard.spending")}</span>
+      </Eyebrow>
+      {items.length === 0 ? (
+        <p className="mt-2 text-[0.85rem] text-muted">{t("dashboard.spendingEmpty")}</p>
+      ) : (
+        <>
+          <div aria-hidden className="mt-3 flex h-[10px] gap-[2px] overflow-hidden rounded-chip">
+            {items.map((s) => (
+              <span
+                key={s.categoryId ?? "none"}
+                data-testid="spending-segment"
+                className="h-full min-w-[2px]"
+                style={{
+                  flex: `${percentOf(s.cents, total)} 1 0%`,
+                  background: categoryColor(s.categoryId),
+                }}
+              />
+            ))}
+          </div>
+          <ul className="mt-3 flex flex-col gap-2">
+            {top.map((s) => (
+              <li
+                key={s.categoryId ?? "none"}
+                className="grid grid-cols-[28px_1fr_auto_auto] items-center gap-3"
+              >
+                <CategoryTile id={s.categoryId} />
+                <span className="text-[0.88rem] leading-tight [overflow-wrap:anywhere]">
+                  {nameOf(s.categoryId)}
+                </span>
+                <span className="whitespace-nowrap text-[0.88rem] font-semibold tabular-nums">
+                  {formatMoney(s.amount)}
+                </span>
+                <span className="w-10 whitespace-nowrap text-right text-[0.78rem] tabular-nums text-muted">
+                  {pct(s.cents)}
+                </span>
+              </li>
+            ))}
+            {rest.length > 0 ? (
+              <li className="grid grid-cols-[28px_1fr_auto_auto] items-center gap-3">
+                <span aria-hidden className="mx-auto h-3 w-3 rounded-tile bg-muted" />
+                <span className="text-[0.88rem] leading-tight">
+                  {t("dashboard.others", { count: rest.length })}
+                </span>
+                <span className="whitespace-nowrap text-[0.88rem] font-semibold tabular-nums">
+                  {formatMoney(fromCents(restCents))}
+                </span>
+                <span className="w-10 whitespace-nowrap text-right text-[0.78rem] tabular-nums text-muted">
+                  {pct(restCents)}
+                </span>
+              </li>
+            ) : null}
+          </ul>
+        </>
+      )}
+    </section>
+  );
+}
+
+/** The next planned bills. Tap opens the "Confirmar pagamento" sheet. */
+function UpcomingBills({ d }: { d: Dashboard }) {
+  const { t } = useTranslation();
+  const { openConfirm } = useEntry();
+  return (
+    <section aria-labelledby="dash-upcoming" className="rounded-card bg-surface p-4">
+      <Eyebrow>
+        <span id="dash-upcoming">{t("dashboard.upcoming")}</span>
+      </Eyebrow>
+      {d.upcoming.length === 0 ? (
+        <p className="mt-2 text-[0.85rem] text-muted">{t("dashboard.upcomingEmpty")}</p>
+      ) : (
+        <ul className="mt-3 flex flex-col gap-2">
+          {d.upcoming.map((b) => (
+            <BillRow
+              key={`${b.kind}-${b.id}`}
+              bill={b}
+              late={false}
+              onOpen={() => openConfirm(b)}
+            />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 /** Início: month numbers from the server (ui-guidelines §7). */
 export function DashboardView() {
   const { t } = useTranslation();
@@ -175,6 +286,8 @@ export function DashboardView() {
         <div className="grid gap-3 md:grid-cols-2">
           <ActualCard d={data} />
           <PlannedCard d={data} overdueCount={bills.data?.overdue.length ?? 0} />
+          <SpendingChart d={data} />
+          <UpcomingBills d={data} />
           <OverallBudget d={data} />
         </div>
       )}

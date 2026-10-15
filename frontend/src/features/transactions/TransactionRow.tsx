@@ -51,7 +51,7 @@ export function TransactionRow({ tx, onOpen }: { tx: Transaction; onOpen: () => 
           >
             {tx.description}
           </span>
-          <span className="block truncate text-[12px] text-muted">
+          <span className="block text-[12px] text-muted [overflow-wrap:anywhere]">
             {metaParts.join(" · ")}
             {toneUser ? ` · ${toneUser.displayName}` : ""}
             {voided

@@ -22,7 +22,7 @@ import { useLoad } from "./use-load";
 
 type Tab = "upcoming" | "recurring" | "installments";
 
-function BillRow({ bill, onOpen, late }: { bill: Bill; onOpen: () => void; late: boolean }) {
+export function BillRow({ bill, onOpen, late }: { bill: Bill; onOpen: () => void; late: boolean }) {
   const { t } = useTranslation();
   const { data } = useLookups();
   const person = data?.users.find(

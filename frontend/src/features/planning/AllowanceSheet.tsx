@@ -4,6 +4,7 @@ import type { FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { messageKeyFor } from "../../auth/error-messages";
 import { Button } from "../../components/ui/button";
+import { AmountField } from "../../components/ui/amount-input";
 import { Field } from "../../components/ui/field";
 import { Sheet } from "../../components/ui/sheet";
 import { parseAmountInput } from "../../lib/currency";
@@ -78,13 +79,11 @@ function AllowanceForm({
 
   return (
     <form onSubmit={(e) => void submit(e)} noValidate className="flex flex-col gap-3">
-      <Field
+      <AmountField
         label={t("allowance.amount")}
-        inputMode="decimal"
-        autoComplete="off"
         placeholder={t("form.amountPlaceholder")}
         value={amount}
-        onChange={(e) => setAmount(e.target.value)}
+        onValueChange={setAmount}
         error={amountError ? t("form.errors.amount") : undefined}
       />
       <Field
