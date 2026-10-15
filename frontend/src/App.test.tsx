@@ -100,6 +100,6 @@ it("blocks a short password on signup and ties the error to the field", async ()
   await userEvent.keyboard("{Enter}");
   const input = await screen.findByLabelText("Senha");
   expect(input).toHaveAttribute("aria-invalid", "true");
-  expect(input).toHaveAccessibleDescription("A senha deve ter de 10 a 200 caracteres.");
+  expect(input).toHaveAccessibleDescription("A senha deve ter de 4 a 200 caracteres.");
   expect(mock.mock.calls.some(([u]) => u === "/api/auth/signup")).toBe(false);
 });

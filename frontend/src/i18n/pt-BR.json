@@ -29,7 +29,7 @@
     "displayName": "Informe seu nome (até 80 caracteres).",
     "username": "Use de 3 a 60 caracteres: letras, números, ponto, hífen ou sublinhado.",
     "usernameRequired": "Informe o usuário.",
-    "password": "A senha deve ter de 10 a 200 caracteres.",
+    "password": "A senha deve ter de 4 a 200 caracteres.",
     "passwordRequired": "Informe a senha.",
     "invalid": "Valor inválido."
   },
