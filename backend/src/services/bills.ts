@@ -208,6 +208,10 @@ export function patchRule(
       );
       const cur = locked.length ? await tx.recurrenceRule.findUnique({ where: { id } }) : null;
       if (!cur) throw new AppError(404, "not_found", "Recurrence rule not found");
+      // Cancelled rows are not restored, so an ended rule cannot be reopened.
+      if (cur.state === "ended" && patch.state !== undefined && patch.state !== "ended") {
+        throw new AppError(409, "invalid_state", "The recurrence rule has ended");
+      }
       if (patch.endDate != null && patch.endDate < dateToDateOnly(cur.startDate)) {
         throw invalid("endDate", "End before start");
       }
@@ -249,7 +253,7 @@ export function patchRule(
           where: {
             ruleId: id,
             status: "planned",
-            periodKey: { gt: dateToDateOnly(row.endDate).slice(0, 7) },
+            dueDate: { gt: row.endDate },
           },
           data: { status: "cancelled" },
         });
@@ -402,7 +406,7 @@ export function confirmBill(
         input.paymentMethodId !== undefined ? input.paymentMethodId : cur.paymentMethodId;
       if (input.payerId !== undefined) await assertActiveUser(tx, input.payerId, "payerId");
       // Check the final values, inherited ones too: an archived account must not be used.
-      await assertCatalogActive(tx, { accountId, paymentMethodId });
+      await assertCatalogActive(tx, { categoryId: cur.categoryId, accountId, paymentMethodId });
 
       const txn = await tx.transaction.create({
         data: {
