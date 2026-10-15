@@ -14,7 +14,7 @@
 | 3 Core CRUD + entry flow | done | `phase-3-core-crud` |
 | 4 Dashboard, budgets, bills, installments | done | `phase-4-dashboard` |
 | 5 Settings and backup | done | `phase-5-settings-backup` |
-| 6 CI and deployment | done (deploy box checks open) | — |
+| 6 CI and deployment | done (deploy box checks open) | `phase-6-ci-deployment` |
 
 Post-Phase-2 commits on `dev` (not in the tag): run-as-host-user dev container, review fixes
 (shared `HOUSEHOLD_ID`, early household-full check, 32-char `SESSION_SECRET`, 15-minute anonymous sessions).
@@ -79,7 +79,6 @@ Post-Phase-2 commits on `dev` (not in the tag): run-as-host-user dev container, 
 - ⚠ Needs a decision: signup is first-come; budget "this period only" with no earlier budget; budget "going forward" next to a P+1 row; edits to past periods.
 - `GET /auth/status` for "vagas livres" hint: skipped.
 - Phase 3/4 routes must validate input with Zod. The Phase 1 services do not.
-- Phase 6: `@spendual/shared` is TS source (`main: ./src/index.ts`), plain `node dist/` may fail; install `openssl` in the image.
 - `npm audit` (2026-10-14): 20 vulnerabilities (2 critical, 11 high, 7 moderate); 5 in prod deps (`--omit=dev`). Triaged, no non-breaking fix; all fixes are major bumps (vitest 5, vite 8, tailwind 4, prisma, react-router 7) except Playwright 1.64.1 (needs image tag change in compose and CI). Windows mDNS untested.
 
 ## How work is run
