@@ -1,7 +1,14 @@
 node_modules
 dist
+build
+coverage
 package-lock.json
+test-results
+playwright-report
+deployment/**
+.github/**
+**/*.md
+**/prisma/migrations/**
 docs
 LICENSE
 .claude
-CLAUDE.md

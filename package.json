@@ -12,17 +12,14 @@
     "packages/*",
     "e2e"
   ],
-  "config": {
-    "format_paths": "backend frontend packages e2e eslint.config.mjs eslint.money.mjs package.json"
-  },
   "scripts": {
     "dev": "npm run dev --workspaces --if-present",
     "lint": "npm run generate -w backend && eslint .",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
-    "format": "prettier --write $npm_package_config_format_paths",
-    "format:check": "prettier --check $npm_package_config_format_paths"
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
