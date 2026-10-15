@@ -1,3 +1,7 @@
+# Fixed project name: the MySQL data lives in the volume "spendual_mysql_data", whatever the
+# folder or worktree you run from. COMPOSE_PROJECT_NAME still overrides this (parallel agents).
+name: spendual
+
 services:
   app:
     build:
@@ -64,4 +68,4 @@ services:
       retries: 20
 
 volumes:
-  mysql_data:
+  mysql_data:  # real name: <project>_mysql_data, so spendual_mysql_data by default
