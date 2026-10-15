@@ -68,4 +68,4 @@ services:
       retries: 20
 
 volumes:
-  mysql_data:  # real name: <project>_mysql_data, so spendual_mysql_data by default
+  mysql_data: # real name: <project>_mysql_data, so spendual_mysql_data by default
