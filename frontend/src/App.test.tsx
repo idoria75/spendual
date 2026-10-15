@@ -96,7 +96,7 @@ it("blocks a short password on signup and ties the error to the field", async ()
   await userEvent.click(screen.getByRole("button", { name: "Criar conta" }));
   await fill("Nome", "Bia");
   await fill("Usuário", "bia");
-  await fill("Senha", "curta");
+  await fill("Senha", "abc");
   await userEvent.keyboard("{Enter}");
   const input = await screen.findByLabelText("Senha");
   expect(input).toHaveAttribute("aria-invalid", "true");
