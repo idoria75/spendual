@@ -13,7 +13,7 @@ import {
 } from "@spendual/shared";
 import { createRule } from "../src/services/bills.js";
 import { currentPeriod } from "../src/lib/period.js";
-import { makeApp } from "./helpers/authApp.js";
+import { csrfToken, makeApp } from "./helpers/authApp.js";
 import { resetDb, testPrisma } from "./helpers/testDb.js";
 import { send, setup, type Ctx } from "./helpers/txApp.js";
 
@@ -37,7 +37,10 @@ const dash = async (month = M, agent = ctx.ana) => {
 const tx = (body: Record<string, unknown>) =>
   send(ctx.ana, "post", "/api/transactions", {
     scope: "household",
-    categoryId: ctx.categoryId,
+    categoryId:
+      body.type === "income" || body.type === "other_receipt"
+        ? ctx.incomeCategoryId
+        : ctx.categoryId,
     transactionDate: `${M}-05`,
     description: "x",
     ...body,
@@ -144,6 +147,125 @@ describe("dashboard: guide worked example", () => {
     // Personal spending is not household spending.
     expect(d.sharedExpensesNet).toBe("0.00");
     expect(d.people.find((p) => p.userId === ctx.betoId)!.closingBalance).toBe("0.00");
+  });
+});
+
+describe("dashboard: categorySpending", () => {
+  it("nets refunds per category, biggest first, null for none; sums to sharedExpensesNet", async () => {
+    const other = await prisma.category.create({ data: { name: "Lazer" } });
+    const e1 = await tx({ type: "expense", amount: "100.00" });
+    await tx({ type: "expense", amount: "300.00", categoryId: other.id });
+    // Uncategorized expenses can only come from old data: write the row directly.
+    await prisma.transaction.create({
+      data: {
+        type: "expense",
+        status: "confirmed",
+        amount: "50.55",
+        description: "old",
+        transactionDate: new Date(`${M}-07T00:00:00Z`),
+        scope: "household",
+        payerId: ctx.anaId,
+        createdById: ctx.anaId,
+        updatedById: ctx.anaId,
+      },
+    });
+    await tx({ type: "expense", amount: "40.00", scope: "personal", ownerId: ctx.anaId });
+    await tx({ type: "refund", amount: "30.00", relatedTransactionId: e1.body.id });
+    // Voided and other-month rows do not count.
+    const v = await tx({ type: "expense", amount: "999.00" });
+    await send(ctx.ana, "post", `/api/transactions/${v.body.id}/void`, { reason: "x" });
+    await tx({ type: "expense", amount: "77.00", transactionDate: "2027-02-05" });
+    const d = await dash();
+    expect(d.categorySpending).toEqual([
+      { categoryId: other.id, amount: "300.00" },
+      { categoryId: ctx.categoryId, amount: "70.00" },
+      { categoryId: null, amount: "50.55" },
+    ]);
+    const sum = d.categorySpending.reduce((a, c) => a + Math.round(Number(c.amount) * 100), 0);
+    expect(sum).toBe(Math.round(Number(d.sharedExpensesNet) * 100));
+    expect(d.sharedExpensesNet).toBe("420.55");
+  });
+
+  it("is empty for a month without expenses", async () => {
+    expect((await dash()).categorySpending).toEqual([]);
+  });
+});
+
+describe("dashboard: upcoming", () => {
+  it("lists the next 5 planned bills from today, soonest first, active rules only", async () => {
+    // Clock is 2027-03-15. Day 10 rows in March are overdue and must not show.
+    const r10 = await rule({ description: "Dia 10", dayOfMonth: 10 });
+    expect(r10.status).toBe(201);
+    await rule({ description: "Dia 20", dayOfMonth: 20 });
+    const d = await dash();
+    expect(d.upcoming.length).toBeLessThanOrEqual(5);
+    for (const b of d.upcoming) billSchema.parse(b);
+    const dates = d.upcoming.map((b) => b.dueDate);
+    expect(dates).toEqual([...dates].sort());
+    expect(dates.every((x) => x >= "2027-03-15")).toBe(true);
+    expect(d.upcoming[0]?.description).not.toBe("Dia 10");
+    expect(d.upcoming.every((b) => b.status === "planned")).toBe(true);
+  });
+
+  it("drops bills of paused rules and bills already confirmed", async () => {
+    await rule({ description: "Dia 20", dayOfMonth: 20 });
+    const row = await prisma.recurrenceOccurrence.findFirstOrThrow({
+      where: { dueDate: new Date("2027-03-20T00:00:00Z") },
+    });
+    expect((await dash()).upcoming.map((b) => b.id)).toContain(row.id);
+    await prisma.recurrenceRule.update({ where: { id: row.ruleId }, data: { state: "paused" } });
+    expect((await dash()).upcoming).toEqual([]);
+    await prisma.recurrenceRule.update({ where: { id: row.ruleId }, data: { state: "active" } });
+    await confirm("recurrence", row.id);
+    expect((await dash()).upcoming.map((b) => b.id)).not.toContain(row.id);
+  });
+
+  it("caps at 5 and includes installments", async () => {
+    await rule({ description: "Dia 20", dayOfMonth: 20 });
+    await send(ctx.ana, "post", "/api/installment-plans", {
+      description: "Geladeira",
+      totalAmount: "100.00",
+      installmentCount: 4,
+      firstDueDate: "2027-03-18",
+      scope: "household",
+      categoryId: ctx.categoryId,
+    });
+    const d = await dash();
+    expect(d.upcoming).toHaveLength(5);
+    expect(d.upcoming[0]?.kind).toBe("installment");
+  });
+});
+
+describe("category kind in planning", () => {
+  it("rules, plans and budgets need an expense category; confirm too", async () => {
+    const r = await rule({ categoryId: ctx.incomeCategoryId });
+    expect(r.status).toBe(400);
+    expect(r.body.error.fields.categoryId).toBeDefined();
+    const p = await send(ctx.ana, "post", "/api/installment-plans", {
+      description: "x",
+      totalAmount: "100.00",
+      installmentCount: 2,
+      firstDueDate: `${M}-20`,
+      scope: "household",
+      categoryId: ctx.incomeCategoryId,
+    });
+    expect(p.status).toBe(400);
+    const token = await csrfToken(ctx.ana);
+    const b = await ctx.ana
+      .put("/api/budgets")
+      .set("X-CSRF-Token", token)
+      .send({ period: M, categoryId: ctx.incomeCategoryId, amount: "10.00", mode: "from_now" });
+    expect(b.status).toBe(400);
+    // A row that points at an income category (bad data) cannot be confirmed.
+    await rule({ description: "Dia 20", dayOfMonth: 20 });
+    const row = await prisma.recurrenceOccurrence.findFirstOrThrow({ include: { rule: true } });
+    await prisma.recurrenceRule.update({
+      where: { id: row.ruleId },
+      data: { categoryId: ctx.incomeCategoryId },
+    });
+    const c = await confirm("recurrence", row.id);
+    expect(c.status).toBe(400);
+    expect(c.body.error.fields.categoryId).toBeDefined();
   });
 });
 

@@ -23,6 +23,7 @@ import {
 } from "../services/allowance.js";
 import { editBudget } from "../services/budget.js";
 import * as dash from "../services/dashboard.js";
+import * as setup from "../services/setup.js";
 import { assertActiveUser } from "../services/transactions.js";
 import { actorId, idParam } from "./params.js";
 
@@ -47,6 +48,20 @@ export function planningRouter(prisma: PrismaClient, clock: () => Date = () => n
     "/dashboard",
     asyncHandler(async (req, res) => {
       res.json(await dash.getDashboard(prisma, month(req), clock()));
+    }),
+  );
+
+  r.get(
+    "/setup",
+    asyncHandler(async (_req, res) => {
+      res.json(await setup.getSetupStatus(prisma));
+    }),
+  );
+
+  r.post(
+    "/setup/complete",
+    asyncHandler(async (_req, res) => {
+      res.json(await setup.completeSetup(prisma));
     }),
   );
 
