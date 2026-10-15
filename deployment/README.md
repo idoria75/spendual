@@ -24,7 +24,23 @@ name to `spendual`, so every folder and worktree uses the same volume.
   (skipped when MySQL is not up yet or the database is empty). The backups are plain files on
   your disk, so they survive a lost volume. Copy them to another disk now and then.
 - Restore: `make restore-dev FILE=backups/spendual-dev-....sql.gz CONFIRM=yes`.
+- A failed automatic backup only prints a warning; `make dev` goes on.
+- Ctrl-C on `make dev` exits 0. Both servers are stopped, including node.
 - Daily backup at 03:00: `make backup-timer-install` prints the sudo commands.
+
+### Find old data
+
+`make dev` lists other `*_mysql_data` volumes at start (read-only look). To move data from an old
+volume into the main one:
+
+1. Start MySQL on the old project: `COMPOSE_PROJECT_NAME=spendual_main docker compose -f compose.dev.yml up -d mysql`
+   (the project name is the volume name without `_mysql_data`).
+2. Back it up: `COMPOSE_PROJECT_NAME=spendual_main make backup-dev`.
+3. Stop it: `COMPOSE_PROJECT_NAME=spendual_main docker compose -f compose.dev.yml stop mysql`.
+4. Start the main one (`make dev`, then Ctrl-C is fine) and restore:
+   `make restore-dev FILE=backups/spendual-dev-....sql.gz CONFIRM=yes`.
+
+Never mount an old volume read-write by hand.
 
 ## Dev: open the app from a phone or by name
 
