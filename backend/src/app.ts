@@ -24,6 +24,8 @@ export interface AppOptions {
   now?: () => Date;
   /** Directory that holds backup files. Backup status reports not configured when unset. */
   backupDir?: string;
+  /** Express `trust proxy` value (hop count, "loopback", CIDR list). Off when unset. */
+  trustProxy?: number | string | boolean;
   /** Folder with the built frontend. When set, it is served with an SPA fallback. */
   staticDir?: string;
 }
@@ -32,6 +34,9 @@ export function createApp(opts: AppOptions) {
   const maxAgeMs = opts.sessionMaxAgeMs ?? SESSION_MAX_AGE_MS;
   const app = express();
   app.disable("x-powered-by");
+  // Behind a reverse proxy the client IP comes from X-Forwarded-For. Off by default: with it on
+  // and no proxy, a client could fake its IP and dodge the login rate limit.
+  if (opts.trustProxy !== undefined) app.set("trust proxy", opts.trustProxy);
   app.use(express.json());
   app.get("/health", (_req, res) => {
     res.json({ status: "ok" });
@@ -70,7 +75,9 @@ export function createApp(opts: AppOptions) {
     // A missing asset is a 404, not the page: a stale hashed file must not parse as HTML.
     app.use("/assets", (_req, res) => res.status(404).end());
     app.use(express.static(dir, { index: false }));
-    app.get("*", (_req, res) => {
+    app.get("*", (req, res, next) => {
+      // A path with a file extension (favicon.ico, robots.txt) is a missing file, not a page.
+      if (path.extname(req.path)) return next();
       res.setHeader("Cache-Control", "no-cache");
       res.sendFile(path.join(dir, "index.html"));
     });

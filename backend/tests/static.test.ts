@@ -4,7 +4,8 @@ import path from "node:path";
 import { PrismaClient } from "@prisma/client";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { makeApp } from "./helpers/authApp.js";
+import { makeApp, newAgent, seedHousehold, signup } from "./helpers/authApp.js";
+import { resetDb, testPrisma } from "./helpers/testDb.js";
 
 describe("static frontend", () => {
   let dir: string;
@@ -50,13 +51,38 @@ describe("static frontend", () => {
     expect(res.text).not.toContain("<title>");
   });
 
+  it("does not fall back for paths with a file extension", async () => {
+    for (const p of ["/favicon.ico", "/robots.txt"]) {
+      const res = await request(app()).get(p);
+      expect(res.status).toBe(404);
+      expect(res.text).not.toContain("<title>");
+    }
+  });
+
   it("keeps /health and /api as they are", async () => {
     const a = app();
     expect((await request(a).get("/health")).body).toEqual({ status: "ok" });
     const csrf = await request(a).get("/api/auth/csrf");
     expect(csrf.status).toBe(200);
-    const unknown = await request(a).get("/api/nope");
-    expect(unknown.headers["content-type"]).toContain("application/json");
+    // Signed out, a protected path may answer 401. It is still JSON, never the page.
+    const out = await request(a).get("/api/nope");
+    expect(out.headers["content-type"]).toContain("application/json");
+    expect(out.text).not.toContain("<title>");
+  });
+
+  it("returns a JSON 404 for an unknown /api path when signed in", async () => {
+    const prisma = testPrisma();
+    try {
+      await resetDb(prisma);
+      await seedHousehold(prisma);
+      const agent = newAgent(makeApp(prisma, { staticDir: dir }));
+      expect((await signup(agent, "ana")).status).toBe(201);
+      const res = await agent.get("/api/nope");
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ error: { code: "not_found", message: "Not found" } });
+    } finally {
+      await prisma.$disconnect();
+    }
   });
 
   it("serves no frontend when staticDir is unset", async () => {
