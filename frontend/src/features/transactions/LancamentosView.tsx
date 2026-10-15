@@ -113,10 +113,16 @@ export function LancamentosView() {
             onChange={(e) => setCategoryId(e.target.value)}
           >
             <option value="">{t("list.allCategories")}</option>
-            {lookups?.categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
+            {(["expense", "income"] as const).map((kind) => (
+              <optgroup key={kind} label={t(`settings.categoryKinds.${kind}`)}>
+                {lookups?.categories
+                  .filter((c) => c.kind === kind)
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+              </optgroup>
             ))}
           </Select>
         </div>

@@ -102,7 +102,7 @@ function CreateForm({ kind, onSaved }: { kind: CreateKind; onSaved: () => void }
     }
   };
 
-  const categories = (lookups?.categories ?? []).filter((c) => c.active);
+  const categories = (lookups?.categories ?? []).filter((c) => c.active && c.kind === "expense");
   const accounts = (lookups?.accounts ?? []).filter((a) => a.active);
   const methods = (lookups?.paymentMethods ?? []).filter((m) => m.active);
   const users = lookups?.users ?? [];
