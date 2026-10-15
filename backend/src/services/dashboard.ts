@@ -1,6 +1,7 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import type {
   AllowanceOverview,
+  Bill,
   BudgetLine,
   BudgetOverview,
   Dashboard,
@@ -16,9 +17,10 @@ import {
   unallocatedSavings,
 } from "../domain/accounting.js";
 import { AppError } from "../auth/errors.js";
-import { currentPeriod, dateOnlyToDate, nextPeriod } from "../lib/period.js";
+import { currentDate, currentPeriod, dateOnlyToDate, nextPeriod } from "../lib/period.js";
 import { withRetry } from "../lib/withRetry.js";
 import { budgetFor, budgetKey } from "./budget.js";
+import { installmentBill, recurrenceBill } from "./bills.js";
 import { generateForRules } from "./recurrence.js";
 
 type Db = PrismaClient | Prisma.TransactionClient;
@@ -129,6 +131,70 @@ async function personSummary(
   };
 }
 
+/**
+ * Household confirmed expenses by category for the month, net of linked refunds
+ * (a refund counts in its expense's month). Biggest first. null = no category.
+ * The amounts add up to the household net spent.
+ */
+export async function categorySpending(
+  db: Db,
+  month: string,
+): Promise<{ categoryId: number | null; amount: string }[]> {
+  const where = {
+    scope: "household" as const,
+    type: "expense" as const,
+    transactionDate: monthRange(month),
+  };
+  const [expenses, refunds] = await Promise.all([
+    db.transaction.groupBy({
+      by: ["categoryId"],
+      _sum: { amount: true },
+      where: { status: "confirmed", ...where },
+    }),
+    db.transaction.findMany({
+      where: {
+        status: "confirmed",
+        type: "refund",
+        relatedTransaction: { is: { status: "confirmed", ...where } },
+      },
+      select: { amount: true, relatedTransaction: { select: { categoryId: true } } },
+    }),
+  ]);
+  const byCategory = new Map<number | null, bigint>();
+  for (const e of expenses) byCategory.set(e.categoryId, cents(e._sum.amount));
+  for (const r of refunds) {
+    const id = r.relatedTransaction?.categoryId ?? null;
+    byCategory.set(id, (byCategory.get(id) ?? 0n) - cents(r.amount));
+  }
+  return [...byCategory.entries()]
+    .sort(([ka, a], [kb, b]) => (a === b ? (ka ?? 0) - (kb ?? 0) : a > b ? -1 : 1))
+    .map(([categoryId, amount]) => ({ categoryId, amount: centsToMoney(amount) }));
+}
+
+/** Next 5 planned bills due today or later. Rules must be active. Soonest first. */
+export async function upcomingBills(db: Db, now: Date): Promise<Bill[]> {
+  const dueDate = { gte: dateOnlyToDate(currentDate(now)) };
+  const [rec, ins] = await Promise.all([
+    db.recurrenceOccurrence.findMany({
+      where: { status: "planned", dueDate, rule: { state: "active" } },
+      include: { rule: true, transaction: { select: { id: true } } },
+      orderBy: [{ dueDate: "asc" }, { id: "asc" }],
+      take: 5,
+    }),
+    db.installmentOccurrence.findMany({
+      where: { status: "planned", dueDate },
+      include: { plan: true, transaction: { select: { id: true } } },
+      orderBy: [{ dueDate: "asc" }, { id: "asc" }],
+      take: 5,
+    }),
+  ]);
+  return [...rec.map(recurrenceBill), ...ins.map(installmentBill)]
+    .sort(
+      (a, b) => a.dueDate.localeCompare(b.dueDate) || a.kind.localeCompare(b.kind) || a.id - b.id,
+    )
+    .slice(0, 5);
+}
+
 export async function getDashboard(
   prisma: PrismaClient,
   month: string,
@@ -138,21 +204,33 @@ export async function getDashboard(
   const range = monthRange(month);
   const household = { scope: "household" as const };
   const planned = { status: "planned" as const, dueDate: range };
-  const [income, sharedNet, people, allocationAgg, recAgg, recUnknown, insAgg, overall] =
-    await Promise.all([
-      sumTx(prisma, { ...household, type: "income", transactionDate: range }),
-      netSpent(prisma, household, range),
-      personSummaries(prisma, month),
-      // Every user counts here, active or not: the household already paid these out.
-      prisma.personalAllowanceEntry.aggregate({
-        _sum: { amount: true },
-        where: { periodKey: month },
-      }),
-      prisma.recurrenceOccurrence.aggregate({ _sum: { expectedAmount: true }, where: planned }),
-      prisma.recurrenceOccurrence.count({ where: { ...planned, expectedAmount: null } }),
-      prisma.installmentOccurrence.aggregate({ _sum: { expectedAmount: true }, where: planned }),
-      budgetFor(prisma, null, month),
-    ]);
+  const [
+    income,
+    sharedNet,
+    people,
+    allocationAgg,
+    recAgg,
+    recUnknown,
+    insAgg,
+    overall,
+    spending,
+    upcoming,
+  ] = await Promise.all([
+    sumTx(prisma, { ...household, type: "income", transactionDate: range }),
+    netSpent(prisma, household, range),
+    personSummaries(prisma, month),
+    // Every user counts here, active or not: the household already paid these out.
+    prisma.personalAllowanceEntry.aggregate({
+      _sum: { amount: true },
+      where: { periodKey: month },
+    }),
+    prisma.recurrenceOccurrence.aggregate({ _sum: { expectedAmount: true }, where: planned }),
+    prisma.recurrenceOccurrence.count({ where: { ...planned, expectedAmount: null } }),
+    prisma.installmentOccurrence.aggregate({ _sum: { expectedAmount: true }, where: planned }),
+    budgetFor(prisma, null, month),
+    categorySpending(prisma, month),
+    upcomingBills(prisma, now),
+  ]);
   const allocations = cents(allocationAgg._sum.amount);
   const savings = savingsBeforeGoals({
     householdIncome: income,
@@ -177,6 +255,8 @@ export async function getDashboard(
       budget: overall ? overall.amount.toFixed(2) : null,
       spent: centsToMoney(sharedNet),
     },
+    categorySpending: spending,
+    upcoming,
     people,
   };
 }
@@ -200,7 +280,7 @@ export async function getBudgetOverview(db: Db, month: string): Promise<BudgetOv
       },
       select: { amount: true, relatedTransaction: { select: { categoryId: true } } },
     }),
-    db.category.findMany({ orderBy: { id: "asc" } }),
+    db.category.findMany({ where: { kind: "expense" }, orderBy: { id: "asc" } }),
     netSpent(db, household, range),
     db.monthlyBudget.findMany({
       where: { effectiveFrom: { lte: month } },
@@ -249,6 +329,11 @@ export async function assertBudgetCategory(db: Db, categoryId: number | null): P
   if (!c) {
     throw new AppError(400, "validation_error", "Invalid request", {
       categoryId: "Unknown category",
+    });
+  }
+  if (c.kind !== "expense") {
+    throw new AppError(400, "validation_error", "Invalid request", {
+      categoryId: "Must be an expense category",
     });
   }
 }
