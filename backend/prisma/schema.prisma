@@ -10,6 +10,8 @@ datasource db {
 model Household {
   id        Int      @id @default(autoincrement())
   name      String   @db.VarChar(120)
+  // Set when the first-run setup page is completed or skipped.
+  setupCompletedAt DateTime?
   createdAt DateTime @default(now())
 }
 
@@ -44,9 +46,15 @@ model User {
   auditEvents    AuditEvent[]             @relation("AuditActor")
 }
 
+enum CategoryKind {
+  expense
+  income
+}
+
 model Category {
   id               Int               @id @default(autoincrement())
   name             String            @unique @db.VarChar(80)
+  kind             CategoryKind      @default(expense)
   active           Boolean           @default(true)
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
