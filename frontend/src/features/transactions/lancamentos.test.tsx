@@ -21,7 +21,10 @@ const lookups = {
     { id: 7, name: "Salário", kind: "income", active: true },
     { id: 8, name: "Presente", kind: "income", active: true },
   ],
-  accounts: [{ id: 1, name: "Nubank", type: "bank", active: true }],
+  accounts: [
+    { id: 1, name: "Nubank", type: "bank", active: true },
+    { id: 2, name: "Visa", type: "credit_card", active: true },
+  ],
   paymentMethods: [
     { id: 1, name: "Pix", active: true },
     { id: 2, name: "Cartão de crédito", active: true },
@@ -493,5 +496,74 @@ describe("Parcelado in the entry form", () => {
     expect(await within(dialog).findByText("Escolha de quem é o lançamento.")).toBeInTheDocument();
     expect(within(dialog).getByText("Informe de 2 a 60 parcelas.")).toBeInTheDocument();
     expect(plans(mock)).toHaveLength(0);
+  });
+});
+
+describe("Review fixes", () => {
+  it("offers Parcelado when the account is a credit card", async () => {
+    mockFetch(base());
+    renderAt("/lancamentos");
+    const dialog = await openForm();
+    expect(within(dialog).queryByRole("radiogroup", { name: "Parcelado" })).not.toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Mais detalhes" }));
+    await userEvent.selectOptions(within(dialog).getByLabelText("Conta"), "2");
+    expect(within(dialog).getByRole("radiogroup", { name: "Parcelado" })).toBeInTheDocument();
+  });
+
+  it("blocks a plan without a category and never sends categoryId 0", async () => {
+    const mock = mockFetch(base());
+    renderAt("/lancamentos");
+    const dialog = await openForm();
+    await userEvent.type(within(dialog).getByLabelText("Valor"), "100000");
+    await userEvent.type(within(dialog).getByLabelText("Descrição"), "TV");
+    await userEvent.selectOptions(within(dialog).getByLabelText("Método"), "2");
+    await userEvent.click(within(dialog).getByRole("radio", { name: "Sim" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
+    expect(await within(dialog).findByText("Escolha a categoria.")).toBeInTheDocument();
+    expect(
+      mock.mock.calls.filter(([u, i]) => u === "/api/installment-plans" && i?.method === "POST"),
+    ).toHaveLength(0);
+  });
+
+  it("brings the category back when the type returns to its kind", async () => {
+    mockFetch(base());
+    renderAt("/lancamentos");
+    const dialog = await openForm();
+    await userEvent.click(await within(dialog).findByRole("button", { name: /Mercado/ }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Receita" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Despesa" }));
+    expect(within(dialog).getByRole("button", { name: /Mercado/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("keeps the selected category visible when editing, even with another kind", async () => {
+    list = [tx({ categoryId: 7 })];
+    mockFetch(base());
+    renderAt("/lancamentos");
+    await userEvent.click(await screen.findByText("iFood"));
+    await userEvent.click(await screen.findByRole("button", { name: "Editar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar lançamento" });
+    expect(within(dialog).getByRole("button", { name: /Salário/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("does not render an empty category group in the filter", async () => {
+    const inner = base();
+    mockFetch((req) =>
+      req.url === "/api/lookups"
+        ? json(200, {
+            ...lookups,
+            categories: lookups.categories.filter((c) => c.kind === "expense"),
+          })
+        : inner(req),
+    );
+    renderAt("/lancamentos");
+    const select = await screen.findByLabelText("Categoria");
+    await within(select).findByRole("group", { name: "Despesas" });
+    expect(within(select).queryByRole("group", { name: "Receitas" })).not.toBeInTheDocument();
   });
 });

@@ -99,6 +99,7 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
   const [installmentCount, setInstallmentCount] = useState("2");
   const [expenses, setExpenses] = useState<Transaction[]>([]);
   const locked = useRef(false);
+  const dropped = useRef(new Map<string, number>());
 
   const set = <K extends keyof FormValues>(key: K, value: FormValues[K]) =>
     setValues((v) => ({ ...v, [key]: value }));
@@ -126,7 +127,9 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
   const activeCategories = useMemo(
     () =>
       (lookups?.categories ?? []).filter(
-        (c) => c.kind === categoryKind && (c.active || c.id === values.categoryId),
+        (c) =>
+          c.id === values.categoryId ||
+          ((categoryKind === null || c.kind === categoryKind) && c.active),
       ),
     [lookups, values.categoryId, categoryKind],
   );
@@ -160,20 +163,24 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
   const activeAccounts = lookups.accounts.filter((a) => a.active || a.id === values.accountId);
   const methods = lookups.paymentMethods.filter((m) => m.active || m.id === values.paymentMethodId);
   const method = methods.find((m) => m.id === values.paymentMethodId);
-  const canInstall = !editing && !bill && type === "expense" && isCreditCardMethod(method?.name);
+  const account = lookups.accounts.find((a) => a.id === values.accountId);
+  const canInstall =
+    !editing &&
+    !bill &&
+    type === "expense" &&
+    (isCreditCardMethod(method?.name) || account?.type === "credit_card");
   const installing = canInstall && installment === "yes";
   const preview = installing ? splitPreview(values.amount, installmentCount) : null;
 
-  const changeType = (ty: TransactionType) =>
-    setValues((v) => {
-      const kind = categoryKindFor(ty);
-      const current = lookups.categories.find((c) => c.id === v.categoryId);
-      return {
-        ...v,
-        type: ty,
-        categoryId: current && current.kind === kind ? v.categoryId : null,
-      };
-    });
+  // A category dropped by a type change comes back when the type goes back to its kind.
+  const changeType = (ty: TransactionType) => {
+    const kind = categoryKindFor(ty);
+    const current = lookups.categories.find((c) => c.id === values.categoryId);
+    if (current) dropped.current.set(current.kind, current.id);
+    const keep = current !== undefined && current.kind === kind;
+    const restored = kind === null ? undefined : dropped.current.get(kind);
+    setValues((v) => ({ ...v, type: ty, categoryId: keep ? v.categoryId : (restored ?? null) }));
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();

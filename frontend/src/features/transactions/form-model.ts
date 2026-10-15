@@ -167,16 +167,23 @@ export function buildInstallment(v: FormValues, count: string): Built<Installmen
     scope: v.scope,
     ownerId: v.scope === "personal" ? v.ownerId : null,
     ...(v.payerId !== null ? { payerId: v.payerId } : {}),
-    categoryId: v.categoryId ?? 0,
+    // Placeholder only to validate the other fields. A missing category is rejected below.
+    categoryId: v.categoryId ?? 1,
     accountId: v.accountId,
     ...(v.notes.trim() !== "" ? { notes: v.notes } : {}),
   });
+  const missing: FieldErrors = v.categoryId === null ? { categoryId: true } : {};
   if (!parsed.success) {
     return {
       ok: false,
-      errors: { ...errorsFromIssues(parsed.error.issues), ...fallbackAmountError(amount) },
+      errors: {
+        ...errorsFromIssues(parsed.error.issues),
+        ...fallbackAmountError(amount),
+        ...missing,
+      },
     };
   }
+  if (v.categoryId === null) return { ok: false, errors: missing };
   return { ok: true, body: parsed.data };
 }
 
