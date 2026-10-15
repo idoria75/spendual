@@ -11,6 +11,9 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     port: 5173,
+    // Dev only. Names allowed in the Host header. Open it by IP, spendual.local or localhost.
+    // IP addresses are always allowed by Vite. Add a name here if you use another one.
+    allowedHosts: ["spendual.local", "localhost", ...(process.env.VITE_ALLOWED_HOSTS?.split(",") ?? [])],
     proxy: { "/api": { target: apiTarget, changeOrigin: true } },
   },
   test: {

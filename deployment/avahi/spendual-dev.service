@@ -1,0 +1,11 @@
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<!-- Dev box: announces the Vite dev server (port 5173). Name resolution comes from
+     spendual-dev-mdns.service. Production uses spendual.service (port 80). -->
+<service-group>
+  <name>Spendual (dev)</name>
+  <service>
+    <type>_http._tcp</type>
+    <port>5173</port>
+  </service>
+</service-group>

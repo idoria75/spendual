@@ -63,3 +63,14 @@ test-restore:
 	$(RUN) sh -c 'npm run migrate -w backend && npm run seed -w backend'
 	COMPOSE_FILE=compose.dev.yml ./deployment/test-restore.sh
 	COMPOSE_FILE=compose.dev.yml ./deployment/test-cleanup.sh
+
+# mDNS: publish spendual.local on the dev box. These targets only PRINT the sudo commands.
+# Nothing runs until you copy and type them. Needs avahi-daemon and avahi-utils on this machine.
+mdns-install:
+	@./deployment/dev-sudo.sh mdns-install
+
+mdns-remove:
+	@./deployment/dev-sudo.sh mdns-remove
+
+backup-timer-install:
+	@./deployment/dev-sudo.sh backup-timer-install
