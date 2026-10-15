@@ -246,6 +246,11 @@
     "balance": "Saldo",
     "allowanceLine": "Mesada do mês: {{amount}}",
     "failed": "Não foi possível carregar o painel.",
+    "spending": "Gastos por categoria",
+    "spendingEmpty": "Os gastos do mês por categoria aparecem aqui.",
+    "others": "Outras ({{count}})",
+    "upcoming": "Próximas contas",
+    "upcomingEmpty": "Nenhuma conta prevista para os próximos dias.",
     "overdue_one": "{{count}} conta vencida",
     "overdue_other": "{{count}} contas vencidas"
   },

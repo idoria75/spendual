@@ -663,3 +663,65 @@ describe("overdue bills", () => {
     expect(await screen.findByText("1 conta vencida")).toBeInTheDocument();
   });
 });
+
+describe("Início chart and upcoming bills", () => {
+  const serve = (over: Record<string, unknown>) =>
+    mockFetch(
+      base((req) =>
+        req.url.startsWith("/api/dashboard") ? json(200, { ...dashboard, ...over }) : undefined,
+      ),
+    );
+
+  it("draws one stacked bar, biggest first, with a legend of names, amounts and percents", async () => {
+    serve({});
+    renderAt("/");
+    const chart = await screen.findByRole("region", { name: "Gastos por categoria" });
+    expect(within(chart).getAllByTestId("spending-segment")).toHaveLength(2);
+    const items = within(chart).getAllByRole("listitem");
+    expect(items).toHaveLength(2);
+    expect(items[0]).toHaveTextContent("Casa e contas");
+    expect(items[0]).toHaveTextContent("R$ 3.400,00");
+    expect(items[0]).toHaveTextContent("68%");
+    expect(items[1]).toHaveTextContent("Mercado");
+    expect(items[1]).toHaveTextContent("32%");
+  });
+
+  it("groups categories after the fourth into Outras (n)", async () => {
+    serve({
+      categorySpending: [
+        { categoryId: 1, amount: "500.00" },
+        { categoryId: 2, amount: "400.00" },
+        { categoryId: 3, amount: "300.00" },
+        { categoryId: 4, amount: "200.00" },
+        { categoryId: 5, amount: "60.00" },
+        { categoryId: null, amount: "40.00" },
+      ],
+    });
+    renderAt("/");
+    const chart = await screen.findByRole("region", { name: "Gastos por categoria" });
+    expect(within(chart).getAllByTestId("spending-segment")).toHaveLength(6);
+    const items = within(chart).getAllByRole("listitem");
+    expect(items).toHaveLength(5);
+    expect(items[4]).toHaveTextContent("Outras (2)");
+    expect(items[4]).toHaveTextContent("R$ 100,00");
+    expect(items[4]).toHaveTextContent("7%");
+  });
+
+  it("shows empty states for no spending and no upcoming bills", async () => {
+    serve({ categorySpending: [], upcoming: [] });
+    renderAt("/");
+    expect(
+      await screen.findByText(/gastos do mês por categoria aparecem aqui/),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Nenhuma conta prevista para os próximos dias.")).toBeInTheDocument();
+  });
+
+  it("lists upcoming bills and opens the confirm sheet on tap", async () => {
+    serve({ upcoming: [bill({})] });
+    renderAt("/");
+    const block = await screen.findByRole("region", { name: "Próximas contas" });
+    await userEvent.click(within(block).getByText("Internet").closest("button")!);
+    const dialog = await screen.findByRole("dialog", { name: "Confirmar pagamento" });
+    expect(within(dialog).getByText("Internet")).toBeInTheDocument();
+  });
+});
