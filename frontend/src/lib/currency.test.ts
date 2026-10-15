@@ -4,6 +4,7 @@ import {
   fromCents,
   maskAmountInput,
   parseAmountInput,
+  parsePastedAmount,
   toCents,
 } from "./currency";
 
@@ -85,5 +86,25 @@ describe("amount field mask", () => {
     expect(parseAmountInput(formatAmountInput("1234.50"))).toBe("1234.50");
     expect(formatAmountInput("0.05")).toBe("0,05");
     expect(formatAmountInput("0.00")).toBe("");
+  });
+});
+
+describe("parsePastedAmount", () => {
+  it.each([
+    ["12.5", "12.50"],
+    ["1234.5", "1234.50"],
+    ["80.25", "80.25"],
+    ["1.234,5", "1234.50"],
+    ["1.234", "1234.00"],
+    ["1.234.567", "1234567.00"],
+    ["80", "80.00"],
+    ["R$ 1.234,56", "1234.56"],
+  ])("parses %s as %s", (input, expected) => {
+    expect(parsePastedAmount(input)).toBe(expected);
+  });
+
+  it("rejects junk", () => {
+    expect(parsePastedAmount("abc")).toBeNull();
+    expect(parsePastedAmount("")).toBeNull();
   });
 });

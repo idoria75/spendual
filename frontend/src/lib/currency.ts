@@ -64,6 +64,21 @@ export function parseAmountInput(input: string): Money | null {
 
 const MAX_AMOUNT_DIGITS = 12;
 
+const DOT_DECIMAL = /^(\d+(?:\.\d{3})*)\.(\d{1,2})$/;
+
+/**
+ * Parse pasted text. Like parseAmountInput, but a last dot followed by 1 or 2 digits is a
+ * decimal point ("12.5" = 12,50). A dot followed by exactly 3 digits is a thousands group.
+ */
+export function parsePastedAmount(input: string): Money | null {
+  const text = input.replace(/\s/g, "").replace(/^R\$/, "");
+  const match = DOT_DECIMAL.exec(text);
+  if (match && !text.includes(",")) {
+    return parseAmountInput(`${(match[1] as string).replaceAll(".", "")},${match[2] as string}`);
+  }
+  return parseAmountInput(text);
+}
+
 function groupThousands(int: string): string {
   return int.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }

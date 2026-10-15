@@ -51,3 +51,24 @@ it("pastes a plain integer as whole reais", async () => {
   await userEvent.paste("80");
   expect(input).toHaveValue("80,00");
 });
+
+it.each([
+  ["12.5", "12,50"],
+  ["1234.5", "1.234,50"],
+  ["1.234,5", "1.234,50"],
+  ["1.234", "1.234,00"],
+  ["80", "80,00"],
+])("pastes %s as %s", async (text, shown) => {
+  render(<Harness />);
+  const input = screen.getByLabelText("Valor");
+  await userEvent.click(input);
+  await userEvent.paste(text);
+  expect(input).toHaveValue(shown);
+});
+
+it("caps at 10 integer digits and 2 decimals, like the parser", async () => {
+  render(<Harness />);
+  const input = screen.getByLabelText("Valor");
+  await userEvent.type(input, "1234567890123");
+  expect(input).toHaveValue("1.234.567.890,12");
+});

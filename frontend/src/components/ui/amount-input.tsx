@@ -1,6 +1,6 @@
 import { forwardRef, useId } from "react";
 import type { ClipboardEvent, InputHTMLAttributes } from "react";
-import { formatAmountInput, maskAmountInput, parseAmountInput } from "../../lib/currency";
+import { formatAmountInput, maskAmountInput, parsePastedAmount } from "../../lib/currency";
 import { Input } from "./input";
 import { Label } from "./field";
 
@@ -21,7 +21,7 @@ export const AmountInput = forwardRef<HTMLInputElement, AmountInputProps>(functi
   ref,
 ) {
   const onPaste = (event: ClipboardEvent<HTMLInputElement>) => {
-    const parsed = parseAmountInput(event.clipboardData.getData("text"));
+    const parsed = parsePastedAmount(event.clipboardData.getData("text"));
     if (parsed === null) return;
     event.preventDefault();
     onValueChange(formatAmountInput(parsed));
