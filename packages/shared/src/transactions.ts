@@ -1,11 +1,5 @@
 import { z } from "zod";
-import {
-  Scope,
-  TransactionStatus,
-  TransactionType,
-  dateOnlySchema,
-  moneySchema,
-} from "./base.js";
+import { Scope, TransactionStatus, TransactionType, dateOnlySchema, moneySchema } from "./base.js";
 
 /**
  * Phase 3 contract: catalogs and transactions. All routes are under /api, need a session,

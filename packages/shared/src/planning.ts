@@ -168,10 +168,7 @@ export type BillList = z.infer<typeof billListSchema>;
 const idSchema = z.number().int().positive();
 const descriptionSchema = z.string().trim().min(1).max(200);
 
-const scopeOwnerCheck = (
-  v: { scope: Scope; ownerId?: number | null },
-  ctx: z.RefinementCtx,
-) => {
+const scopeOwnerCheck = (v: { scope: Scope; ownerId?: number | null }, ctx: z.RefinementCtx) => {
   if (v.scope === "personal" && v.ownerId == null)
     ctx.addIssue({ code: "custom", path: ["ownerId"], message: "Owner required" });
   if (v.scope === "household" && v.ownerId != null)

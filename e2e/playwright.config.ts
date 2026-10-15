@@ -8,7 +8,9 @@ const databaseName = (url: string) => new URL(url).pathname.slice(1);
 const fromEnv = process.env.DATABASE_URL;
 const databaseUrl = fromEnv && databaseName(fromEnv).includes("e2e") ? fromEnv : defaultUrl;
 if (!databaseName(databaseUrl).includes("e2e")) {
-  throw new Error(`Refusing to reset database "${databaseName(databaseUrl)}": name must contain "e2e".`);
+  throw new Error(
+    `Refusing to reset database "${databaseName(databaseUrl)}": name must contain "e2e".`,
+  );
 }
 const env = {
   DATABASE_URL: databaseUrl,

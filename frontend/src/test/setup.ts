@@ -20,6 +20,8 @@ afterEach(() => {
   const calls = errorSpy.mock.calls.length;
   errorSpy.mockRestore();
   if (calls > 0 && !allowed) {
-    throw new Error(`Unexpected console.error (${calls} call(s)). Mock the endpoint or fix the bug.`);
+    throw new Error(
+      `Unexpected console.error (${calls} call(s)). Mock the endpoint or fix the bug.`,
+    );
   }
 });

@@ -7,7 +7,12 @@ import { moneySelectors } from "./eslint.money.mjs";
 import i18n from "./frontend/eslint.i18n.config.js";
 
 // Type-aware rules run on source only. Tests are looser (mocks, supertest bodies are `any`).
-const TESTS = ["**/*.test.{ts,tsx}", "backend/tests/**/*.ts", "frontend/src/test/**", "e2e/**/*.ts"];
+const TESTS = [
+  "**/*.test.{ts,tsx}",
+  "backend/tests/**/*.ts",
+  "frontend/src/test/**",
+  "e2e/**/*.ts",
+];
 const TYPED_SRC = ["{backend,frontend,packages/shared}/src/**/*.{ts,tsx}"];
 
 export default tseslint.config(

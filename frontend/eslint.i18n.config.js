@@ -34,7 +34,6 @@ const i18nSelectors = [
   },
 ];
 
-
 /** Flat config block: no hardcoded UI text in JSX. Spread into the root config. */
 export default [
   {

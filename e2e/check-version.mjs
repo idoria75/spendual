@@ -9,7 +9,9 @@ let bad = false;
 for (const file of ["../compose.dev.yml", "../.github/workflows/ci.yml"]) {
   const tags = [...read(file).matchAll(/playwright:v([0-9.]+)-/g)].map((m) => m[1]);
   if (tags.length === 0 || tags.some((t) => t !== pinned)) {
-    console.error(`${file}: image tags [${tags.join(", ")}] do not match @playwright/test ${pinned}`);
+    console.error(
+      `${file}: image tags [${tags.join(", ")}] do not match @playwright/test ${pinned}`,
+    );
     bad = true;
   }
 }
