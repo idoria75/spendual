@@ -135,3 +135,28 @@ it("keeps the typed values and shows an error when saving fails, without repeati
   expect(callsTo(mock, "/api/budgets", "PUT")).toHaveLength(1);
   await waitFor(() => expect(callsTo(mock, "/api/setup/complete", "POST")).toHaveLength(2));
 });
+
+it("re-sends a step whose amount changed after a failed finish", async () => {
+  let failComplete = true;
+  const mock = mockFetch(
+    handler((req) =>
+      req.url === "/api/setup/complete" && failComplete
+        ? apiError(500, "internal_error")
+        : undefined,
+    ),
+  );
+  renderAt("/");
+  const field = await screen.findByLabelText("Orçamento mensal da casa");
+  await userEvent.type(field, "800000");
+  await userEvent.click(screen.getByRole("button", { name: "Concluir" }));
+  await screen.findByRole("alert");
+  await userEvent.clear(field);
+  await userEvent.type(field, "900000");
+  failComplete = false;
+  await userEvent.click(screen.getByRole("button", { name: "Concluir" }));
+  expect(await screen.findByText("Olá, Ana")).toBeInTheDocument();
+  expect(callsTo(mock, "/api/budgets", "PUT").map(bodyOf)).toMatchObject([
+    { amount: "8000.00" },
+    { amount: "9000.00" },
+  ]);
+});

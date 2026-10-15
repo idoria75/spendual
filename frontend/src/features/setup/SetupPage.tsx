@@ -36,8 +36,8 @@ function SetupForm() {
   const [formError, setFormError] = useState<ReturnType<typeof messageKeyFor> | null>(null);
   const [busy, setBusy] = useState<"save" | "skip" | null>(null);
   const locked = useRef(false);
-  // Steps that already worked, so a retry after a failure does not repeat them.
-  const done = useRef(new Set<string>());
+  // Amount saved per step, so a retry skips only steps whose amount did not change.
+  const done = useRef(new Map<string, string>());
 
   const finish = async (mode: "save" | "skip") => {
     if (locked.current) return;
@@ -70,19 +70,19 @@ function SetupForm() {
     ];
     for (const [key, categoryId, text] of budgets) {
       const amount = parseAmountInput(text);
-      if (amount === null || done.current.has(key)) continue;
+      if (amount === null || done.current.get(key) === amount) continue;
       const body = budgetEditSchema.parse({ categoryId, period, amount, mode: "going_forward" });
       await putBudget(body);
-      done.current.add(key);
+      done.current.set(key, amount);
     }
     for (const [id, text] of Object.entries(allowances)) {
       const key = `allowance:${id}`;
       const amount = parseAmountInput(text);
-      if (amount === null || done.current.has(key)) continue;
+      if (amount === null || done.current.get(key) === amount) continue;
       await createAllowance(
         allowanceCreateSchema.parse({ ownerId: Number(id), month: period, amount }),
       );
-      done.current.add(key);
+      done.current.set(key, amount);
     }
   };
 
