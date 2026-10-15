@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 export interface Loaded<T> {
   data: T | null;
@@ -17,7 +17,9 @@ export function useLoad<T>(load: () => Promise<T>, deps: readonly unknown[]): Lo
   const [tick, setTick] = useState(0);
   // The caller passes a new closure each render; only the deps (as `key`) decide when to load.
   const loadRef = useRef(load);
-  loadRef.current = load;
+  useLayoutEffect(() => {
+    loadRef.current = load;
+  });
   const reload = useCallback(() => setTick((n) => n + 1), []);
 
   useEffect(() => {
