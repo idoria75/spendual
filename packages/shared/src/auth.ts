@@ -15,7 +15,7 @@ export const usernameSchema = z
   .min(3)
   .max(60)
   .regex(/^[a-zA-Z0-9._-]+$/);
-export const passwordSchema = z.string().min(10).max(200);
+export const passwordSchema = z.string().min(4).max(200);
 
 export const signupRequestSchema = z.object({
   username: usernameSchema,

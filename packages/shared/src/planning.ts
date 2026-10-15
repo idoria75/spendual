@@ -41,6 +41,12 @@ import { periodKeySchema, positiveMoneySchema } from "./transactions.js";
  *    refunds, per category (overall = all household expenses). Personal spending is not budgeted.
  *  - Savings rate = savings before goals / household income, as a percent string "12.5",
  *    or null when income is 0.
+ *  - Setup (first run, shared by both users): GET /setup -> 200 SetupStatus,
+ *    POST /setup/complete -> 200 SetupStatus (idempotent, stores Household.setupCompletedAt).
+ *    The app shows the setup page (overall and category budgets, optional allowances) until it is
+ *    completed. Skipping is allowed and still calls complete. Budgets use PUT /budgets.
+ *  - Installments from the entry form use POST /installment-plans. The entry form offers
+ *    "Parcelado" when the chosen payment method is a credit card.
  *  - Goals are not in P0, so goal allocations are 0 and unallocated savings = savings.
  */
 
@@ -56,23 +62,6 @@ export const personSummarySchema = z.object({
   closingBalance: moneySchema,
 });
 export type PersonSummary = z.infer<typeof personSummarySchema>;
-
-export const dashboardSchema = z.object({
-  month: periodKeySchema,
-  householdIncome: moneySchema,
-  sharedExpensesNet: moneySchema,
-  allowanceAllocations: moneySchema,
-  savingsBeforeGoals: moneySchema,
-  goalAllocationsNet: moneySchema,
-  unallocatedSavings: moneySchema,
-  savingsRate: z.string().nullable(),
-  /** Planned, not yet confirmed, with a known amount. */
-  plannedBillsTotal: moneySchema,
-  plannedBillsUnknownCount: z.number().int(),
-  overallBudget: z.object({ budget: moneySchema.nullable(), spent: moneySchema }),
-  people: z.array(personSummarySchema),
-});
-export type Dashboard = z.infer<typeof dashboardSchema>;
 
 export const budgetLineSchema = z.object({
   /** null = the overall household budget */
@@ -151,6 +140,27 @@ export const billSchema = z.object({
   transactionId: z.number().int().nullable(),
 });
 export type Bill = z.infer<typeof billSchema>;
+
+export const dashboardSchema = z.object({
+  month: periodKeySchema,
+  householdIncome: moneySchema,
+  sharedExpensesNet: moneySchema,
+  allowanceAllocations: moneySchema,
+  savingsBeforeGoals: moneySchema,
+  goalAllocationsNet: moneySchema,
+  unallocatedSavings: moneySchema,
+  savingsRate: z.string().nullable(),
+  /** Planned, not yet confirmed, with a known amount. */
+  plannedBillsTotal: moneySchema,
+  plannedBillsUnknownCount: z.number().int(),
+  overallBudget: z.object({ budget: moneySchema.nullable(), spent: moneySchema }),
+  /** Household expenses net of refunds by category, biggest first. Feeds the stacked bar. */
+  categorySpending: z.array(z.object({ categoryId: z.number().int().nullable(), amount: moneySchema })),
+  /** Next planned bills, soonest first, at most 5, due from today on (not overdue ones). */
+  upcoming: z.array(billSchema),
+  people: z.array(personSummarySchema),
+});
+export type Dashboard = z.infer<typeof dashboardSchema>;
 
 export const billListSchema = z.object({
   month: periodKeySchema,
@@ -269,3 +279,6 @@ export const billConfirmSchema = z.object({
   notes: z.string().trim().max(500).nullable().optional(),
 });
 export type BillConfirm = z.infer<typeof billConfirmSchema>;
+
+export const setupStatusSchema = z.object({ completed: z.boolean() });
+export type SetupStatus = z.infer<typeof setupStatusSchema>;

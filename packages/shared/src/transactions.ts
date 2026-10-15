@@ -31,7 +31,9 @@ import { Scope, TransactionStatus, TransactionType, dateOnlySchema, moneySchema 
  *  - POST always creates status "confirmed". Planned rows come from Phase 4.
  *  - scope "personal" needs `ownerId`. scope "household" must send `ownerId` null.
  *  - `payerId` defaults to the signed-in user. `ownerId` and `payerId` must be active users.
- *  - expense: `categoryId` required. income and other_receipt: category optional.
+ *  - expense: `categoryId` required, and the category kind must be "expense".
+ *    income and other_receipt: category optional, but if sent its kind must be "income".
+ *    A wrong kind -> 400 validation_error. Category kind never changes after creation.
  *    refund: `relatedTransactionId` required (a confirmed expense); sum of its confirmed
  *    refunds may not pass its amount (409 refund_exceeds). transfer: `accountId` required,
  *    no category, no related transaction.
@@ -46,9 +48,14 @@ import { Scope, TransactionStatus, TransactionType, dateOnlySchema, moneySchema 
  *    Newest first. Planned rows are never in this list (Lançamentos shows actuals only).
  */
 
+/** Income categories (Salário, Reembolso, ...) are separate from expense categories. */
+export const CategoryKind = z.enum(["expense", "income"]);
+export type CategoryKind = z.infer<typeof CategoryKind>;
+
 export const categorySchema = z.object({
   id: z.number().int(),
   name: z.string(),
+  kind: CategoryKind,
   active: z.boolean(),
 });
 export type Category = z.infer<typeof categorySchema>;
@@ -73,7 +80,7 @@ export type PaymentMethod = z.infer<typeof paymentMethodSchema>;
 
 const nameSchema = z.string().trim().min(1).max(80);
 
-export const categoryInputSchema = z.object({ name: nameSchema });
+export const categoryInputSchema = z.object({ name: nameSchema, kind: CategoryKind.default("expense") });
 export type CategoryInput = z.infer<typeof categoryInputSchema>;
 export const categoryPatchSchema = z
   .object({ name: nameSchema, active: z.boolean() })
