@@ -27,6 +27,8 @@ backup() {
   chmod 700 "$dir"
   local stamp final
   stamp="$(date +%Y%m%d-%H%M%S)"
+  # Never overwrite an existing file (a restore takes a safety backup in the same second).
+  while [ -e "$dir/spendual-dev-$stamp.sql.gz" ]; do stamp="$stamp-$RANDOM"; done
   final="$dir/spendual-dev-$stamp.sql.gz"
   partial="$dir/.spendual-dev-$stamp.partial"
   trap 'rm -f "${partial:-}"' EXIT
