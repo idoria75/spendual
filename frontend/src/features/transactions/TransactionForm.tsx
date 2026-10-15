@@ -326,7 +326,7 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
                   set("categoryId", values.categoryId === c.id && !f.categoryRequired ? null : c.id)
                 }
                 className={cn(
-                  "flex min-h-[64px] flex-col items-center justify-center gap-1 rounded-input border px-1 text-[0.72rem]",
+                  "flex min-h-[72px] flex-col items-center justify-center gap-1 rounded-input border px-1 py-1 text-center text-[0.72rem] leading-tight",
                   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
                   values.categoryId === c.id
                     ? "border-accent bg-surface-2 font-semibold"
@@ -334,7 +334,7 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
                 )}
               >
                 <CategoryTile id={c.id} size={40} />
-                <span className="max-w-full truncate">{c.name}</span>
+                <span className="max-w-full [overflow-wrap:anywhere]">{c.name}</span>
               </button>
             ))}
           </div>

@@ -141,7 +141,7 @@ export function CatalogManager({ kind }: { kind: CatalogKind }) {
               </form>
             ) : (
               <>
-                <span className={cn("flex-1 truncate", !item.active && "text-muted")}>
+                <span className={cn("flex-1 py-2 leading-tight [overflow-wrap:anywhere]", !item.active && "text-muted")}>
                   {item.name}
                   {item.active ? "" : ` · ${t("settings.archived")}`}
                 </span>
