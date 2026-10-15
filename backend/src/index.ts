@@ -8,6 +8,17 @@ if (!sessionSecret || sessionSecret.length < 32) {
   process.exit(1);
 }
 
+// TRUST_PROXY: unset/"false" = off, "true" = trust all, a number = hops, else an Express value.
+const tp = process.env.TRUST_PROXY;
+const trustProxy =
+  tp === undefined || tp === "" || tp === "false"
+    ? undefined
+    : tp === "true"
+      ? true
+      : /^\d+$/.test(tp)
+        ? Number(tp)
+        : tp;
+
 const loginMax = Number(process.env.LOGIN_RATE_LIMIT_MAX ?? 10);
 
 createApp({
@@ -15,6 +26,7 @@ createApp({
   sessionSecret,
   loginLimit: { windowMs: 15 * 60 * 1000, max: loginMax },
   backupDir: process.env.BACKUP_DIR || undefined,
+  trustProxy,
   staticDir: process.env.STATIC_DIR || undefined,
   sessionCleanupSeconds: 10 * 60,
 }).listen(port, "0.0.0.0", () => {
