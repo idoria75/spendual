@@ -46,7 +46,12 @@ TXT
   backup-timer-install)
     cat <<TXT
 Daily backup of the DEV database at 03:00 (and at next boot if the machine was off).
-The unit runs 'make backup-dev' as user $me in $repo. It skips quietly if MySQL is not running.
+The unit runs '$repo/deployment/dev-data.sh backup-auto' as user $me. It skips quietly if MySQL
+is not running, and prints a warning (exit 0) if a dump fails.
+The user must be in the docker group (check: id -nG $me | grep -w docker). HOST_UID and HOST_GID
+are not needed: the backup only runs docker compose exec on the MySQL container.
+If you start the dev stack with COMPOSE_PROJECT_NAME set, add Environment=COMPOSE_PROJECT_NAME=...
+to the unit; the default (spendual) is what this timer backs up.
 Files go to $repo/backups (mode 600, last 14 kept). Type these commands:
 
   sudo tee /etc/systemd/system/spendual-dev-backup.service >/dev/null <<'UNIT'
