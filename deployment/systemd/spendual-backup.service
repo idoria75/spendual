@@ -1,0 +1,12 @@
+[Unit]
+Description=Spendual database backup
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+# Edit User and the paths to match the box. See deployment/README.md.
+User=spendual
+EnvironmentFile=/etc/spendual/backup.env
+WorkingDirectory=/opt/spendual/deployment
+ExecStart=/opt/spendual/deployment/backup.sh
