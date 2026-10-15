@@ -45,6 +45,9 @@ test("recurring bill: one occurrence, confirmed once", async ({ page }) => {
   await page.getByLabel("Usuário").fill(USERNAME);
   await page.getByLabel("Senha").fill(PASSWORD);
   await page.getByRole("button", { name: "Criar conta" }).last().click();
+  // First run: the setup page comes first. Skip it.
+  await expect(page.getByRole("heading", { name: "Configuração inicial" })).toBeVisible();
+  await page.getByRole("button", { name: "Pular por agora" }).click();
   await expect(page.getByRole("heading", { name: "Início" })).toBeVisible();
 
   // Dashboard starts with no expenses.
