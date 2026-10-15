@@ -41,7 +41,9 @@ export default tseslint.config(
   },
   ...i18n,
   {
-    files: ["{backend,frontend,packages/shared}/src/**/*.{ts,tsx}"],
+    // The frontend block (money + i18n selectors together) lives in frontend/eslint.i18n.config.js,
+    // because one file can only have one `no-restricted-syntax` list.
+    files: ["{backend,packages/shared}/src/**/*.{ts,tsx}"],
     ignores: TESTS,
     rules: { "no-restricted-syntax": ["error", ...moneySelectors] },
   },
