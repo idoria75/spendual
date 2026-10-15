@@ -12,9 +12,12 @@ export async function getSetupStatus(prisma: PrismaClient): Promise<SetupStatus>
 
 /** Idempotent: the first call stamps the time, later calls keep it. */
 export async function completeSetup(prisma: PrismaClient): Promise<SetupStatus> {
-  await prisma.household.updateMany({
+  const { count } = await prisma.household.updateMany({
     where: { id: HOUSEHOLD_ID, setupCompletedAt: null },
     data: { setupCompletedAt: new Date() },
   });
+  if (count === 0 && !(await prisma.household.findUnique({ where: { id: HOUSEHOLD_ID } }))) {
+    throw new Error("Household row 1 is missing. Run the seed.");
+  }
   return getSetupStatus(prisma);
 }

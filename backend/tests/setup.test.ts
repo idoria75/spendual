@@ -49,4 +49,11 @@ describe("setup", () => {
     expect(res.status).toBe(403);
     expect((await ctx.ana.get("/api/setup")).body).toEqual({ completed: false });
   });
+
+  it("fails clearly when the household row is missing", async () => {
+    await prisma.household.deleteMany();
+    const res = await send(ctx.ana, "post", "/api/setup/complete");
+    expect(res.status).toBe(500);
+    expect((await ctx.ana.get("/api/setup")).body).toEqual({ completed: false });
+  });
 });
