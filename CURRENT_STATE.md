@@ -29,7 +29,7 @@ Post-Phase-2 commits on `dev` (not in the tag): run-as-host-user dev container, 
 | Services | `backend/src/services` | allowance (row lock), budget versioning, recurrence generator, installment split. |
 | Auth | `backend/src/auth` | Sessions in MySQL (`@quixo3/prisma-session-store`), CSRF header, argon2, 2-account cap, login rate limit. |
 | Frontend | `frontend/src` | Vite, Tailwind tokens, i18next pt-BR, `/entrar`, api-client with CSRF, `ProtectedRoute`, Home placeholder. |
-| Lint | `eslint.config.mjs`, `frontend/eslint.i18n.config.js` | `react/jsx-no-literals` blocks hardcoded JSX text. |
+| Lint | `eslint.config.mjs`, `eslint.money.mjs`, `frontend/eslint.i18n.config.js` | Type-aware typescript-eslint on src, react-hooks (error), jsx-a11y, money bans (parseFloat, toNumber, Number on money names), no hardcoded text in JSX, text props or toasts. `make format-check` runs Prettier. Dependabot in `.github/dependabot.yml`. |
 | Catalog + transaction API | `backend/src/routes`, `backend/src/services/{catalog,transactions}.ts`, `backend/src/lib/serialize.ts` | Zod on every route, row locks, AuditEvent on patch/void/cancel. Contract: `packages/shared/src/transactions.ts`. |
 | App shell + Lançamentos | `frontend/src/shell`, `frontend/src/features/{transactions,settings}`, `frontend/src/components/ui` | Entry form, list, void/cancel dialogs, catalog manager. `lib/currency.ts`, `lib/date.ts`. |
 | Domain + planning API | `backend/src/domain/accounting.ts`, `backend/src/services/{dashboard,bills}.ts`, `backend/src/routes/planning.ts` | Appendix A in integer cents. Dashboard, budgets, allowances, bills (recurring, installments), confirm/cancel, overdue list. Contract: `packages/shared/src/planning.ts`. |
@@ -80,7 +80,7 @@ Post-Phase-2 commits on `dev` (not in the tag): run-as-host-user dev container, 
 - `GET /auth/status` for "vagas livres" hint: skipped.
 - Phase 3/4 routes must validate input with Zod. The Phase 1 services do not.
 - Phase 6: `@spendual/shared` is TS source (`main: ./src/index.ts`), plain `node dist/` may fail; install `openssl` in the image.
-- `npm audit`: 15 vulnerabilities, not triaged. Windows mDNS untested.
+- `npm audit` (2026-10-14): 20 vulnerabilities (2 critical, 11 high, 7 moderate); 5 in prod deps (`--omit=dev`). Triaged, no non-breaking fix; all fixes are major bumps (vitest 5, vite 8, tailwind 4, prisma, react-router 7) except Playwright 1.64.1 (needs image tag change in compose and CI). Windows mDNS untested.
 
 ## How work is run
 
