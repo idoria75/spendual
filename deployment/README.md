@@ -19,9 +19,13 @@ A corrupt volume then does not take the backups with it.
    refuse to run:
 
    ```
-   sudo install -m 600 -o "$USER" /dev/null /etc/spendual/mysql-root.cnf
+   sudo install -d -o "$USER" -m 750 /etc/spendual
+   install -m 600 /dev/null /etc/spendual/mysql-root.cnf
    printf '[client]\nuser=root\npassword=THE_PASSWORD\n' > /etc/spendual/mysql-root.cnf
    ```
+
+   For the systemd timer the owner must be the `spendual` user. The "Backup timer" section sets
+   this up.
 
    The password never goes on a command line or into an env var. The script copies the file
    into the container through stdin, uses it with `--defaults-extra-file`, and removes the copy
@@ -61,16 +65,27 @@ A corrupt volume then does not take the backups with it.
 
 ### Backup timer (systemd)
 
-Units are in `deployment/systemd/`. The box needs the repo at `/opt/spendual` and a user
-`spendual` in the `docker` group. Change the names and paths in the units if yours differ.
+Units are in `deployment/systemd/`. The service runs as the user `spendual`, which must be in
+the `docker` group. The repo is at `/opt/spendual`. Change names and paths in the units if yours
+differ.
 
 ```
-sudo install -d -m 750 /etc/spendual
-sudo cp deployment/systemd/backup.env.example /etc/spendual/backup.env   # edit the paths
+sudo useradd --system --create-home --shell /usr/sbin/nologin spendual   # skip if it exists
+sudo usermod -aG docker spendual
+# Config folder: owned by spendual, mode 750. The MySQL root file inside is mode 600.
+sudo install -d -o spendual -g spendual -m 750 /etc/spendual
+sudo install -m 600 -o spendual -g spendual /dev/null /etc/spendual/mysql-root.cnf
+printf '[client]\nuser=root\npassword=THE_ROOT_PASSWORD\n' | sudo tee /etc/spendual/mysql-root.cnf >/dev/null
+sudo install -m 640 -o spendual -g spendual deployment/systemd/backup.env.example /etc/spendual/backup.env
+# Backup folder: owned by spendual, mode 700.
+sudo install -d -o spendual -g spendual -m 700 /srv/spendual-backups
 sudo cp deployment/systemd/spendual-backup.{service,timer} /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now spendual-backup.timer
 ```
+
+Edit `/etc/spendual/backup.env` if your paths differ. `mysql-root.cnf` replaces the file from
+the "Set up" section above (same content, now owned by `spendual`).
 
 Check:
 
@@ -82,6 +97,8 @@ sudo systemctl start spendual-backup.service && journalctl -u spendual-backup.se
 - Runs daily at 03:00, and at next boot if the box was off (`Persistent=true`).
 - The unit files pass `systemd-analyze verify` apart from the repo path, which exists only on the
   deploy box. They have not run on the deploy box.
+- Confirm the unit runs as that user: `systemctl show -p User spendual-backup.service`, and the
+  last run: `sudo -u spendual env $(cat /etc/spendual/backup.env | xargs) /opt/spendual/deployment/backup.sh`.
 - The app container runs as UID 1000 (`node`) and mounts the backup folder read-only. For the
   status row in Ajustes, the backup user should be UID 1000, or the folder must be mode `750`
   with a group that UID 1000 is in.
@@ -137,12 +154,11 @@ cp .env.example .env
 # fill in the three secrets:  openssl rand -hex 24   (SESSION_SECRET: openssl rand -hex 32)
 mkdir -p /srv/spendual-backups
 docker compose up -d --build
-docker compose exec app node --conditions=production backend/dist/seed/run.js   # first run only
 curl http://localhost/health
 ```
 
-- The seed adds the base categories and accounts. It is safe to run twice. Run it once on a new
-  database.
+- The container runs the seed after the migrations on every start. It adds the household row and
+  the base categories and accounts, and it is safe to repeat. No manual seed step.
 - Then open the site and sign up account 1 and account 2. A third signup is refused.
 - Update: `git pull && docker compose up -d --build`. Migrations run on start. Take a backup first.
 - `sudo systemctl enable docker` so the stack starts after a reboot. Every service has
@@ -154,6 +170,16 @@ curl http://localhost/health
   on an `internal: true` network.
 - Check on the box: `ss -ltn | grep 3306` must show nothing, and `docker compose ps` must show no
   host port for `mysql`.
+
+### Login rate limit behind Docker
+
+The login limit counts failures per client IP. Set `TRUST_PROXY` in `.env` only when a reverse
+proxy sits in front (a hop count such as `1`, or `true`). It is off by default, because with it
+on and no proxy a client can fake its IP in `X-Forwarded-For` and skip the limit. Docker's
+published port can show all clients as the bridge IP (for example 172.x.x.1), so the limit
+would be shared by every device. To verify on the box: make 11 wrong logins from one device,
+then try a login from a second device. If the second device is also blocked, the app sees the
+bridge IP. This is **not verified**.
 
 ### Risk: no HTTPS
 

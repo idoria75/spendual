@@ -18,6 +18,7 @@ services:
       DATABASE_URL: mysql://spendual:${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}@mysql:3306/spendual
       SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
       BACKUP_DIR: /backups
+      TRUST_PROXY: ${TRUST_PROXY:-}
       TZ: ${TZ:-America/Sao_Paulo}
     volumes:
       # Backup folder from the host, read-only. The app only reads it for the status row.
