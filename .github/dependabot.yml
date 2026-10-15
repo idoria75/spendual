@@ -8,7 +8,13 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+        # Bumped by a person, together with the Playwright image tag in compose and CI.
+        exclude-patterns: ["@playwright/test"]
   - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+  - package-ecosystem: docker
     directory: /
     schedule:
       interval: monthly
