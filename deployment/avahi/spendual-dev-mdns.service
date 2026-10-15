@@ -6,7 +6,7 @@ After=avahi-daemon.service network-online.target
 [Service]
 # Announces the name spendual.local for the IP the default route uses. avahi-publish stays up
 # while the name is published. Restart after the IP changes: sudo systemctl restart spendual-dev-mdns
-ExecStart=/bin/sh -c 'ip=$(ip route get 1.1.1.1 | sed -n "s/.*src \\([0-9.]*\\).*/\\1/p"); exec avahi-publish -a -R spendual.local "$ip"'
+ExecStart=/bin/sh -c 'ip=$$(ip route get 1.1.1.1 | sed -n "s/.*src \\([0-9.]*\\).*/\\1/p"); exec avahi-publish -a -R spendual.local "$$ip"'
 Restart=on-failure
 RestartSec=5
 
