@@ -3,7 +3,7 @@ export HOST_GID := $(shell id -g)
 COMPOSE = docker compose -f compose.dev.yml
 RUN = mkdir -p node_modules && $(COMPOSE) run --rm app
 
-.PHONY: install dev lint typecheck test build migrate e2e down test-restore
+.PHONY: install dev lint typecheck test build migrate e2e down test-restore format format-check
 
 install:
 	$(RUN) npm install
@@ -24,6 +24,12 @@ test:
 
 build:
 	$(RUN) npm run build
+
+format:
+	$(RUN) npm run format
+
+format-check:
+	$(RUN) npm run format:check
 
 migrate:
 	$(RUN) npm run migrate --workspace backend
