@@ -16,7 +16,10 @@ export default defineConfig({
     allowedHosts: [
       "spendual.local",
       "localhost",
-      ...(process.env.VITE_ALLOWED_HOSTS?.split(",") ?? []),
+      ...(process.env.VITE_ALLOWED_HOSTS ?? "")
+        .split(",")
+        .map((h) => h.trim())
+        .filter((h) => h !== ""),
     ],
     proxy: { "/api": { target: apiTarget, changeOrigin: true } },
   },
