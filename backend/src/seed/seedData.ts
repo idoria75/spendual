@@ -48,6 +48,10 @@ export async function seedBase(prisma: PrismaClient): Promise<void> {
   }
   // Name is unique across kinds. A user row with the same name is left as it is.
   for (const name of DEFAULT_INCOME_CATEGORIES) {
+    const existing = await prisma.category.findUnique({ where: { name } });
+    if (existing && existing.kind !== "income") {
+      console.warn(`Seed: category "${name}" exists as an expense category. Left as it is.`);
+    }
     await prisma.category.upsert({ where: { name }, update: {}, create: { name, kind: "income" } });
   }
   for (const a of DEFAULT_ACCOUNTS) {
