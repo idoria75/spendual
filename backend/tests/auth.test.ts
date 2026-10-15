@@ -82,7 +82,7 @@ describe("signup", () => {
     const res = await agent
       .post("/api/auth/signup")
       .set("X-CSRF-Token", token)
-      .send({ username: "a", displayName: "", password: "short" });
+      .send({ username: "a", displayName: "", password: "abc" });
     expect(res.status).toBe(400);
     expect(errorCode(res.body)).toBe("validation_error");
     expect(Object.keys(res.body.error.fields).sort()).toEqual([

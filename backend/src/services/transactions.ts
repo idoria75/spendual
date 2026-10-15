@@ -32,6 +32,9 @@ export async function assertActiveUser(tx: Db, id: number, field: string): Promi
   if (!user?.active) throw invalid(field, "Unknown or inactive user");
 }
 
+/** Which category kind a write needs. */
+export type CategoryKindNeed = "expense" | "income";
+
 interface CatalogIds {
   categoryId?: number | null;
   accountId?: number | null;
@@ -39,10 +42,17 @@ interface CatalogIds {
 }
 
 /** Each given id must exist and be active. */
-export async function assertCatalogActive(tx: Db, ids: CatalogIds): Promise<void> {
+export async function assertCatalogActive(
+  tx: Db,
+  ids: CatalogIds,
+  categoryKind?: CategoryKindNeed,
+): Promise<void> {
   if (ids.categoryId != null) {
     const c = await tx.category.findUnique({ where: { id: ids.categoryId } });
     if (!c?.active) throw invalid("categoryId", "Unknown or archived category");
+    if (categoryKind && c.kind !== categoryKind) {
+      throw invalid("categoryId", `Must be an ${categoryKind} category`);
+    }
   }
   if (ids.accountId != null) {
     const a = await tx.account.findUnique({ where: { id: ids.accountId } });
@@ -78,6 +88,13 @@ function assertRefundFits(expense: TxRow, others: Prisma.Decimal, refund: Prisma
       amount: "Refunds would be more than the expense",
     });
   }
+}
+
+/** Category kind a transaction type needs. Refund and transfer: not checked here. */
+function kindFor(type: TxRow["type"]): CategoryKindNeed | undefined {
+  if (type === "expense") return "expense";
+  if (type === "income" || type === "other_receipt") return "income";
+  return undefined;
 }
 
 export async function listTransactions(
@@ -152,7 +169,7 @@ export function createTransaction(
       const payerId = input.payerId ?? actorId;
       await assertActiveUser(tx, payerId, "payerId");
       if (input.ownerId != null) await assertActiveUser(tx, input.ownerId, "ownerId");
-      await assertCatalogActive(tx, input);
+      await assertCatalogActive(tx, input, kindFor(input.type));
 
       const row = await tx.transaction.create({
         data: {
@@ -237,7 +254,7 @@ export function patchTransaction(
         changed.accountId = patch.accountId;
       if (patch.paymentMethodId != null && patch.paymentMethodId !== cur.paymentMethodId)
         changed.paymentMethodId = patch.paymentMethodId;
-      await assertCatalogActive(tx, changed);
+      await assertCatalogActive(tx, changed, kindFor(cur.type));
       if (patch.payerId !== undefined && patch.payerId !== cur.payerId) {
         await assertActiveUser(tx, patch.payerId, "payerId");
       }

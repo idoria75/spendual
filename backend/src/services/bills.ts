@@ -171,7 +171,7 @@ export async function createRule(
       const payerId = input.payerId ?? actorId;
       await assertActiveUser(tx, payerId, "payerId");
       if (input.ownerId != null) await assertActiveUser(tx, input.ownerId, "ownerId");
-      await assertCatalogActive(tx, input);
+      await assertCatalogActive(tx, input, "expense");
       const rule = await tx.recurrenceRule.create({
         data: {
           description: input.description,
@@ -274,7 +274,7 @@ export function createInstallmentPlan(
       const payerId = input.payerId ?? actorId;
       await assertActiveUser(tx, payerId, "payerId");
       if (input.ownerId != null) await assertActiveUser(tx, input.ownerId, "ownerId");
-      await assertCatalogActive(tx, input);
+      await assertCatalogActive(tx, input, "expense");
       const plan = await tx.installmentPlan.create({
         data: {
           description: input.description,
@@ -406,7 +406,11 @@ export function confirmBill(
         input.paymentMethodId !== undefined ? input.paymentMethodId : cur.paymentMethodId;
       if (input.payerId !== undefined) await assertActiveUser(tx, input.payerId, "payerId");
       // Check the final values, inherited ones too: an archived account must not be used.
-      await assertCatalogActive(tx, { categoryId: cur.categoryId, accountId, paymentMethodId });
+      await assertCatalogActive(
+        tx,
+        { categoryId: cur.categoryId, accountId, paymentMethodId },
+        "expense",
+      );
 
       const txn = await tx.transaction.create({
         data: {

@@ -43,7 +43,8 @@ describe("lookups", () => {
     expect(res.status).toBe(200);
     const body = lookupsSchema.parse(res.body);
     expect(body.users.map((u) => u.id)).toEqual([ctx.anaId, ctx.betoId]);
-    expect(body.categories.map((c) => c.name)).toEqual(["Mercado", "Velha"]);
+    expect(body.categories.map((c) => c.name)).toEqual(["Mercado", "Salário", "Velha"]);
+    expect(body.categories.map((c) => c.kind)).toEqual(["expense", "income", "expense"]);
     expect(body.categories.find((c) => c.name === "Velha")?.active).toBe(false);
     expect(body.accounts).toHaveLength(1);
     expect(body.paymentMethods).toHaveLength(1);
@@ -115,4 +116,32 @@ describe.each([
 it("rejects an unknown account type", async () => {
   const res = await send(ctx.ana, "post", "/api/accounts", { name: "X", type: "crypto" });
   expect(res.status).toBe(400);
+});
+
+describe("category kind", () => {
+  it("defaults to expense and accepts income", async () => {
+    const a = await send(ctx.ana, "post", "/api/categories", { name: "Lazer" });
+    expect(a.status).toBe(201);
+    expect(a.body.kind).toBe("expense");
+    const b = await send(ctx.ana, "post", "/api/categories", { name: "Bônus", kind: "income" });
+    expect(b.body.kind).toBe("income");
+  });
+
+  it("name stays unique across kinds", async () => {
+    const res = await send(ctx.ana, "post", "/api/categories", { name: "Mercado", kind: "income" });
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe("name_taken");
+  });
+
+  it("patch never changes the kind", async () => {
+    const res = await send(ctx.ana, "patch", `/api/categories/${ctx.incomeCategoryId}`, {
+      name: "Pagamento",
+      kind: "expense",
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe("Pagamento");
+    expect(res.body.kind).toBe("income");
+    const row = await prisma.category.findUniqueOrThrow({ where: { id: ctx.incomeCategoryId } });
+    expect(row.kind).toBe("income");
+  });
 });

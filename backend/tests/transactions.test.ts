@@ -135,7 +135,7 @@ describe("create: type and scope combos", () => {
         description: "x",
         transactionDate: "2026-10-01",
         scope: "household",
-        categoryId: ctx.categoryId,
+        categoryId: ctx.incomeCategoryId,
       });
       expect(withCat.status).toBe(201);
     }
@@ -545,5 +545,49 @@ describe("get, list and audit", () => {
     expect(await ids("month=2026-10&status=voided")).toEqual([e]);
     expect(await ids("month=2026-10&status=confirmed")).toEqual([b, a]);
     expect(await ids("month=2026-10&status=planned")).toEqual([]);
+  });
+});
+
+describe("category kind rules", () => {
+  const post = (ctx0: Ctx, body: Record<string, unknown>) =>
+    send(ctx0.ana, "post", "/api/transactions", {
+      scope: "household",
+      transactionDate: "2027-03-05",
+      description: "x",
+      amount: "10.00",
+      ...body,
+    });
+
+  it("expense needs an expense category", async () => {
+    const bad = await post(ctx, { type: "expense", categoryId: ctx.incomeCategoryId });
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.code).toBe("validation_error");
+    expect(bad.body.error.fields.categoryId).toBeDefined();
+    const ok = await post(ctx, { type: "expense", categoryId: ctx.categoryId });
+    expect(ok.status).toBe(201);
+  });
+
+  it("income and other_receipt take an income category or none", async () => {
+    for (const type of ["income", "other_receipt"]) {
+      const bad = await post(ctx, { type, categoryId: ctx.categoryId });
+      expect(bad.status).toBe(400);
+      expect(bad.body.error.fields.categoryId).toBeDefined();
+      expect((await post(ctx, { type, categoryId: ctx.incomeCategoryId })).status).toBe(201);
+      expect((await post(ctx, { type })).status).toBe(201);
+    }
+  });
+
+  it("patch checks the kind of a new category", async () => {
+    const e = await post(ctx, { type: "expense", categoryId: ctx.categoryId });
+    const bad = await send(ctx.ana, "patch", `/api/transactions/${e.body.id}`, {
+      categoryId: ctx.incomeCategoryId,
+    });
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.fields.categoryId).toBeDefined();
+    const i = await post(ctx, { type: "income", categoryId: ctx.incomeCategoryId });
+    const bad2 = await send(ctx.ana, "patch", `/api/transactions/${i.body.id}`, {
+      categoryId: ctx.categoryId,
+    });
+    expect(bad2.status).toBe(400);
   });
 });

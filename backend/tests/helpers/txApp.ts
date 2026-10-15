@@ -9,6 +9,7 @@ export interface Ctx {
   anaId: number;
   betoId: number;
   categoryId: number;
+  incomeCategoryId: number;
   accountId: number;
   paymentMethodId: number;
 }
@@ -22,6 +23,7 @@ export async function setup(prisma: PrismaClient, opts: Partial<AppOptions> = {}
   const a = await signup(ana, "ana");
   const b = await signup(beto, "beto");
   const category = await prisma.category.create({ data: { name: "Mercado" } });
+  const income = await prisma.category.create({ data: { name: "Salário", kind: "income" } });
   const account = await prisma.account.create({ data: { name: "Conta", type: "bank" } });
   const pm = await prisma.paymentMethod.create({ data: { name: "Pix" } });
   return {
@@ -31,6 +33,7 @@ export async function setup(prisma: PrismaClient, opts: Partial<AppOptions> = {}
     anaId: a.body.id as number,
     betoId: b.body.id as number,
     categoryId: category.id,
+    incomeCategoryId: income.id,
     accountId: account.id,
     paymentMethodId: pm.id,
   };

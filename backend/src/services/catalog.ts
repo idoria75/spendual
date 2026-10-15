@@ -10,7 +10,8 @@ import type {
 } from "@spendual/shared";
 import { AppError } from "../auth/errors.js";
 
-const categorySelect = { id: true, name: true, active: true } as const;
+const categorySelect = { id: true, name: true, kind: true, active: true } as const;
+const nameSelect = { id: true, name: true, active: true } as const;
 const accountSelect = { id: true, name: true, type: true, active: true } as const;
 
 /** Map unique-name and missing-row errors to clean API errors. */
@@ -35,7 +36,7 @@ export async function getLookups(prisma: PrismaClient): Promise<Lookups> {
     }),
     prisma.category.findMany({ select: categorySelect, orderBy: { name: "asc" } }),
     prisma.account.findMany({ select: accountSelect, orderBy: { name: "asc" } }),
-    prisma.paymentMethod.findMany({ select: categorySelect, orderBy: { name: "asc" } }),
+    prisma.paymentMethod.findMany({ select: nameSelect, orderBy: { name: "asc" } }),
   ]);
   return { users, categories, accounts, paymentMethods };
 }
@@ -53,9 +54,7 @@ export const updateAccount = (prisma: PrismaClient, id: number, data: AccountPat
   mapCatalogErrors(() => prisma.account.update({ where: { id }, data, select: accountSelect }));
 
 export const createPaymentMethod = (prisma: PrismaClient, data: PaymentMethodInput) =>
-  mapCatalogErrors(() => prisma.paymentMethod.create({ data, select: categorySelect }));
+  mapCatalogErrors(() => prisma.paymentMethod.create({ data, select: nameSelect }));
 
 export const updatePaymentMethod = (prisma: PrismaClient, id: number, data: PaymentMethodPatch) =>
-  mapCatalogErrors(() =>
-    prisma.paymentMethod.update({ where: { id }, data, select: categorySelect }),
-  );
+  mapCatalogErrors(() => prisma.paymentMethod.update({ where: { id }, data, select: nameSelect }));
