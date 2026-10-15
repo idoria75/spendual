@@ -155,7 +155,9 @@ export const dashboardSchema = z.object({
   plannedBillsUnknownCount: z.number().int(),
   overallBudget: z.object({ budget: moneySchema.nullable(), spent: moneySchema }),
   /** Household expenses net of refunds by category, biggest first. Feeds the stacked bar. */
-  categorySpending: z.array(z.object({ categoryId: z.number().int().nullable(), amount: moneySchema })),
+  categorySpending: z.array(
+    z.object({ categoryId: z.number().int().nullable(), amount: moneySchema }),
+  ),
   /** Next planned bills, soonest first, at most 5, due from today on (not overdue ones). */
   upcoming: z.array(billSchema),
   people: z.array(personSummarySchema),

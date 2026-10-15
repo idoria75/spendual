@@ -80,7 +80,10 @@ export type PaymentMethod = z.infer<typeof paymentMethodSchema>;
 
 const nameSchema = z.string().trim().min(1).max(80);
 
-export const categoryInputSchema = z.object({ name: nameSchema, kind: CategoryKind.default("expense") });
+export const categoryInputSchema = z.object({
+  name: nameSchema,
+  kind: CategoryKind.default("expense"),
+});
 export type CategoryInput = z.infer<typeof categoryInputSchema>;
 export const categoryPatchSchema = z
   .object({ name: nameSchema, active: z.boolean() })
