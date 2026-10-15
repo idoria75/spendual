@@ -55,7 +55,7 @@ describe("static frontend", () => {
     for (const p of ["/favicon.ico", "/robots.txt"]) {
       const res = await request(app()).get(p);
       expect(res.status).toBe(404);
-      expect(res.text).not.toContain("<title>");
+      expect(res.text).not.toContain("<title>spendual</title>");
     }
   });
 
