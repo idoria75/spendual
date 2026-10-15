@@ -15,6 +15,7 @@ createApp({
   sessionSecret,
   loginLimit: { windowMs: 15 * 60 * 1000, max: loginMax },
   backupDir: process.env.BACKUP_DIR || undefined,
+  staticDir: process.env.STATIC_DIR || undefined,
   sessionCleanupSeconds: 10 * 60,
 }).listen(port, "0.0.0.0", () => {
   console.log(`spendual backend listening on ${port}`);
