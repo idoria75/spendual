@@ -98,6 +98,17 @@
     "categoryAll": "todas ›",
     "categoryFewer": "‹ menos",
     "payer": "Pago por",
+    "receiver": "Recebido por",
+    "installment": {
+      "label": "Parcelado",
+      "no": "Não",
+      "yes": "Sim",
+      "count": "Parcelas",
+      "first": "1ª parcela",
+      "preview": "{{n}}x de {{each}}",
+      "previewLast": "{{n}}x de {{each}} (última {{last}})",
+      "saved": "Compra parcelada criada. Veja em A pagar."
+    },
     "date": "Data",
     "method": "Método",
     "moreDetails": "Mais detalhes",
@@ -114,7 +125,8 @@
       "account": "Escolha a conta.",
       "category": "Escolha a categoria.",
       "date": "Informe uma data válida.",
-      "notes": "Use até 500 caracteres."
+      "notes": "Use até 500 caracteres.",
+      "installmentCount": "Informe de 2 a 60 parcelas."
     }
   },
   "list": {
@@ -202,6 +214,11 @@
     "categories": {
       "title": "Categorias",
       "newLabel": "Nova categoria"
+    },
+    "categoryKind": "Tipo de categoria",
+    "categoryKinds": {
+      "expense": "Despesas",
+      "income": "Receitas"
     },
     "accounts": {
       "title": "Contas",

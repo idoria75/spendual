@@ -19,7 +19,7 @@ const lookups = {
     { id: 2, name: "Casa e contas", kind: "expense", active: true },
   ],
   accounts: [{ id: 1, name: "Nubank", type: "bank", active: true }],
-  paymentMethods: [{ id: 1, name: "Pix", kind: "expense", active: true }],
+  paymentMethods: [{ id: 1, name: "Pix", active: true }],
 };
 
 const dashboard = {

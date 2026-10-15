@@ -46,7 +46,9 @@ function BudgetForm({
   onSaved: () => void;
 }) {
   const { t } = useTranslation();
-  const [amount, setAmount] = useState(target.line.amount ? formatAmountInput(target.line.amount) : "");
+  const [amount, setAmount] = useState(
+    target.line.amount ? formatAmountInput(target.line.amount) : "",
+  );
   const [mode, setMode] = useState<BudgetEditMode>("going_forward");
   const [amountError, setAmountError] = useState(false);
   const [formError, setFormError] = useState<ReturnType<typeof messageKeyFor> | null>(null);

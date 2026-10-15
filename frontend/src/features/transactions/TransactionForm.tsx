@@ -22,12 +22,17 @@ import {
   rememberMethod,
 } from "../../lib/recent";
 import { cn } from "../../lib/cn";
-import { confirmBill } from "../planning/api";
+import { confirmBill, createPlan } from "../planning/api";
+import { splitPreview } from "../planning/form-model";
 import { createTransaction, listTransactions, patchTransaction } from "./api";
 import { CategoryTile } from "./CategoryTile";
 import {
   buildConfirm,
   buildCreate,
+  buildInstallment,
+  categoryKindFor,
+  isCreditCardMethod,
+  isReceipt,
   buildPatch,
   valuesFromBill,
   valuesFromTransaction,
@@ -42,7 +47,8 @@ type ErrKey =
   | "form.errors.owner"
   | "form.errors.related"
   | "form.errors.account"
-  | "form.errors.notes";
+  | "form.errors.notes"
+  | "form.errors.installmentCount";
 
 function relatedLabel(x: Transaction): string {
   return `${formatDayMonth(x.transactionDate)} · ${x.description} · ${formatMoney(x.amount)}`;
@@ -89,6 +95,8 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
   const [submitting, setSubmitting] = useState(false);
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [showMore, setShowMore] = useState(false);
+  const [installment, setInstallment] = useState<"no" | "yes">("no");
+  const [installmentCount, setInstallmentCount] = useState("2");
   const [expenses, setExpenses] = useState<Transaction[]>([]);
   const locked = useRef(false);
 
@@ -114,9 +122,13 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
     };
   }, [editing, type, month]);
 
+  const categoryKind = categoryKindFor(type);
   const activeCategories = useMemo(
-    () => (lookups?.categories ?? []).filter((c) => c.active || c.id === values.categoryId),
-    [lookups, values.categoryId],
+    () =>
+      (lookups?.categories ?? []).filter(
+        (c) => c.kind === categoryKind && (c.active || c.id === values.categoryId),
+      ),
+    [lookups, values.categoryId, categoryKind],
   );
   const visibleCategories = useMemo(() => {
     if (showAllCategories) return activeCategories;
@@ -147,6 +159,21 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
   const users = lookups.users;
   const activeAccounts = lookups.accounts.filter((a) => a.active || a.id === values.accountId);
   const methods = lookups.paymentMethods.filter((m) => m.active || m.id === values.paymentMethodId);
+  const method = methods.find((m) => m.id === values.paymentMethodId);
+  const canInstall = !editing && !bill && type === "expense" && isCreditCardMethod(method?.name);
+  const installing = canInstall && installment === "yes";
+  const preview = installing ? splitPreview(values.amount, installmentCount) : null;
+
+  const changeType = (ty: TransactionType) =>
+    setValues((v) => {
+      const kind = categoryKindFor(ty);
+      const current = lookups.categories.find((c) => c.id === v.categoryId);
+      return {
+        ...v,
+        type: ty,
+        categoryId: current && current.kind === kind ? v.categoryId : null,
+      };
+    });
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -169,6 +196,14 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
       }
       const body = built.body;
       run = body === null ? null : () => patchTransaction(editing.id, body);
+    } else if (installing) {
+      const built = buildInstallment(values, installmentCount);
+      if (!built.ok) {
+        setErrors(built.errors);
+        return;
+      }
+      const body = built.body;
+      run = () => createPlan(body);
     } else {
       const built = buildCreate(values);
       if (!built.ok) {
@@ -189,7 +224,17 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
       await run();
       if (!bill && values.categoryId !== null && f.category) rememberCategory(values.categoryId);
       if (!editing && !bill) rememberMethod(values.paymentMethodId);
-      showToast(t(bill ? "bills.confirmed" : editing ? "form.savedEdit" : "form.saved"));
+      showToast(
+        t(
+          bill
+            ? "bills.confirmed"
+            : editing
+              ? "form.savedEdit"
+              : installing
+                ? "form.installment.saved"
+                : "form.saved",
+        ),
+      );
       onSaved();
     } catch (error) {
       setFormError(messageKeyFor(error));
@@ -207,7 +252,7 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
       {editing || bill ? null : (
         <div role="group" aria-label={t("form.typeLabel")} className="flex flex-wrap gap-2">
           {TYPES.map((ty) => (
-            <Chip key={ty} active={values.type === ty} onClick={() => set("type", ty)}>
+            <Chip key={ty} active={values.type === ty} onClick={() => changeType(ty)}>
               {t(`form.type.${ty}`)}
             </Chip>
           ))}
@@ -353,7 +398,7 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
 
       <div className="grid grid-cols-2 gap-2">
         <Select
-          label={t("form.payer")}
+          label={t(isReceipt(type) ? "form.receiver" : "form.payer")}
           value={values.payerId ?? ""}
           onChange={(e) => set("payerId", idOrNull(e.target.value))}
         >
@@ -364,7 +409,7 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
           ))}
         </Select>
         <div className="flex flex-col gap-[3px]">
-          <Label htmlFor="tx-date">{t("form.date")}</Label>
+          <Label htmlFor="tx-date">{t(installing ? "form.installment.first" : "form.date")}</Label>
           <Input
             id="tx-date"
             type="date"
@@ -389,6 +434,46 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
             </option>
           ))}
         </Select>
+      ) : null}
+
+      {canInstall ? (
+        <div className="flex flex-col gap-2">
+          <Segmented
+            label={t("form.installment.label")}
+            value={installment}
+            onChange={setInstallment}
+            options={[
+              { value: "no", label: t("form.installment.no") },
+              { value: "yes", label: t("form.installment.yes") },
+            ]}
+          />
+          {installing ? (
+            <>
+              <Field
+                label={t("form.installment.count")}
+                inputMode="numeric"
+                autoComplete="off"
+                value={installmentCount}
+                onChange={(e) => setInstallmentCount(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                error={err("installmentCount", "form.errors.installmentCount")}
+              />
+              {preview ? (
+                <p className="text-[0.85rem] tabular-nums text-muted">
+                  {preview.each === preview.last
+                    ? t("form.installment.preview", {
+                        n: preview.n,
+                        each: formatMoney(preview.each),
+                      })
+                    : t("form.installment.previewLast", {
+                        n: preview.n,
+                        each: formatMoney(preview.each),
+                        last: formatMoney(preview.last),
+                      })}
+                </p>
+              ) : null}
+            </>
+          ) : null}
+        </div>
       ) : null}
 
       <div className="flex flex-col gap-2">
