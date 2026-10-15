@@ -645,6 +645,29 @@ describe("rule state and confirm guards", () => {
     expect(await prisma.transaction.count()).toBe(0);
   });
 
+  it("an ended rule cannot go back to active or paused", async () => {
+    await rule();
+    const id = await firstRuleId();
+    await send(ctx.ana, "patch", `/api/recurrence-rules/${id}`, { state: "ended" });
+    for (const state of ["active", "paused"]) {
+      const res = await send(ctx.ana, "patch", `/api/recurrence-rules/${id}`, { state });
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe("invalid_state");
+    }
+    const same = await send(ctx.ana, "patch", `/api/recurrence-rules/${id}`, { state: "ended" });
+    expect(same.status).toBe(200);
+  });
+
+  it("refuses to confirm when the inherited category is archived", async () => {
+    await rule();
+    const occ = (await bills()).items[0]!;
+    await prisma.category.update({ where: { id: ctx.categoryId }, data: { active: false } });
+    const bad = await confirm("recurrence", occ.id);
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.fields.categoryId).toBeTruthy();
+    expect(await prisma.transaction.count()).toBe(0);
+  });
+
   it("checks the final account and payment method, inherited ones too", async () => {
     await rule({ accountId: ctx.accountId, paymentMethodId: ctx.paymentMethodId });
     const occ = (await bills()).items[0]!;
@@ -662,6 +685,22 @@ describe("rule state and confirm guards", () => {
     expect(await prisma.transaction.count()).toBe(0);
     const ok = await confirm("recurrence", occ.id, { accountId: null, paymentMethodId: null });
     expect(ok.status).toBe(200);
+  });
+});
+
+describe("PUT /budgets period window", () => {
+  it("rejects periods outside the window, 9999-12 included", async () => {
+    const token = (await ctx.ana.get("/api/auth/csrf")).body.csrfToken as string;
+    for (const period of ["9999-12", "2020-01", "2030-04"]) {
+      const res = await ctx.ana
+        .put("/api/budgets")
+        .set("X-CSRF-Token", token)
+        .send({ categoryId: null, period, amount: "1.00", mode: "going_forward" });
+      expect(res.status, period).toBe(400);
+      expect(res.body.error.code).toBe("validation_error");
+      expect(res.body.error.fields.period).toBeTruthy();
+    }
+    expect(await prisma.monthlyBudget.count()).toBe(0);
   });
 });
 
