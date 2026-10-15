@@ -14,7 +14,7 @@
 | 3 Core CRUD + entry flow | done | `phase-3-core-crud` |
 | 4 Dashboard, budgets, bills, installments | done | `phase-4-dashboard` |
 | 5 Settings and backup | done | `phase-5-settings-backup` |
-| 6 CI and deployment | not started | — |
+| 6 CI and deployment | done (deploy box checks open) | — |
 
 Post-Phase-2 commits on `dev` (not in the tag): run-as-host-user dev container, review fixes
 (shared `HOUSEHOLD_ID`, early household-full check, 32-char `SESSION_SECRET`, 15-minute anonymous sessions).
@@ -48,7 +48,7 @@ Post-Phase-2 commits on `dev` (not in the tag): run-as-host-user dev container, 
 
 ## Missing
 
-- Phase 6: production Dockerfile, deploy compose (mount `BACKUP_DIR` read-only into backend), systemd timer, mDNS, secret scan. CI already runs lint, typecheck, test, build and e2e (e2e job never run on GitHub).
+- Phase 6 built (see `deployment/README.md`): `Dockerfile`, `deployment/docker-compose.yml`, systemd timer, avahi file, gitleaks and docker build jobs in CI. Verified locally with curl. Not verified: mDNS, Windows, reboot restart, systemd timer on the deploy box, CI on GitHub.
 - AuditEvent table exists; nothing writes to it yet.
 
 ## Phase 4 (2026-10-14)
