@@ -12,6 +12,7 @@ dc() { docker compose -f compose.dev.yml "$@"; }
 dir="${BACKUP_DIR_DEV:-./backups}"
 keep="${BACKUP_KEEP:-14}"
 db=spendual
+partial=""
 
 die() { echo "error: $*" >&2; exit 1; }
 
@@ -24,11 +25,11 @@ sql() { dc exec -T -e MYSQL_PWD=root mysql mysql -uroot "$@"; }
 backup() {
   mkdir -p "$dir"
   chmod 700 "$dir"
-  local stamp final partial
+  local stamp final
   stamp="$(date +%Y%m%d-%H%M%S)"
   final="$dir/spendual-dev-$stamp.sql.gz"
   partial="$dir/.spendual-dev-$stamp.partial"
-  trap 'rm -f "$partial"' EXIT
+  trap 'rm -f "${partial:-}"' EXIT
   dc exec -T -e MYSQL_PWD=root mysql mysqldump -uroot --single-transaction --routines \
     --triggers --events --hex-blob --no-tablespaces "$db" | gzip -9 > "$partial"
   gzip -t "$partial"

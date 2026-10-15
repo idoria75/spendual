@@ -3,6 +3,7 @@
 # Ctrl-C or SIGTERM stops both servers and exits 0. If a server stops on its own, exit non-zero.
 set -u
 
+npm run generate -w backend || exit $?
 npm run migrate -w backend || exit $?
 npm run seed -w backend || exit $?
 
