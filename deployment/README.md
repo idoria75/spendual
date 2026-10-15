@@ -51,7 +51,7 @@ A corrupt volume then does not take the backups with it.
    failed run never leaves a broken backup that looks good. Old files are removed only when the
    new one is complete.
 
-4. Schedule it with a systemd timer on the host (the unit files come in Phase 6).
+4. Schedule it with the systemd timer (see "Backup timer" below).
 
 5. The backend reads `BACKUP_DIR` for the status row in Ajustes. The script makes the folder mode
    `700`, so the backend user cannot read it by default. Either run the backend with the same UID
@@ -59,11 +59,32 @@ A corrupt volume then does not take the backups with it.
    the folder exists but is unreadable, Ajustes shows "configured" with no last backup, and the
    backend logs one warning. Only files named `spendual-*.sql.gz` count.
 
-### Phase 6 list
+### Backup timer (systemd)
 
-- The deploy compose must mount `BACKUP_DIR` read-only into the backend container and set the
-  same `BACKUP_DIR` env there.
-- systemd timer units for `backup.sh`.
+Units are in `deployment/systemd/`. The box needs the repo at `/opt/spendual` and a user
+`spendual` in the `docker` group. Change the names and paths in the units if yours differ.
+
+```
+sudo install -d -m 750 /etc/spendual
+sudo cp deployment/systemd/backup.env.example /etc/spendual/backup.env   # edit the paths
+sudo cp deployment/systemd/spendual-backup.{service,timer} /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now spendual-backup.timer
+```
+
+Check:
+
+```
+systemctl list-timers spendual-backup.timer
+sudo systemctl start spendual-backup.service && journalctl -u spendual-backup.service -n 20
+```
+
+- Runs daily at 03:00, and at next boot if the box was off (`Persistent=true`).
+- The unit files pass `systemd-analyze verify` apart from the repo path, which exists only on the
+  deploy box. They have not run on the deploy box.
+- The app container runs as UID 1000 (`node`) and mounts the backup folder read-only. For the
+  status row in Ajustes, the backup user should be UID 1000, or the folder must be mode `750`
+  with a group that UID 1000 is in.
 
 ### Restore
 
@@ -92,3 +113,115 @@ row count of every table. It also checks that the backup file is mode `600` and 
 
 Not covered: restoring on a different MySQL version, and a full disaster drill. Do a real
 restore drill once before you rely on this.
+
+## Deploy
+
+One image serves the API and the built frontend on one port. MySQL runs in a second container.
+
+### Files
+
+- `Dockerfile` (repo root): multi-stage build. Shared and backend are compiled to plain JS, the
+  frontend is built by Vite, the runtime image has `openssl`, production dependencies only, and
+  runs as the non-root user `node`.
+- `docker-compose.yml` (this folder): `app` and `mysql:8.4`. We use this folder, not the repo
+  root, so the dev file (`compose.dev.yml`) and the deploy file never mix.
+- `.env.example`: all settings. Copy to `.env` (git ignores it) and fill in.
+- `docker-entrypoint.sh`: runs `prisma migrate deploy`, then starts the server. If a migration
+  fails the container stops and restarts, so look at `docker compose logs app`.
+
+### First run
+
+```
+cd deployment
+cp .env.example .env
+# fill in the three secrets:  openssl rand -hex 24   (SESSION_SECRET: openssl rand -hex 32)
+mkdir -p /srv/spendual-backups
+docker compose up -d --build
+docker compose exec app node --conditions=production backend/dist/seed/run.js   # first run only
+curl http://localhost/health
+```
+
+- The seed adds the base categories and accounts. It is safe to run twice. Run it once on a new
+  database.
+- Then open the site and sign up account 1 and account 2. A third signup is refused.
+- Update: `git pull && docker compose up -d --build`. Migrations run on start. Take a backup first.
+- `sudo systemctl enable docker` so the stack starts after a reboot. Every service has
+  `restart: unless-stopped`.
+
+### Network
+
+- Only the app port is published (`APP_PORT`, default 80). MySQL has no `ports:` entry and sits
+  on an `internal: true` network.
+- Check on the box: `ss -ltn | grep 3306` must show nothing, and `docker compose ps` must show no
+  host port for `mysql`.
+
+### Risk: no HTTPS
+
+There is no HTTPS at MVP. The session cookie has `Secure` off, so passwords and cookies cross
+the LAN in clear text. Anyone on the same network (Wi-Fi guests, a hacked device) can read them.
+Limits:
+
+- No public ingress. Do not forward the port on the router.
+- Allow the port only from the LAN subnet. Example with ufw (change the subnet and port):
+
+  ```
+  sudo ufw default deny incoming
+  sudo ufw allow from 192.168.0.0/24 to any port 80 proto tcp
+  sudo ufw allow from 192.168.0.0/24 to any port 5353 proto udp   # mDNS
+  sudo ufw allow OpenSSH   # or limit it to the LAN too
+  sudo ufw enable
+  ```
+
+- Docker publishes ports through its own iptables rules, and these can bypass ufw. Check from a
+  second device outside the subnet, or bind the port to the LAN address in `.env`
+  (`APP_PORT=192.168.0.10:80`).
+- Do not use a shared or guest Wi-Fi. Use a strong password.
+
+### mDNS: spendual.local
+
+Status: **untested**. It was written on the dev box and could not be tried on the deploy box.
+
+The name `spendual.local` comes from the host name of the box plus avahi. Set the host name:
+`sudo hostnamectl set-hostname spendual`.
+
+1. On the deploy box, check whether avahi already runs:
+
+   ```
+   systemctl is-active avahi-daemon
+   ss -ulpn | grep 5353
+   ```
+
+2. Active (default path): publish the service with a host file, no container.
+
+   ```
+   sudo cp deployment/avahi/spendual.service /etc/avahi/services/spendual.service
+   sudo systemctl reload avahi-daemon
+   avahi-resolve -n spendual.local     # from the box; or ping spendual.local from another device
+   ```
+
+   Edit `<port>` in the file if `APP_PORT` is not 80. If `avahi-daemon` is missing:
+   `sudo apt install avahi-daemon`.
+
+3. Not active and you cannot install it: use the container option. It uses `network_mode: host`
+   and the same service file.
+
+   ```
+   docker compose --profile mdns up -d avahi
+   ```
+
+   Do not run this next to a host avahi: two daemons on UDP 5353 clash.
+
+4. Linux and macOS resolve `.local` out of the box. Windows 10 (1803+) and 11 should too (not
+   tested). It can fail depending on the network profile (Public vs Private) and the firewall.
+   Test on the real Windows device.
+
+5. Fallback if a device cannot resolve the name: give the box a fixed IP (router DHCP reservation)
+   and use the IP in the browser. Optional hosts file entry, as administrator:
+   `C:\Windows\System32\drivers\etc\hosts` gets the line `192.168.0.10  spendual.local`
+   (use the real IP). On Linux or macOS: `/etc/hosts`.
+
+### Sign-off checks that need the deploy box
+
+Not done on the dev box: resolve `spendual.local` from a second device (and the Windows device),
+reboot the host and see the stack come back, run the backup timer. Steps 2 and 13 of the plan's
+end-to-end list.
