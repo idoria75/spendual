@@ -577,6 +577,15 @@ describe("category kind rules", () => {
     }
   });
 
+  it("refund with a category needs an expense category", async () => {
+    const e = await post(ctx, { type: "expense", categoryId: ctx.categoryId });
+    const refund = { type: "refund", relatedTransactionId: e.body.id, amount: "5.00" };
+    const bad = await post(ctx, { ...refund, categoryId: ctx.incomeCategoryId });
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.fields.categoryId).toBeDefined();
+    expect((await post(ctx, { ...refund, categoryId: ctx.categoryId })).status).toBe(201);
+  });
+
   it("patch checks the kind of a new category", async () => {
     const e = await post(ctx, { type: "expense", categoryId: ctx.categoryId });
     const bad = await send(ctx.ana, "patch", `/api/transactions/${e.body.id}`, {

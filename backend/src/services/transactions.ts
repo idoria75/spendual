@@ -1,6 +1,7 @@
 import { Prisma, type PrismaClient, type Transaction as TxRow } from "@prisma/client";
 import type {
   AuditEventDto,
+  CategoryKind,
   Transaction,
   TransactionCreate,
   TransactionListQuery,
@@ -32,9 +33,6 @@ export async function assertActiveUser(tx: Db, id: number, field: string): Promi
   if (!user?.active) throw invalid(field, "Unknown or inactive user");
 }
 
-/** Which category kind a write needs. */
-export type CategoryKindNeed = "expense" | "income";
-
 interface CatalogIds {
   categoryId?: number | null;
   accountId?: number | null;
@@ -45,7 +43,7 @@ interface CatalogIds {
 export async function assertCatalogActive(
   tx: Db,
   ids: CatalogIds,
-  categoryKind?: CategoryKindNeed,
+  categoryKind?: CategoryKind,
 ): Promise<void> {
   if (ids.categoryId != null) {
     const c = await tx.category.findUnique({ where: { id: ids.categoryId } });
@@ -90,9 +88,9 @@ function assertRefundFits(expense: TxRow, others: Prisma.Decimal, refund: Prisma
   }
 }
 
-/** Category kind a transaction type needs. Refund and transfer: not checked here. */
-function kindFor(type: TxRow["type"]): CategoryKindNeed | undefined {
-  if (type === "expense") return "expense";
+/** Category kind a transaction type needs. Transfer has no category. */
+function kindFor(type: TxRow["type"]): CategoryKind | undefined {
+  if (type === "expense" || type === "refund") return "expense";
   if (type === "income" || type === "other_receipt") return "income";
   return undefined;
 }
