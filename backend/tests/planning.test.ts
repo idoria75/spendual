@@ -186,6 +186,32 @@ describe("dashboard: categorySpending", () => {
     expect(d.sharedExpensesNet).toBe("420.55");
   });
 
+  it("equals sharedExpensesNet and overallBudget.spent; voided and planned refunds are ignored", async () => {
+    const e1 = await tx({ type: "expense", amount: "200.00" });
+    const e2 = await tx({ type: "expense", amount: "80.00" });
+    await tx({ type: "refund", amount: "50.00", relatedTransactionId: e1.body.id });
+    const voided = await tx({ type: "refund", amount: "20.00", relatedTransactionId: e2.body.id });
+    await send(ctx.ana, "post", `/api/transactions/${voided.body.id}/void`, { reason: "x" });
+    await prisma.transaction.create({
+      data: {
+        type: "refund",
+        status: "planned",
+        amount: "10.00",
+        description: "p",
+        transactionDate: new Date(`${M}-09T00:00:00Z`),
+        scope: "household",
+        relatedTransactionId: e2.body.id,
+        payerId: ctx.anaId,
+        createdById: ctx.anaId,
+        updatedById: ctx.anaId,
+      },
+    });
+    const d = await dash();
+    expect(d.categorySpending).toEqual([{ categoryId: ctx.categoryId, amount: "230.00" }]);
+    expect(d.sharedExpensesNet).toBe("230.00");
+    expect(d.overallBudget.spent).toBe("230.00");
+  });
+
   it("is empty for a month without expenses", async () => {
     expect((await dash()).categorySpending).toEqual([]);
   });
@@ -205,6 +231,13 @@ describe("dashboard: upcoming", () => {
     expect(dates.every((x) => x >= "2027-03-15")).toBe(true);
     expect(d.upcoming[0]?.description).not.toBe("Dia 10");
     expect(d.upcoming.every((b) => b.status === "planned")).toBe(true);
+  });
+
+  it("fills this month's rows even when a later month is shown (fresh data)", async () => {
+    await rule({ description: "Dia 20", dayOfMonth: 20 });
+    await prisma.recurrenceOccurrence.deleteMany();
+    const d = await dash("2027-05");
+    expect(d.upcoming.map((b) => b.dueDate)).toContain("2027-03-20");
   });
 
   it("drops bills of paused rules and bills already confirmed", async () => {

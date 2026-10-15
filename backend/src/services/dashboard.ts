@@ -201,6 +201,8 @@ export async function getDashboard(
   now: Date = new Date(),
 ): Promise<Dashboard> {
   await generateForAllRules(prisma, month, now);
+  // Upcoming starts today, so this month needs rows even when a later month is shown.
+  if (month > currentPeriod(now)) await generateForAllRules(prisma, currentPeriod(now), now);
   const range = monthRange(month);
   const household = { scope: "household" as const };
   const planned = { status: "planned" as const, dueDate: range };
