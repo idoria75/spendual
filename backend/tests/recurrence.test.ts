@@ -86,7 +86,42 @@ describe("generateOccurrences", () => {
     });
     await generateOccurrences(prisma, ruleId, "2026-01");
     const rows = await prisma.recurrenceOccurrence.findMany({ orderBy: { periodKey: "asc" } });
-    expect(rows.map((r) => r.periodKey)).toEqual(["2026-02", "2026-03"]);
+    // Day 31 of March is after the end date 03-15, so March is skipped too.
+    expect(rows.map((r) => r.periodKey)).toEqual(["2026-02"]);
+  });
+
+  it("skips the first month when the due day is before the start date", async () => {
+    await prisma.recurrenceRule.update({
+      where: { id: ruleId },
+      data: { dayOfMonth: 5, startDate: dateOnlyToDate("2026-01-10") },
+    });
+    await generateOccurrences(prisma, ruleId, "2026-01");
+    const rows = await prisma.recurrenceOccurrence.findMany({ orderBy: { periodKey: "asc" } });
+    expect(rows.map((r) => r.periodKey)).toEqual(["2026-02", "2026-03", "2026-04"]);
+  });
+
+  it("keeps the due day equal to the start date and equal to the end date", async () => {
+    await prisma.recurrenceRule.update({
+      where: { id: ruleId },
+      data: {
+        dayOfMonth: 10,
+        startDate: dateOnlyToDate("2026-01-10"),
+        endDate: dateOnlyToDate("2026-03-10"),
+      },
+    });
+    await generateOccurrences(prisma, ruleId, "2026-01");
+    const rows = await prisma.recurrenceOccurrence.findMany({ orderBy: { periodKey: "asc" } });
+    expect(rows.map((r) => r.periodKey)).toEqual(["2026-01", "2026-02", "2026-03"]);
+  });
+
+  it("skips the last month when the due day is after the end date", async () => {
+    await prisma.recurrenceRule.update({
+      where: { id: ruleId },
+      data: { dayOfMonth: 20, endDate: dateOnlyToDate("2026-03-19") },
+    });
+    await generateOccurrences(prisma, ruleId, "2026-01");
+    const rows = await prisma.recurrenceOccurrence.findMany({ orderBy: { periodKey: "asc" } });
+    expect(rows.map((r) => r.periodKey)).toEqual(["2026-01", "2026-02"]);
   });
 
   it("creates nothing for a paused rule", async () => {
