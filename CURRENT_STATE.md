@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-14. **Branch:** `dev` (never push, no PRs without the user's yes).
 **Plan (decisions + phases):** `docs/plan.md`. Read it first.
-**Open points memory:** `/home/ivan/.claude/projects/-home-ivan-spendual/memory/spendual-open-points.md`.
+**Open points:** `docs/open-points.md`.
 
 ## Phase status
 
@@ -67,7 +67,7 @@ Post-Phase-2 commits on `dev` (not in the tag): run-as-host-user dev container, 
 - Migration `add_category_kind` and `add_setup_completed` tested on a copy of the real dev DB: data kept (6 transactions). The real dev DB migrates on the next `make dev`.
 - Open: setup page shows once for existing households; a zero amount cannot be typed in the amount field (empty = none); installment plan does not store the card; `spendual.local` not published until the user runs `make mdns-install`; Android may not resolve `.local`.
 
-## Open points (details in the memory file)
+## Open points (details in `docs/open-points.md`)
 
 - Decided (2026-10-14): both users may read and edit each other's personal records.
 - Frontend uses Radix where it fits: Dialog, Toggle Group (segmented), Toast. The `Select` stays native on purpose (best phone picker, simple in jsdom). Revisit if strict Radix is wanted.
