@@ -1,7 +1,7 @@
 # spendual — current state
 
 **Date:** 2026-10-14. **Branch:** `dev` (never push, no PRs without the user's yes).
-**Plan (decisions + phases):** `/home/ivan/.claude/plans/look-into-the-docs-swift-micali.md`. Read it first.
+**Plan (decisions + phases):** `docs/plan.md`. Read it first.
 **Open points memory:** `/home/ivan/.claude/projects/-home-ivan-spendual/memory/spendual-open-points.md`.
 
 ## Phase status
