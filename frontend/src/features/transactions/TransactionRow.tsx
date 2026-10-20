@@ -5,7 +5,7 @@ import { cn } from "../../lib/cn";
 import { formatDayMonth } from "../../lib/date";
 import { CategoryTile } from "./CategoryTile";
 import { formatTxAmount, toneColor } from "./display";
-import { useLookups } from "./lookups";
+import { useLookups, useSingleUser } from "./lookups";
 
 const ARROWS = "\u21c4 ";
 
@@ -13,6 +13,7 @@ const ARROWS = "\u21c4 ";
 export function TransactionRow({ tx, onOpen }: { tx: Transaction; onOpen: () => void }) {
   const { t } = useTranslation();
   const { data } = useLookups();
+  const singleUser = useSingleUser();
   const category = data?.categories.find((c) => c.id === tx.categoryId);
   // Tone: the owner for personal records, otherwise the payer.
   const toneUserId = tx.scope === "personal" ? tx.ownerId : tx.payerId;
@@ -53,7 +54,7 @@ export function TransactionRow({ tx, onOpen }: { tx: Transaction; onOpen: () => 
           </span>
           <span className="block text-[12px] text-muted [overflow-wrap:anywhere]">
             {metaParts.join(" · ")}
-            {toneUser ? ` · ${toneUser.displayName}` : ""}
+            {toneUser && !singleUser ? ` · ${toneUser.displayName}` : ""}
             {voided
               ? ` · ${t(tx.status === "voided" ? "list.voided" : "list.cancelled", { reason: tx.voidReason ?? "" })}`
               : ""}

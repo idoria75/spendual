@@ -259,7 +259,10 @@ describe("A pagar", () => {
     expect(within(dialog).getByLabelText("Valor")).toHaveValue("190,00");
     expect(within(dialog).getByText("Internet")).toBeInTheDocument();
     expect(within(dialog).getByLabelText("Data")).toHaveValue(`${month}-20`);
-    expect(within(dialog).getByLabelText("Pago por")).toHaveValue("2");
+    expect(within(dialog).getByRole("button", { name: "Bia" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     expect(within(dialog).getByLabelText("Método")).toHaveValue("1");
     expect(within(dialog).queryByLabelText("Descrição")).not.toBeInTheDocument();
 

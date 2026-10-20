@@ -121,7 +121,15 @@ describe("Novo lançamento fields", () => {
     expect(within(dialog).getByLabelText("Valor")).toHaveFocus();
 
     await userEvent.click(within(dialog).getByRole("radio", { name: "Pessoal" }));
-    expect(within(dialog).getByLabelText("De quem")).toBeInTheDocument();
+    const owner = within(dialog).getByRole("group", { name: "De quem" });
+    expect(within(owner).getByRole("button", { name: "Ana" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(within(owner).getByRole("button", { name: "Bia" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
 
     await userEvent.click(within(dialog).getByRole("button", { name: "Transferência" }));
     expect(within(dialog).queryByText("Categoria")).not.toBeInTheDocument();
@@ -355,6 +363,79 @@ describe("Lançamentos category drill-down", () => {
     const call = listCalls(mock)[0]!;
     expect([...call.keys()]).toEqual(["month"]);
     expect(screen.queryByTestId("category-total")).not.toBeInTheDocument();
+  });
+});
+
+describe("One account", () => {
+  /** Lookups with the second user not created yet. */
+  const oneUser = (extra?: Extra): Handler => {
+    const inner = base(extra);
+    return (req) =>
+      new URL(req.url, "http://x").pathname === "/api/lookups"
+        ? json(200, {
+            ...lookups,
+            users: lookups.users.slice(0, 1),
+            categories: lookups.categories.map((c) => ({ ...c, usageCount: 0 })),
+          })
+        : inner(req);
+  };
+
+  it("shows no person picker in the entry form and saves for the only user", async () => {
+    const mock = mockFetch(
+      oneUser((req) => (req.method === "POST" ? json(201, tx({})) : undefined)),
+    );
+    renderAt("/lancamentos");
+    const dialog = await openForm();
+    await within(dialog).findByRole("button", { name: /Mercado/ });
+    expect(within(dialog).queryByRole("group", { name: "Pago por" })).not.toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("radio", { name: "Pessoal" }));
+    expect(within(dialog).queryByRole("group", { name: "De quem" })).not.toBeInTheDocument();
+    await userEvent.type(within(dialog).getByLabelText("Valor"), "1000");
+    await userEvent.type(within(dialog).getByLabelText("Descrição"), "Feira");
+    await userEvent.click(within(dialog).getByRole("button", { name: /Mercado/ }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(posts(mock)).toHaveLength(1));
+    const body = JSON.parse(posts(mock)[0]![1]!.body as string) as Record<string, unknown>;
+    expect(body).toMatchObject({ scope: "personal", ownerId: 1, payerId: 1 });
+  });
+
+  it("has no person filter and no person name in rows or the detail", async () => {
+    list = [tx({ description: "Feira" })];
+    mockFetch(oneUser());
+    renderAt("/lancamentos");
+    const row = (await screen.findByText("Feira")).closest("button")!;
+    expect(row).toHaveTextContent("Mercado · Casa");
+    expect(row).not.toHaveTextContent("Ana");
+    expect(screen.queryByRole("group", { name: "Pessoa" })).not.toBeInTheDocument();
+    await userEvent.click(row);
+    const detail = await screen.findByRole("dialog");
+    expect(within(detail).queryByText("Pago por")).not.toBeInTheDocument();
+  });
+
+  it("with two users: person tiles filter, tap again clears, names show in rows", async () => {
+    list = [tx({ description: "Feira" })];
+    const mock = mockFetch(base());
+    renderAt("/lancamentos");
+    const row = (await screen.findByText("Feira")).closest("button")!;
+    expect(row).toHaveTextContent("Mercado · Casa · Ana");
+    const people = screen.getByRole("group", { name: "Pessoa" });
+    await userEvent.click(within(people).getByRole("button", { name: "Bia" }));
+    await waitFor(() =>
+      expect(
+        mock.mock.calls.some(
+          ([u]) => String(u).includes("/api/transactions?") && String(u).includes("personId=2"),
+        ),
+      ).toBe(true),
+    );
+    expect(within(people).getByRole("button", { name: "Bia" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await userEvent.click(within(people).getByRole("button", { name: "Bia" }));
+    expect(within(people).getByRole("button", { name: "Bia" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
   });
 });
 
@@ -621,7 +702,7 @@ describe("Parcelado in the entry form", () => {
     expect(await screen.findByText(/Compra parcelada criada/)).toBeInTheDocument();
   });
 
-  it("needs the owner for a personal plan and a count from 2 to 60", async () => {
+  it("needs a count from 2 to 60 for a personal plan", async () => {
     const mock = mockFetch(base());
     renderAt("/lancamentos");
     const dialog = await openForm();
@@ -631,13 +712,11 @@ describe("Parcelado in the entry form", () => {
     await userEvent.selectOptions(within(dialog).getByLabelText("Método"), "2");
     await userEvent.click(within(dialog).getByRole("radio", { name: "Pessoal" }));
     await userEvent.click(within(dialog).getByRole("radio", { name: "Sim" }));
-    await userEvent.selectOptions(within(dialog).getByLabelText("De quem"), "");
     const count = within(dialog).getByLabelText("Parcelas");
     await userEvent.clear(count);
     await userEvent.type(count, "1");
     await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
-    expect(await within(dialog).findByText("Escolha de quem é o lançamento.")).toBeInTheDocument();
-    expect(within(dialog).getByText("Informe de 2 a 60 parcelas.")).toBeInTheDocument();
+    expect(await within(dialog).findByText("Informe de 2 a 60 parcelas.")).toBeInTheDocument();
     expect(plans(mock)).toHaveLength(0);
   });
 });

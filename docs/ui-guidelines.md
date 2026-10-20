@@ -56,6 +56,7 @@ the server.
 | `--line` | `#dde3e7` | `#2d373e` | Borders, dividers, dashed planned cards |
 | `--accent` | `#1f6f78` | `#5fb7b4` | Primary buttons, active tab, links, progress |
 | `--accent-fg` | `#ffffff` | `#0d1417` | Text on accent |
+| `--on-tone` | `#14202a` | `#14202a` | Text on a solid user color (the tones are pastel in both themes) |
 | `--pos` | `#1e8449` | `#5cc98a` | Income amounts, and money left or saved (balance above 0, savings above 0, under budget in a closed month). Always with a sign or arrow. |
 | `--warn` | `#b86e00` | `#f0a630` | Over budget, overdue, warning icon |
 | `--err` | `#c62f3a` | `#f07178` | Validation errors, failed saves only |
@@ -170,6 +171,18 @@ One category picker everywhere (entry form, `A pagar` create sheet, `Lançamento
 tiles, the 4 most used plus `todas ›`. Chosen tiles are highlighted (`aria-pressed`) and stay
 visible. No dropdown and no filter bubble for categories.
 
+### 6.1b Person picker
+
+Users are picked with tiles too (entry form `De quem` and `Pago por` / `Recebido por`, A pagar create
+sheet, `Lançamentos` person filter): one full-width row, equal widths, min height 44 px. Unselected:
+the user's color at 25 % with a thin border. Selected: the full user color, bold name, 2 px accent
+border, `--on-tone` text. Forms keep one tile selected; the filter clears when the selected tile is
+tapped again.
+
+**One account:** while only one user exists (second signup not done), no person field is shown
+anywhere: no pickers, no person name in row subtitles, no `Pago por` / `De quem` rows in detail
+sheets. The record is saved for that user. The `Pessoal` page and the `Casa | Pessoal` scope stay.
+
 ### 6.2 Cards: actual vs planned
 
 - Actual card: `--surface` fill, no border.
@@ -242,6 +255,22 @@ Required before edit of history, void, cancel and goal withdrawal (guide §8).
 - Submit buttons disable while a request runs. No double submit.
 - No optimistic updates for financial records.
 
+### 6.8 Logo
+
+Rounded tile cut by one diagonal: top-left `--tone-blue` (`#7d9cc0`), bottom-right `--tone-rose` (`#c98b9a`),
+a teal badge (`#1f6f78`) in the middle with a white `$` tilted +14° (Figtree 800, outlined to a path). The gaps
+are transparent cut-outs, so it works on light and dark. The colors are fixed; they do not follow the users' tones.
+
+| File (`frontend/public`) | Use |
+|---|---|
+| `logo.svg`, `favicon.svg` | Header mark, login page, browser tab |
+| `favicon-32.png` | Tab icon fallback |
+| `apple-touch-icon.png` (180), `icon-maskable-512.png` | Opaque full-bleed art on `#f4f6f8`; the OS rounds it |
+| `icon-192.png`, `icon-512.png`, `manifest.webmanifest` | Install icon (name, theme color `#1f6f78`) |
+
+`Logo` (`components/ui/logo.tsx`): 28 px next to `Spendual` in the desktop sidebar; 28 px alone (alt
+`Spendual`) at the left of the phone header; 72 px above the title on `Entrar`.
+
 ## 7. Views
 
 | View | Route | Layout | Key rules |
@@ -267,7 +296,7 @@ Required before edit of history, void, cancel and goal withdrawal (guide §8).
 3. `Descrição`.
 4. `Casa | Pessoal` (default `Casa`).
 5. Category grid: the 4 most used (count of confirmed records, server side) + `todas ›`. Ties by name.
-6. `Pago por` (default: me) and `Data` (default: today) in one row.
+6. Person tiles `Pago por` (default: me; hidden with one account), then `Data` (default: today).
 7. `Método`, full row (default: last used).
 8. If `Método` is a credit card: a `Parcelado` label above `Não | Sim`. On `Sim`: `Parcelas`, `1ª parcela`, and a
    live line `10x de R$ 410,00` (no last-installment or total text). Remainder cents go to the last installment.

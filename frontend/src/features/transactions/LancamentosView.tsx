@@ -6,7 +6,6 @@ import { messageKeyFor } from "../../auth/error-messages";
 import { Button } from "../../components/ui/button";
 import { Chip } from "../../components/ui/chip";
 import { ConfirmDialog } from "../../components/ui/confirm-dialog";
-import { Select } from "../../components/ui/select";
 import { useToast } from "../../components/ui/toast";
 import { formatMoney } from "../../lib/currency";
 import { formatDayHeader, formatDayMonth } from "../../lib/date";
@@ -15,7 +14,8 @@ import { dayTotal, formatTxAmount, groupByDay, netSpent } from "./display";
 import { CategoryPicker } from "./CategoryPicker";
 import { categoryIdsOf, readDrilldown } from "./drilldown";
 import { useEntry } from "./entry";
-import { byUsage, useLookups } from "./lookups";
+import { byUsage, useLookups, useSingleUser } from "./lookups";
+import { UserPicker } from "./UserPicker";
 import { useMonth } from "./month";
 import { TransactionDetail } from "./TransactionDetail";
 import { TransactionRow } from "./TransactionRow";
@@ -27,6 +27,7 @@ export function LancamentosView() {
   const { t } = useTranslation();
   const { month } = useMonth();
   const { data: lookups } = useLookups();
+  const singleUser = useSingleUser();
   const entry = useEntry();
   const { showToast } = useToast();
 
@@ -125,19 +126,14 @@ export function LancamentosView() {
           ))}
         </div>
         <div className="flex flex-col gap-2">
-          <Select
-            label={t("list.person")}
-            hideLabel
-            value={personId}
-            onChange={(e) => setPersonId(e.target.value)}
-          >
-            <option value="">{t("list.allPeople")}</option>
-            {lookups?.users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.displayName}
-              </option>
-            ))}
-          </Select>
+          {singleUser ? null : (
+            <UserPicker
+              users={lookups?.users ?? []}
+              selected={personId === "" ? null : Number(personId)}
+              onSelect={(id) => setPersonId((cur) => (cur === String(id) ? "" : String(id)))}
+              legend={t("list.person")}
+            />
+          )}
           <CategoryPicker
             categories={pickable}
             selected={picked}

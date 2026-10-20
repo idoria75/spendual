@@ -15,6 +15,7 @@ export default {
         line: v("line"),
         accent: v("accent"),
         "accent-fg": v("accent-fg"),
+        "on-tone": v("on-tone"),
         pos: v("pos"),
         warn: v("warn"),
         err: v("err"),

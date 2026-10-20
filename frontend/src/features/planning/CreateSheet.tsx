@@ -14,7 +14,8 @@ import { StickyActions } from "../../components/ui/sticky-actions";
 import { formatMoney } from "../../lib/currency";
 import { today } from "../../lib/date";
 import { CategoryPicker } from "../transactions/CategoryPicker";
-import { byUsage, useLookups } from "../transactions/lookups";
+import { UserPicker } from "../transactions/UserPicker";
+import { byUsage, useLookups, useSingleUser } from "../transactions/lookups";
 import { createPlan, createRule } from "./api";
 import {
   buildPlan,
@@ -110,6 +111,7 @@ function CreateForm({ kind, onSaved }: { kind: CreateKind; onSaved: () => void }
   const accounts = (lookups?.accounts ?? []).filter((a) => a.active);
   const methods = (lookups?.paymentMethods ?? []).filter((m) => m.active);
   const users = lookups?.users ?? [];
+  const singleUser = useSingleUser();
 
   return (
     <form onSubmit={(e) => void submit(e)} noValidate className="flex flex-col gap-3">
@@ -209,20 +211,14 @@ function CreateForm({ kind, onSaved }: { kind: CreateKind; onSaved: () => void }
           { value: "personal", label: t("form.scope.personal") },
         ]}
       />
-      {v.scope === "personal" ? (
-        <Select
-          label={t("form.owner")}
-          value={v.ownerId ?? ""}
-          onChange={(e) => set("ownerId", idOrNull(e.target.value))}
+      {v.scope === "personal" && !singleUser ? (
+        <UserPicker
+          users={users}
+          selected={v.ownerId}
+          onSelect={(id) => set("ownerId", id)}
+          legend={t("form.owner")}
           error={errors.ownerId ? t("form.errors.owner") : undefined}
-        >
-          <option value="">{t("form.choose")}</option>
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.displayName}
-            </option>
-          ))}
-        </Select>
+        />
       ) : null}
       <CategoryPicker
         categories={categories}
@@ -230,17 +226,14 @@ function CreateForm({ kind, onSaved }: { kind: CreateKind; onSaved: () => void }
         onSelect={(id) => set("categoryId", id)}
         error={errors.categoryId ? t("form.errors.category") : undefined}
       />
-      <Select
-        label={t("form.payer")}
-        value={v.payerId ?? ""}
-        onChange={(e) => set("payerId", idOrNull(e.target.value))}
-      >
-        {users.map((u) => (
-          <option key={u.id} value={u.id}>
-            {u.displayName}
-          </option>
-        ))}
-      </Select>
+      {singleUser ? null : (
+        <UserPicker
+          users={users}
+          selected={v.payerId}
+          onSelect={(id) => set("payerId", id)}
+          legend={t("form.payer")}
+        />
+      )}
       {isRule ? (
         <Select
           label={t("form.method")}

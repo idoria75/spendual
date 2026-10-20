@@ -5,7 +5,7 @@ import { Button } from "../../components/ui/button";
 import { Sheet } from "../../components/ui/sheet";
 import { formatDate } from "../../lib/date";
 import { formatTxAmount } from "./display";
-import { useLookups } from "./lookups";
+import { useLookups, useSingleUser } from "./lookups";
 
 interface Props {
   tx: Transaction | null;
@@ -17,14 +17,16 @@ interface Props {
 export function TransactionDetail({ tx, onClose, onEdit, onVoid }: Props) {
   const { t } = useTranslation();
   const { data } = useLookups();
+  // One account: who paid is never a question.
+  const people = useSingleUser() ? undefined : data?.users;
   const rows: [string, string | null | undefined][] = tx
     ? [
         [t("form.type.label"), t(`form.type.${tx.type}`)],
         [t("form.date"), formatDate(tx.transactionDate)],
         [t("form.scopeLabel"), t(`form.scope.${tx.scope}`)],
         [t("form.category"), data?.categories.find((c) => c.id === tx.categoryId)?.name],
-        [t("form.payer"), data?.users.find((u) => u.id === tx.payerId)?.displayName],
-        [t("form.owner"), data?.users.find((u) => u.id === tx.ownerId)?.displayName],
+        [t("form.payer"), people?.find((u) => u.id === tx.payerId)?.displayName],
+        [t("form.owner"), people?.find((u) => u.id === tx.ownerId)?.displayName],
         [t("form.method"), data?.paymentMethods.find((m) => m.id === tx.paymentMethodId)?.name],
         [t("form.account"), data?.accounts.find((a) => a.id === tx.accountId)?.name],
         [t("form.notes"), tx.notes],

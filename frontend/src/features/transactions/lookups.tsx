@@ -40,6 +40,12 @@ export function useLookups(): LookupsValue {
   return ctx;
 }
 
+/** True once the lookups are loaded and only one account exists: person fields and labels are hidden. */
+export function useSingleUser(): boolean {
+  const { data } = useLookups();
+  return data !== null && data.users.length === 1;
+}
+
 /** Most used first, then by name. The order of every category picker in the entry flow. */
 export const byUsage = (
   a: { usageCount: number; name: string },

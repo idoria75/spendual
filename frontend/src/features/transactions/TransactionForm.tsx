@@ -21,6 +21,7 @@ import { confirmBill, createPlan } from "../planning/api";
 import { splitPreview } from "../planning/form-model";
 import { createTransaction, listTransactions, patchTransaction } from "./api";
 import { CategoryPicker } from "./CategoryPicker";
+import { UserPicker } from "./UserPicker";
 import {
   buildConfirm,
   buildCreate,
@@ -144,6 +145,7 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
   }
 
   const users = lookups.users;
+  const singleUser = users.length === 1;
   const activeAccounts = lookups.accounts.filter((a) => a.active || a.id === values.accountId);
   const methods = lookups.paymentMethods.filter((m) => m.active || m.id === values.paymentMethodId);
   const method = methods.find((m) => m.id === values.paymentMethodId);
@@ -300,20 +302,14 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
         />
       )}
 
-      {f.owner && !editing && !bill ? (
-        <Select
-          label={t("form.owner")}
-          value={values.ownerId ?? ""}
-          onChange={(e) => set("ownerId", idOrNull(e.target.value))}
+      {f.owner && !editing && !bill && !singleUser ? (
+        <UserPicker
+          users={users}
+          selected={values.ownerId}
+          onSelect={(id) => set("ownerId", id)}
+          legend={t("form.owner")}
           error={err("ownerId", "form.errors.owner")}
-        >
-          <option value="">{t("form.choose")}</option>
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.displayName}
-            </option>
-          ))}
-        </Select>
+        />
       ) : null}
 
       {f.related && !editing && !bill ? (
@@ -359,18 +355,15 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
         />
       ) : null}
 
-      <div className="grid grid-cols-2 gap-2">
-        <Select
-          label={t(isReceipt(type) ? "form.receiver" : "form.payer")}
-          value={values.payerId ?? ""}
-          onChange={(e) => set("payerId", idOrNull(e.target.value))}
-        >
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.displayName}
-            </option>
-          ))}
-        </Select>
+      {singleUser ? null : (
+        <UserPicker
+          users={users}
+          selected={values.payerId}
+          onSelect={(id) => set("payerId", id)}
+          legend={t(isReceipt(type) ? "form.receiver" : "form.payer")}
+        />
+      )}
+      <div className="flex flex-col gap-2">
         <div className="flex flex-col gap-[3px]">
           <Label htmlFor="tx-date">{t(installing ? "form.installment.first" : "form.date")}</Label>
           <Input

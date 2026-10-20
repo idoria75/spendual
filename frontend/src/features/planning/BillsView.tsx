@@ -13,7 +13,7 @@ import { addDays, currentMonth, formatDate, formatDayMonth, today } from "../../
 import { CategoryTile } from "../transactions/CategoryTile";
 import { toneColor } from "../transactions/display";
 import { useEntry } from "../transactions/entry";
-import { useLookups } from "../transactions/lookups";
+import { useLookups, useSingleUser } from "../transactions/lookups";
 import { useMonth } from "../transactions/month";
 import { cancelBill, fetchBills, fetchRules } from "./api";
 import { CreateSheet, type CreateKind } from "./CreateSheet";
@@ -186,13 +186,14 @@ function BillDetail({
 }) {
   const { t } = useTranslation();
   const { data } = useLookups();
+  const people = useSingleUser() ? undefined : data?.users;
   const rows: [string, string | null | undefined][] = bill
     ? [
         [t("bills.dueLabel"), formatDate(bill.dueDate)],
         [t("form.scopeLabel"), t(`form.scope.${bill.scope}`)],
         [t("form.category"), data?.categories.find((c) => c.id === bill.categoryId)?.name],
-        [t("form.payer"), data?.users.find((u) => u.id === bill.payerId)?.displayName],
-        [t("form.owner"), data?.users.find((u) => u.id === bill.ownerId)?.displayName],
+        [t("form.payer"), people?.find((u) => u.id === bill.payerId)?.displayName],
+        [t("form.owner"), people?.find((u) => u.id === bill.ownerId)?.displayName],
         [t("form.method"), data?.paymentMethods.find((m) => m.id === bill.paymentMethodId)?.name],
         [t("form.account"), data?.accounts.find((a) => a.id === bill.accountId)?.name],
       ]
