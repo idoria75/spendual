@@ -9,6 +9,7 @@ import { AmountInput } from "../../components/ui/amount-input";
 import { Button } from "../../components/ui/button";
 import { Chip } from "../../components/ui/chip";
 import { Field, Label } from "../../components/ui/field";
+import { StickyActions } from "../../components/ui/sticky-actions";
 import { Input } from "../../components/ui/input";
 import { Segmented } from "../../components/ui/segmented";
 import { Select } from "../../components/ui/select";
@@ -16,11 +17,10 @@ import { useToast } from "../../components/ui/toast";
 import { formatMoney } from "../../lib/currency";
 import { formatDayMonth, today } from "../../lib/date";
 import { lastMethodId, rememberMethod } from "../../lib/recent";
-import { cn } from "../../lib/cn";
 import { confirmBill, createPlan } from "../planning/api";
 import { splitPreview } from "../planning/form-model";
 import { createTransaction, listTransactions, patchTransaction } from "./api";
-import { CategoryTile } from "./CategoryTile";
+import { CategoryPicker } from "./CategoryPicker";
 import {
   buildConfirm,
   buildCreate,
@@ -88,7 +88,6 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<ReturnType<typeof messageKeyFor> | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [showAllCategories, setShowAllCategories] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const [installment, setInstallment] = useState<"no" | "yes">("no");
   const [installmentCount, setInstallmentCount] = useState("2");
@@ -130,14 +129,6 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
         .sort(byUsage),
     [lookups, values.categoryId, categoryKind],
   );
-  const visibleCategories = useMemo(() => {
-    if (showAllCategories) return activeCategories;
-    // The chosen category stays visible, then the most used ones fill the 4 slots.
-    const picked = activeCategories.filter((c) => c.id === values.categoryId);
-    for (const c of activeCategories) if (picked.length < 4 && !picked.includes(c)) picked.push(c);
-    return picked;
-  }, [activeCategories, showAllCategories, values.categoryId]);
-
   if (!lookups) {
     return (
       <p role="status" className="py-6 text-muted">
@@ -358,41 +349,14 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
       ) : null}
 
       {!bill && f.category && (!editing || editing.type !== "transfer") ? (
-        <fieldset className="flex flex-col gap-1">
-          <legend className="text-[0.72rem] font-semibold text-muted">{t("form.category")}</legend>
-          <div className="grid grid-cols-2 gap-2 min-[380px]:grid-cols-4">
-            {visibleCategories.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                aria-pressed={values.categoryId === c.id}
-                onClick={() =>
-                  set("categoryId", values.categoryId === c.id && !f.categoryRequired ? null : c.id)
-                }
-                className={cn(
-                  "flex min-h-[72px] flex-col items-center justify-center gap-1 rounded-input border px-1 py-1 text-center text-[0.72rem] leading-tight",
-                  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-                  values.categoryId === c.id
-                    ? "border-accent bg-surface-2 font-semibold"
-                    : "border-line",
-                )}
-              >
-                <CategoryTile id={c.id} size={40} />
-                <span className="max-w-full [overflow-wrap:anywhere]">{c.name}</span>
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowAllCategories((s) => !s)}
-            className="min-h-[44px] self-start text-[0.82rem] font-semibold text-accent"
-          >
-            {showAllCategories ? t("form.categoryFewer") : t("form.categoryAll")}
-          </button>
-          {errors.categoryId ? (
-            <p className="text-[0.75rem] text-err">{t("form.errors.category")}</p>
-          ) : null}
-        </fieldset>
+        <CategoryPicker
+          categories={activeCategories}
+          selected={values.categoryId === null ? [] : [values.categoryId]}
+          onSelect={(id) =>
+            set("categoryId", values.categoryId === id && !f.categoryRequired ? null : id)
+          }
+          error={errors.categoryId ? t("form.errors.category") : undefined}
+        />
       ) : null}
 
       <div className="grid grid-cols-2 gap-2">
@@ -516,11 +480,11 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
         </p>
       ) : null}
 
-      <div className="sticky bottom-0 -mx-4 -mb-4 mt-auto bg-surface px-4 pb-5 pt-2">
+      <StickyActions>
         <Button type="submit" disabled={submitting} className="w-full">
           {submitting ? t("form.saving") : t(bill ? "bills.confirm" : "form.save")}
         </Button>
-      </div>
+      </StickyActions>
     </form>
   );
 }

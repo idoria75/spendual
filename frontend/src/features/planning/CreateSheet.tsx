@@ -10,8 +10,10 @@ import { Input } from "../../components/ui/input";
 import { Segmented } from "../../components/ui/segmented";
 import { Select } from "../../components/ui/select";
 import { Sheet } from "../../components/ui/sheet";
+import { StickyActions } from "../../components/ui/sticky-actions";
 import { formatMoney } from "../../lib/currency";
 import { today } from "../../lib/date";
+import { CategoryPicker } from "../transactions/CategoryPicker";
 import { byUsage, useLookups } from "../transactions/lookups";
 import { createPlan, createRule } from "./api";
 import {
@@ -222,19 +224,12 @@ function CreateForm({ kind, onSaved }: { kind: CreateKind; onSaved: () => void }
           ))}
         </Select>
       ) : null}
-      <Select
-        label={t("form.category")}
-        value={v.categoryId ?? ""}
-        onChange={(e) => set("categoryId", idOrNull(e.target.value))}
+      <CategoryPicker
+        categories={categories}
+        selected={v.categoryId === null ? [] : [v.categoryId]}
+        onSelect={(id) => set("categoryId", id)}
         error={errors.categoryId ? t("form.errors.category") : undefined}
-      >
-        <option value="">{t("form.choose")}</option>
-        {categories.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
-      </Select>
+      />
       <Select
         label={t("form.payer")}
         value={v.payerId ?? ""}
@@ -277,11 +272,11 @@ function CreateForm({ kind, onSaved }: { kind: CreateKind; onSaved: () => void }
           {t(formError)}
         </p>
       ) : null}
-      <div className="sticky bottom-0 -mx-4 -mb-4 mt-auto bg-surface px-4 pb-5 pt-2">
+      <StickyActions>
         <Button type="submit" disabled={busy} className="w-full">
           {busy ? t("form.saving") : t("form.save")}
         </Button>
-      </div>
+      </StickyActions>
     </form>
   );
 }

@@ -109,7 +109,9 @@ test("Análises: bars, average line and budget line for a category", async ({ pa
   // A legend row opens Lançamentos for that category; the total matches the legend amount.
   await balance.getByRole("link", { name: "Ver lançamentos de Mercado" }).click();
   await expect(page).toHaveURL(/\/lancamentos\?categorias=\d+&escopo=household&status=confirmed/);
-  await expect(page.getByText("Categorias: Mercado")).toBeVisible();
+  await expect(
+    page.getByRole("group", { name: "Categoria" }).getByRole("button", { name: /Mercado/ }),
+  ).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("category-total")).toHaveText("R$ 60,00");
   await shoot(page, "lancamentos-categoria");
 

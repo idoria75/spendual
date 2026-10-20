@@ -275,7 +275,10 @@ describe("Lançamentos category drill-down", () => {
       .filter((u) => u.startsWith("/api/transactions?"))
       .map((u) => new URLSearchParams(u.split("?")[1]));
 
-  it("reads the filters from the link, asks for those categories, and shows the net total", async () => {
+  const tile = (name: RegExp | string) =>
+    within(screen.getByRole("group", { name: "Categoria" })).getByRole("button", { name });
+
+  it("highlights the linked categories, asks for them, and shows the net total", async () => {
     list = [
       tx({ id: 1, amount: "100.00", description: "Feira" }),
       tx({
@@ -295,34 +298,53 @@ describe("Lançamentos category drill-down", () => {
     expect(call.get("scope")).toBe("household");
     expect(call.get("status")).toBe("confirmed");
     expect(call.get("categoryId")).toBeNull();
-    expect(screen.getByText("Categorias: Mercado, Sem categoria")).toBeInTheDocument();
+    expect(tile(/Mercado/)).toHaveAttribute("aria-pressed", "true");
+    expect(tile(/Sem categoria/)).toHaveAttribute("aria-pressed", "true");
+    expect(tile(/Lazer/)).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByText(/^Categorias:/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Casa" })).toHaveAttribute("aria-pressed", "true");
     // 100 expense - 30 refund; the voided row does not count.
     expect(screen.getByTestId("category-total")).toHaveTextContent("R$ 70,00");
   });
 
-  it("removes the category filter and drops the total", async () => {
+  it("clears the filter when the highlighted tile is tapped again", async () => {
     list = [tx({})];
     const mock = mockFetch(base());
     renderAt("/lancamentos?categorias=1");
     await screen.findByText("iFood");
     expect(screen.getByTestId("category-total")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Remover filtro" }));
+    await userEvent.click(tile(/Mercado/));
     await waitFor(() => expect(screen.queryByTestId("category-total")).not.toBeInTheDocument());
-    expect(screen.queryByText(/^Categorias:/)).not.toBeInTheDocument();
+    expect(tile(/Mercado/)).toHaveAttribute("aria-pressed", "false");
     const calls = listCalls(mock);
     expect(calls[calls.length - 1]!.get("categories")).toBeNull();
   });
 
-  it("shows the total for the category dropdown too, and no total without a filter", async () => {
+  it("picks one category by tile, with the same total as the link", async () => {
     list = [tx({})];
-    mockFetch(base());
+    const mock = mockFetch(base());
     renderAt("/lancamentos");
     await screen.findByText("iFood");
     expect(screen.queryByTestId("category-total")).not.toBeInTheDocument();
-    await userEvent.selectOptions(screen.getByLabelText("Categoria"), "1");
+    await userEvent.click(tile(/Mercado/));
     expect(await screen.findByTestId("category-total")).toHaveTextContent("R$ 64,50");
-    expect(screen.getByText("Categorias: Mercado")).toBeInTheDocument();
+    expect(tile(/Mercado/)).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByText(/^Categorias:/)).not.toBeInTheDocument();
+    await userEvent.click(tile(/Lazer/));
+    await waitFor(() => expect(listCalls(mock).at(-1)!.get("categories")).toBe("4"));
+    expect(tile(/Mercado/)).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("filters an income category with categoryId and shows no total", async () => {
+    list = [tx({ type: "income", categoryId: 7, description: "Salário maio" })];
+    const mock = mockFetch(base());
+    renderAt("/lancamentos");
+    await screen.findByText("Salário maio");
+    await userEvent.click(screen.getByRole("button", { name: "todas ›" }));
+    await userEvent.click(tile(/Salário/));
+    await waitFor(() => expect(listCalls(mock).at(-1)!.get("categoryId")).toBe("7"));
+    expect(listCalls(mock).at(-1)!.get("categories")).toBeNull();
+    expect(screen.queryByTestId("category-total")).not.toBeInTheDocument();
   });
 
   it("falls back to the defaults on bad parameters", async () => {
@@ -492,12 +514,17 @@ describe("Categories by kind", () => {
     });
   });
 
-  it("filters the list by a category grouped under its kind", async () => {
+  it("offers the filter as the same icon tiles, expense categories before income ones", async () => {
     mockFetch(base());
     renderAt("/lancamentos");
-    const select = await screen.findByLabelText("Categoria");
-    expect(within(select).getByRole("group", { name: "Receitas" })).toBeInTheDocument();
-    expect(within(select).getByRole("group", { name: "Despesas" })).toBeInTheDocument();
+    await screen.findByText("Os lançamentos do mês aparecem aqui.");
+    expect(screen.queryByLabelText("Categoria")).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: "todas ›" }));
+    const names = screen
+      .getAllByRole("button", { pressed: false })
+      .map((b) => b.textContent ?? "")
+      .filter((n) => /Mercado|Salário/.test(n));
+    expect(names).toEqual(["Mercado", "Salário"]);
   });
 
   it("wraps a long category name in the tile instead of cutting it", async () => {
@@ -667,7 +694,7 @@ describe("Review fixes", () => {
     );
   });
 
-  it("does not render an empty category group in the filter", async () => {
+  it("shows no income tile in the filter when there are no income categories", async () => {
     const inner = base();
     mockFetch((req) =>
       req.url === "/api/lookups"
@@ -678,8 +705,9 @@ describe("Review fixes", () => {
         : inner(req),
     );
     renderAt("/lancamentos");
-    const select = await screen.findByLabelText("Categoria");
-    await within(select).findByRole("group", { name: "Despesas" });
-    expect(within(select).queryByRole("group", { name: "Receitas" })).not.toBeInTheDocument();
+    await screen.findByText("Os lançamentos do mês aparecem aqui.");
+    await userEvent.click(await screen.findByRole("button", { name: "todas ›" }));
+    expect(screen.queryByRole("button", { name: /Salário/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Mercado/ })).toBeInTheDocument();
   });
 });

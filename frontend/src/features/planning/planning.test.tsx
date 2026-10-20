@@ -330,7 +330,7 @@ describe("A pagar", () => {
     const dialog = await screen.findByRole("dialog", { name: "Nova conta recorrente" });
     await userEvent.type(within(dialog).getByLabelText("Descrição"), "Luz");
     await userEvent.click(within(dialog).getByLabelText("Ainda não sei o valor"));
-    await userEvent.selectOptions(within(dialog).getByLabelText("Categoria"), "2");
+    await userEvent.click(within(dialog).getByRole("button", { name: /Casa e contas/ }));
     await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
     await waitFor(() => expect(callsTo(mock, "/api/recurrence-rules", "POST")).toHaveLength(1));
     const body = JSON.parse(callsTo(mock, "/api/recurrence-rules", "POST")[0]![1]!.body as string);
@@ -360,7 +360,7 @@ describe("A pagar", () => {
     await userEvent.type(within(dialog).getByLabelText("Parcelas"), "3");
     expect(within(dialog).getByText("3x R$ 33,33")).toBeInTheDocument();
     expect(within(dialog).queryByText(/última|soma/)).not.toBeInTheDocument();
-    await userEvent.selectOptions(within(dialog).getByLabelText("Categoria"), "1");
+    await userEvent.click(within(dialog).getByRole("button", { name: /Mercado/ }));
     await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
     await waitFor(() => expect(callsTo(mock, "/api/installment-plans", "POST")).toHaveLength(1));
     const body = JSON.parse(callsTo(mock, "/api/installment-plans", "POST")[0]![1]!.body as string);

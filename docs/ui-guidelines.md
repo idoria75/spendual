@@ -166,6 +166,10 @@ Short UI text must never break into two lines. Long text may wrap, but must wrap
 via `color-mix`. Icon: Lucide, 16 px, stroke 2, in the category color. "Tinted" only; no solid
 tiles.
 
+One category picker everywhere (entry form, `A pagar` create sheet, `Lançamentos` filter): icon
+tiles, the 4 most used plus `todas ›`. Chosen tiles are highlighted (`aria-pressed`) and stay
+visible. No dropdown and no filter bubble for categories.
+
 ### 6.2 Cards: actual vs planned
 
 - Actual card: `--surface` fill, no border.
@@ -213,7 +217,8 @@ at the first month with spending. Value labels above the bars up to 7 months.
 ### 6.7 Bottom sheet / dialog
 
 - Phone: bottom sheet with grab handle over a 38 % black scrim. Desktop: centered dialog, max
-  width 440 px.
+  width 520 px, max height 90 % of the window (at most 820 px); the body then scrolls.
+- The save bar is sticky with a top border and a fade, so cut-off fields read as scrollable.
 - Built on Radix `Dialog`. Focus goes into the sheet and returns to the trigger on close.
 
 ### 6.8 Confirmation
@@ -243,7 +248,7 @@ Required before edit of history, void, cancel and goal withdrawal (guide §8).
 |---|---|---|---|
 | Entrar / Criar conta | `/entrar` | Centered, no shell. Segmented `Entrar | Criar conta`. | `autocomplete` on fields. Shows free slots (`1 de 2 vagas livres`). Signup tab disabled after 2 accounts. |
 | Início | `/` | Phone: one column. Desktop: two columns. | Order: `Saldo atual` card (balance, `Gasto/Total`, bar, legend; each legend row links to `Lançamentos` for those categories, `Outras (n)` for all of them, `Sem categoria` for records without one) → `Realizado` card → `Previsão` card (dashed) → `Próximas contas`. **No personal balances.** |
-| Lançamentos | `/lancamentos` | Filter chips, then rows by day. | Actuals only, no planned items. Voided rows stay visible. Filters: month, scope, person, category, status. Opened from an `Início` legend row it is filtered to those categories (household, confirmed) with a removable chip; with a category filter a `Total do mês` line shows expenses minus refunds. |
+| Lançamentos | `/lancamentos` | Filter chips, then rows by day. | Actuals only, no planned items. Voided rows stay visible. Filters: month, scope, person, category, status. Opened from an `Início` legend row it is filtered to those categories (household, confirmed) with those category tiles highlighted; with a category filter a `Total do mês` line shows expenses minus refunds. |
 | Novo lançamento | sheet from `+` | Full-height sheet (phone), dialog (desktop). | See 7.1. |
 | A pagar | `/a-pagar` | Segmented `Próximas | Recorrentes | Parcelas`. | `Próximas` groups: `Vencidas`, `Esta semana`, then by month. `Confirmar pagamento` opens the entry form pre-filled. `Informar valor` for unknown amounts. Never auto-confirm. |
 | Orçamentos | `/orcamentos` | Overall budget card, then one row per category. | Edit asks `Só <mês>` or `De <mês> em diante`. Past months never change. |

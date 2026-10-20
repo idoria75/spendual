@@ -62,7 +62,8 @@ test("recurring bill: one occurrence, confirmed once", async ({ page }) => {
   await sheet.getByLabel("Valor mensal").fill(AMOUNT);
   await sheet.getByLabel("Dia do mês").fill(DAY);
   await sheet.getByLabel("Começa em").fill(TODAY);
-  await sheet.getByLabel("Categoria").selectOption({ label: "Moradia e contas" });
+  await sheet.getByRole("button", { name: "todas ›" }).click();
+  await sheet.getByRole("button", { name: /Moradia e contas/ }).click();
   await sheet.getByRole("button", { name: "Salvar" }).click();
   await expect(page.getByText("Conta criada", { exact: true })).toBeVisible();
 
@@ -101,6 +102,8 @@ test("recurring bill: one occurrence, confirmed once", async ({ page }) => {
   // Dashboard: the expense counted once.
   await page.getByRole("link", { name: "Início" }).first().click();
   await expect(actualRow(page, "Despesas da casa")).toHaveText(MONEY);
+  // A reload would abort requests still in flight and log "Failed to fetch".
+  await page.waitForLoadState("networkidle");
   await page.reload();
   await expect(actualRow(page, "Despesas da casa")).toHaveText(MONEY);
 
