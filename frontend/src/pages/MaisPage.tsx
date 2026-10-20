@@ -1,8 +1,8 @@
-import { ChevronRight, Settings, User, Wallet } from "lucide-react";
+import { ChartColumn, ChevronRight, Settings, User, Wallet } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
-/** Phone "Mais" list: Orçamentos and Ajustes exist so far. */
+/** Phone "Mais" list: Orçamentos, Análises, Pessoal and Ajustes. */
 export function MaisPage() {
   const { t } = useTranslation();
   return (
@@ -18,6 +18,19 @@ export function MaisPage() {
             <span className="flex-1">
               <span className="block font-semibold">{t("nav.orcamentos")}</span>
               <span className="block text-[12px] text-muted">{t("nav.orcamentosHint")}</span>
+            </span>
+            <ChevronRight size={16} aria-hidden />
+          </Link>
+        </li>
+        <li>
+          <Link
+            to="/analises"
+            className="flex min-h-[56px] items-center gap-3 rounded-input bg-surface px-3"
+          >
+            <ChartColumn size={20} aria-hidden />
+            <span className="flex-1">
+              <span className="block font-semibold">{t("nav.analises")}</span>
+              <span className="block text-[12px] text-muted">{t("nav.analisesHint")}</span>
             </span>
             <ChevronRight size={16} aria-hidden />
           </Link>

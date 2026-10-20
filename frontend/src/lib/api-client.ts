@@ -1,5 +1,8 @@
 import { apiErrorSchema, csrfResponseSchema, type ApiErrorCode } from "@spendual/shared";
-import type { ZodType } from "zod";
+import type { ZodType, ZodTypeDef } from "zod";
+
+/** Any schema whose output is T. The input may differ (a field with a default). */
+type ApiSchema<T> = ZodType<T, ZodTypeDef, unknown>;
 
 const BASE = "/api";
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
@@ -51,7 +54,7 @@ async function getCsrfToken(): Promise<string> {
 interface RequestOptions<T> {
   body?: unknown;
   /** Schema for the response body. Omit for 204 responses. */
-  schema?: ZodType<T>;
+  schema?: ApiSchema<T>;
 }
 
 async function send(method: string, path: string, body: unknown): Promise<Response> {
@@ -86,19 +89,19 @@ export async function request<T = void>(
   return parse(res, options.schema);
 }
 
-async function parse<T>(res: Response, schema?: ZodType<T>): Promise<T> {
+async function parse<T>(res: Response, schema?: ApiSchema<T>): Promise<T> {
   if (res.status === 204 || !schema) return undefined as T;
   return schema.parse(await res.json());
 }
 
 export const api = {
-  get: <T>(path: string, schema: ZodType<T>) => request("GET", path, { schema }),
-  post: <T = void>(path: string, body?: unknown, schema?: ZodType<T>) =>
+  get: <T>(path: string, schema: ApiSchema<T>) => request("GET", path, { schema }),
+  post: <T = void>(path: string, body?: unknown, schema?: ApiSchema<T>) =>
     request("POST", path, { body, ...(schema ? { schema } : {}) }),
-  put: <T = void>(path: string, body?: unknown, schema?: ZodType<T>) =>
+  put: <T = void>(path: string, body?: unknown, schema?: ApiSchema<T>) =>
     request("PUT", path, { body, ...(schema ? { schema } : {}) }),
-  patch: <T = void>(path: string, body?: unknown, schema?: ZodType<T>) =>
+  patch: <T = void>(path: string, body?: unknown, schema?: ApiSchema<T>) =>
     request("PATCH", path, { body, ...(schema ? { schema } : {}) }),
-  delete: <T = void>(path: string, schema?: ZodType<T>) =>
+  delete: <T = void>(path: string, schema?: ApiSchema<T>) =>
     request("DELETE", path, schema ? { schema } : {}),
 };

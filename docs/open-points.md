@@ -50,3 +50,18 @@ Phase 5 (2026-10-14):
 - Ajustes: no allowance row (Pessoal has it); `ls -t` rotation in backup.sh; test-restore needs seed data; no restore test on other MySQL versions.
 - Sheet sticky-bar fix and Ajustes/theme not checked in a real browser (run `SCREENSHOTS=1 make e2e` and look).
 - Disk: /home 98% full. Old worktrees in ~/spendual-wt and stale containers (p4-a-mysql-1, p3-b-mysql-1) to remove.
+
+Análises, Início balance block, category usage (2026-10-20):
+- DONE: Análises page, `Saldo atual` card on Início (replaces the `Orçamento do mês` card and the separate chart card), categories sorted by use in the entry forms.
+- Backend tests are slow on this box (about 11 s per test, `TRUNCATE` is slow on the disk). `resetDb` now uses a 60 s transaction timeout. Check on the deploy disk.
+- Análises: the average skips months before the first spending. A category with a budget change in the middle shows a step. Categories without data in the range are not listed.
+- Análises: no personal spending, no goals, no planned bills. Range is 6 or 12 months, never later than the current month.
+- `Saldo atual` = overall budget minus household net spending of the month. Planned bills are not subtracted. Not decided: should it also subtract planned bills?
+- Category usage counts confirmed records only (not planned bills, recurrence rules or installment plans). Archived categories keep their count.
+- Not checked by eye: Análises and `Saldo atual` in a real phone browser. Screenshots from Playwright only (`test-results/shots/`).
+
+Category drill-down from Início (2026-10-20):
+- DONE: legend rows link to Lançamentos (`categorias=` list, `none` = no category); `Total do mês` on category filters.
+- `categories` (from Início) follows the linked expense for refunds, like the dashboard. The old dropdown `categoryId` uses the refund's own category, so its total can differ from Início when a refund has another category.
+- Filters are read from the URL once; changing them in the UI does not write the URL back. Reload resets them.
+- The new `categories` filter ignores `type`.

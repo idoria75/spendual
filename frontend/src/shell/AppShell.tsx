@@ -1,4 +1,5 @@
 import {
+  ChartColumn,
   ChevronLeft,
   ChevronRight,
   House,
@@ -11,6 +12,7 @@ import {
   Wallet,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
@@ -24,7 +26,8 @@ import { toneColor } from "../features/transactions/display";
 import { cn } from "../lib/cn";
 import { formatMonth, shiftMonth } from "../lib/date";
 
-type NavKey = "inicio" | "pessoal" | "lancamentos" | "aPagar" | "orcamentos" | "mais" | "ajustes";
+type NavKey =
+  "inicio" | "analises" | "pessoal" | "lancamentos" | "aPagar" | "orcamentos" | "mais" | "ajustes";
 interface NavItem {
   to: string;
   key: NavKey;
@@ -36,6 +39,7 @@ const SIDEBAR: NavItem[] = [
   { to: "/lancamentos", key: "lancamentos", icon: List },
   { to: "/a-pagar", key: "aPagar", icon: Receipt },
   { to: "/orcamentos", key: "orcamentos", icon: Wallet },
+  { to: "/analises", key: "analises", icon: ChartColumn },
   { to: "/pessoal", key: "pessoal", icon: User },
   { to: "/ajustes", key: "ajustes", icon: Settings },
 ];
@@ -96,8 +100,12 @@ function MonthSelector() {
 function Shell() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const { data } = useLookups();
-  const { openNew } = useEntry();
+  const { data, reload: reloadLookups } = useLookups();
+  const { openNew, version } = useEntry();
+  // A saved record changes how often a category was used, so the pickers sort again.
+  useEffect(() => {
+    if (version > 0) void reloadLookups();
+  }, [version, reloadLookups]);
   const tone = data?.users.find((u) => u.id === user?.id)?.tonePalette ?? user?.tonePalette;
   return (
     <div className="min-h-screen md:grid md:grid-cols-[220px_1fr]">

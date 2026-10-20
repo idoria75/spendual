@@ -3,6 +3,7 @@ import {
   billListSchema,
   billSchema,
   budgetOverviewSchema,
+  categoryTrendsSchema,
   dashboardSchema,
   installmentPlanDetailSchema,
   recurrenceRuleListSchema,
@@ -15,6 +16,7 @@ import {
   type BillList,
   type BudgetEdit,
   type BudgetOverview,
+  type CategoryTrends,
   type Dashboard,
   type InstallmentPlanCreate,
   type InstallmentPlanDetail,
@@ -53,3 +55,6 @@ export const cancelBill = (kind: BillKind, id: number, reason: string): Promise<
 export const fetchSetup = (): Promise<SetupStatus> => api.get("/setup", setupStatusSchema);
 export const completeSetup = (): Promise<SetupStatus> =>
   api.post("/setup/complete", {}, setupStatusSchema);
+
+export const fetchCategoryTrends = (from: string, to: string): Promise<CategoryTrends> =>
+  api.get(`/analytics/categories?from=${from}&to=${to}`, categoryTrendsSchema);

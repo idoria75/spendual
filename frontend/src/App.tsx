@@ -1,6 +1,7 @@
 import { Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./auth/AuthContext";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
+import { AnalisesPage } from "./pages/AnalisesPage";
 import { BillsPage } from "./pages/BillsPage";
 import { BudgetsPage } from "./pages/BudgetsPage";
 import { AjustesPage } from "./pages/AjustesPage";
@@ -26,6 +27,7 @@ export function App() {
               <Route path="/lancamentos" element={<LancamentosPage />} />
               <Route path="/a-pagar" element={<BillsPage />} />
               <Route path="/orcamentos" element={<BudgetsPage />} />
+              <Route path="/analises" element={<AnalisesPage />} />
               <Route path="/pessoal" element={<PessoalPage />} />
               <Route path="/mais" element={<MaisPage />} />
               <Route path="/ajustes" element={<AjustesPage />} />

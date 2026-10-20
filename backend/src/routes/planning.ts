@@ -6,6 +6,7 @@ import {
   allowanceCreateSchema,
   billConfirmSchema,
   budgetEditSchema,
+  categoryTrendsQuerySchema,
   dashboardQuerySchema,
   installmentPlanCreateSchema,
   reasonRequestSchema,
@@ -14,7 +15,8 @@ import {
   type RecurrenceRuleList,
 } from "@spendual/shared";
 import { AppError, asyncHandler } from "../auth/errors.js";
-import { MONTHS_AHEAD, MONTHS_BACK, isMonthInWindow } from "../lib/period.js";
+import { MONTHS_AHEAD, MONTHS_BACK, currentPeriod, isMonthInWindow } from "../lib/period.js";
+import { MAX_TREND_MONTHS, getCategoryTrends, monthsBetween } from "../services/analytics.js";
 import * as bills from "../services/bills.js";
 import {
   AllocationExistsError,
@@ -48,6 +50,25 @@ export function planningRouter(prisma: PrismaClient, clock: () => Date = () => n
     "/dashboard",
     asyncHandler(async (req, res) => {
       res.json(await dash.getDashboard(prisma, month(req), clock()));
+    }),
+  );
+
+  r.get(
+    "/analytics/categories",
+    asyncHandler(async (req, res) => {
+      const { from, to } = categoryTrendsQuerySchema.parse(req.query);
+      const now = clock();
+      const problems: Record<string, string> = {};
+      if (!isMonthInWindow(from, now)) problems.from = `Must be within ${MONTHS_BACK} months back`;
+      if (to > currentPeriod(now)) problems.to = "Must not be after the current month";
+      if (from > to) problems.to = "Must not be before from";
+      else if (monthsBetween(from, to).length > MAX_TREND_MONTHS) {
+        problems.to = `At most ${MAX_TREND_MONTHS} months`;
+      }
+      if (Object.keys(problems).length > 0) {
+        throw new AppError(400, "validation_error", "Invalid request", problems);
+      }
+      res.json(await getCategoryTrends(prisma, from, to, now));
     }),
   );
 

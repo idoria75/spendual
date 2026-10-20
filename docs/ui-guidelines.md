@@ -56,7 +56,7 @@ the server.
 | `--line` | `#dde3e7` | `#2d373e` | Borders, dividers, dashed planned cards |
 | `--accent` | `#1f6f78` | `#5fb7b4` | Primary buttons, active tab, links, progress |
 | `--accent-fg` | `#ffffff` | `#0d1417` | Text on accent |
-| `--pos` | `#1e8449` | `#5cc98a` | Income amounts only |
+| `--pos` | `#1e8449` | `#5cc98a` | Income amounts, and money left or saved (balance above 0, savings above 0, under budget in a closed month). Always with a sign or arrow. |
 | `--warn` | `#b86e00` | `#f0a630` | Over budget, overdue, warning icon |
 | `--err` | `#c62f3a` | `#f07178` | Validation errors, failed saves only |
 
@@ -192,9 +192,18 @@ Grid `28px 1fr auto`: tile · title + meta · amount.
 
 ### 6.5 Dashboard chart
 
-One horizontal stacked bar, height 10 px, 2 px gaps. All categories in the bar, sorted by amount.
-Legend below: top 4 categories, then `Outras (n)`, each row `tile · name · value · %`. Actuals
-only. Built with plain HTML/CSS, no chart library. Trend charts are P1.
+One horizontal stacked bar, height 10 px, 2 px gaps, inside the `Saldo atual` card. Its width is
+the month's budget: each category takes its share of the budget, and the empty rest is the
+balance. Two categories of 25 % each fill half the bar. Over budget, the bar scales to the
+spending. Without a budget, it scales to the spending. Legend below: top 4 categories, then
+`Outras (n)`, each row `tile · name · value · % of budget`. Actuals only. Plain HTML/CSS.
+
+### 6.5b Trend chart (Análises)
+
+Plain SVG, no library. One bar per month in the category color, a dashed line for the average
+of the closed months, a gray step line for the budget in force each month. A bar above its
+budget is `--warn`. The month in progress is hatched and not in the average. The average starts
+at the first month with spending. Value labels above the bars up to 7 months.
 
 ### 6.6 Chips and segmented control
 
@@ -233,11 +242,12 @@ Required before edit of history, void, cancel and goal withdrawal (guide §8).
 | View | Route | Layout | Key rules |
 |---|---|---|---|
 | Entrar / Criar conta | `/entrar` | Centered, no shell. Segmented `Entrar | Criar conta`. | `autocomplete` on fields. Shows free slots (`1 de 2 vagas livres`). Signup tab disabled after 2 accounts. |
-| Início | `/` | Phone: one column. Desktop: two columns. | Order: `Realizado` card → `Previsão` card (dashed) → chart → `Próximas contas` → budgets (desktop). **No personal balances.** |
-| Lançamentos | `/lancamentos` | Filter chips, then rows by day. | Actuals only, no planned items. Voided rows stay visible. Filters: month, scope, person, category, status. |
+| Início | `/` | Phone: one column. Desktop: two columns. | Order: `Saldo atual` card (balance, `Gasto/Total`, bar, legend; each legend row links to `Lançamentos` for those categories, `Outras (n)` for all of them, `Sem categoria` for records without one) → `Realizado` card → `Previsão` card (dashed) → `Próximas contas`. **No personal balances.** |
+| Lançamentos | `/lancamentos` | Filter chips, then rows by day. | Actuals only, no planned items. Voided rows stay visible. Filters: month, scope, person, category, status. Opened from an `Início` legend row it is filtered to those categories (household, confirmed) with a removable chip; with a category filter a `Total do mês` line shows expenses minus refunds. |
 | Novo lançamento | sheet from `+` | Full-height sheet (phone), dialog (desktop). | See 7.1. |
 | A pagar | `/a-pagar` | Segmented `Próximas | Recorrentes | Parcelas`. | `Próximas` groups: `Vencidas`, `Esta semana`, then by month. `Confirmar pagamento` opens the entry form pre-filled. `Informar valor` for unknown amounts. Never auto-confirm. |
 | Orçamentos | `/orcamentos` | Overall budget card, then one row per category. | Edit asks `Só <mês>` or `De <mês> em diante`. Past months never change. |
+| Análises | `/analises` | Category chips, 3 number tiles (average, budget, months above), trend chart, month list. `6 meses | 12 meses`. | Reached from `Mais` (phone) and the sidebar. Household spending only. Month selector sets the last month. No budget: no gray line, text `sem orçamento`. |
 | Pessoal | `/pessoal` | Phone: segmented per person. Desktop: two columns. | Reached only from `Mais`. Balance, previous balance, allowance, spending, then the person's records. Both people see everything. |
 | Metas (P1) | `/metas` | Unallocated savings card, then one card per goal with progress. | `Alocar` / `Retirar`. Closing a goal with money left asks for a transfer first. |
 | Ajustes | `/ajustes` | Profile card, then list rows. | Name, user tone (taken tone disabled), theme, categories, accounts, payment methods, allowance, backup status, `Sair`. |
@@ -251,7 +261,7 @@ Required before edit of history, void, cancel and goal withdrawal (guide §8).
 2. Amount, large, focused on open, numeric keyboard (`inputmode="decimal"`), PT-BR parsing.
 3. `Descrição`.
 4. `Casa | Pessoal` (default `Casa`).
-5. Category grid: 4 most recent + `todas ›`.
+5. Category grid: the 4 most used (count of confirmed records, server side) + `todas ›`. Ties by name.
 6. `Pago por` (default: me) and `Data` (default: today) in one row.
 7. `Método`, full row (default: last used).
 8. If `Método` is a credit card: `Parcelado? Não | Sim`. On `Sim`: `Parcelas`, `1ª parcela`, and a

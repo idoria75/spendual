@@ -13,11 +13,15 @@ export async function resetDb(prisma: PrismaClient): Promise<void> {
   const tables = await prisma.$queryRaw<{ name: string }[]>`
     SELECT TABLE_NAME AS name FROM information_schema.TABLES
     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME <> '_prisma_migrations'`;
-  await prisma.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe("SET FOREIGN_KEY_CHECKS = 0");
-    for (const t of tables) await tx.$executeRawUnsafe(`TRUNCATE TABLE \`${t.name}\``);
-    await tx.$executeRawUnsafe("SET FOREIGN_KEY_CHECKS = 1");
-  });
+  // TRUNCATE is DDL and slow on some disks; the default 5 s transaction timeout is too short.
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.$executeRawUnsafe("SET FOREIGN_KEY_CHECKS = 0");
+      for (const t of tables) await tx.$executeRawUnsafe(`TRUNCATE TABLE \`${t.name}\``);
+      await tx.$executeRawUnsafe("SET FOREIGN_KEY_CHECKS = 1");
+    },
+    { timeout: 60_000 },
+  );
 }
 
 export async function makeUser(prisma: PrismaClient, username: string, tonePalette?: string) {

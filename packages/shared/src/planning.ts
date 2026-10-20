@@ -284,3 +284,49 @@ export type BillConfirm = z.infer<typeof billConfirmSchema>;
 
 export const setupStatusSchema = z.object({ completed: z.boolean() });
 export type SetupStatus = z.infer<typeof setupStatusSchema>;
+
+/**
+ * Category trends (page "Análises"). Read only.
+ *   GET /analytics/categories?from=&to=   -> 200 CategoryTrends
+ *
+ * Rules:
+ *  - `from` and `to` are period keys, `from <= to`, at most 12 months, `to` not after the
+ *    current month, both inside the usual month window.
+ *  - Amounts are household expenses, confirmed, net of linked refunds. A refund counts in the
+ *    month of its expense. Personal spending is not included. Same rule as the dashboard chart.
+ *  - `overall` covers every household expense (also those with no category); its budget is the
+ *    overall budget. Each entry of `categories` has the category budget in force that month.
+ *  - `budget` is null when no budget row is in force yet. Past months use the row that was in force
+ *    then, so a budget change shows as a step.
+ *  - `categories` lists only categories with spending or a budget in the range, plus
+ *    `categoryId: null` (no category) when it has spending. Every series has one point per month.
+ *  - `partial` is true for the current month. The client leaves it out of the average, and so
+ *    the closed months before the first month with spending.
+ */
+export const categoryTrendsQuerySchema = z.object({
+  from: periodKeySchema,
+  to: periodKeySchema,
+});
+export type CategoryTrendsQuery = z.infer<typeof categoryTrendsQuerySchema>;
+
+export const trendPointSchema = z.object({
+  month: periodKeySchema,
+  amount: moneySchema,
+  budget: moneySchema.nullable(),
+  partial: z.boolean(),
+});
+export type TrendPoint = z.infer<typeof trendPointSchema>;
+
+export const trendSeriesSchema = z.object({
+  categoryId: z.number().int().nullable(),
+  points: z.array(trendPointSchema),
+});
+export type TrendSeries = z.infer<typeof trendSeriesSchema>;
+
+export const categoryTrendsSchema = z.object({
+  from: periodKeySchema,
+  to: periodKeySchema,
+  overall: trendSeriesSchema,
+  categories: z.array(trendSeriesSchema),
+});
+export type CategoryTrends = z.infer<typeof categoryTrendsSchema>;
