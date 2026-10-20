@@ -1,6 +1,8 @@
 import type { Scope, Transaction, TransactionListQuery } from "@spendual/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router-dom";
 import { messageKeyFor } from "../../auth/error-messages";
 import { Button } from "../../components/ui/button";
 import { Chip } from "../../components/ui/chip";
@@ -10,9 +12,10 @@ import { useToast } from "../../components/ui/toast";
 import { formatMoney } from "../../lib/currency";
 import { formatDayHeader, formatDayMonth } from "../../lib/date";
 import { cancelTransaction, listTransactions, voidTransaction } from "./api";
-import { dayTotal, formatTxAmount, groupByDay } from "./display";
+import { dayTotal, formatTxAmount, groupByDay, netSpent } from "./display";
+import { categoryIdsOf, readDrilldown } from "./drilldown";
 import { useEntry } from "./entry";
-import { useLookups } from "./lookups";
+import { byUsage, useLookups } from "./lookups";
 import { useMonth } from "./month";
 import { TransactionDetail } from "./TransactionDetail";
 import { TransactionRow } from "./TransactionRow";
@@ -27,10 +30,14 @@ export function LancamentosView() {
   const entry = useEntry();
   const { showToast } = useToast();
 
-  const [scope, setScope] = useState<ScopeFilter>("all");
-  const [status, setStatus] = useState<StatusFilter>("all");
+  // Links from Início set the filters once; the UI does not write them back to the URL.
+  const [params] = useSearchParams();
+  const [initial] = useState(() => readDrilldown(params));
+  const [scope, setScope] = useState<ScopeFilter>(initial.scope);
+  const [status, setStatus] = useState<StatusFilter>(initial.status);
   const [personId, setPersonId] = useState("");
-  const [categoryId, setCategoryId] = useState("");
+  const [categoryId, setCategoryId] = useState(initial.categoryId);
+  const [categories, setCategories] = useState<string | null>(initial.categories);
 
   const [items, setItems] = useState<Transaction[] | null>(null);
   const [error, setError] = useState<ReturnType<typeof messageKeyFor> | null>(null);
@@ -43,7 +50,8 @@ export function LancamentosView() {
     if (scope !== "all") query.scope = scope;
     if (status !== "all") query.status = status;
     if (personId) query.personId = Number(personId);
-    if (categoryId) query.categoryId = Number(categoryId);
+    if (categories) query.categories = categories;
+    else if (categoryId) query.categoryId = Number(categoryId);
     const id = ++requestId.current;
     setError(null);
     try {
@@ -55,7 +63,7 @@ export function LancamentosView() {
         setItems([]);
       }
     }
-  }, [month, scope, status, personId, categoryId]);
+  }, [month, scope, status, personId, categoryId, categories]);
 
   useEffect(() => {
     setItems(null);
@@ -63,6 +71,14 @@ export function LancamentosView() {
   }, [load, entry.version]);
 
   const groups = items ? groupByDay(items) : [];
+  const filterList = categories ?? (categoryId ? categoryId : null);
+  const categoryNames = filterList
+    ? categoryIdsOf(filterList).map(
+        (id) =>
+          (id === null ? null : lookups?.categories.find((c) => c.id === id)?.name) ??
+          t("list.noCategory"),
+      )
+    : [];
 
   const confirmVoid = async (reason: string) => {
     if (!voiding) return;
@@ -109,12 +125,20 @@ export function LancamentosView() {
           <Select
             label={t("list.category")}
             hideLabel
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
+            value={categories !== null && /^\d+$/.test(categories) ? categories : categoryId}
+            onChange={(e) => {
+              // Expense categories use the drill-down filter (same rows and total as Início).
+              const id = e.target.value;
+              const isExpense = lookups?.categories.some(
+                (c) => c.id === Number(id) && c.kind === "expense",
+              );
+              setCategories(isExpense ? id : null);
+              setCategoryId(isExpense ? "" : id);
+            }}
           >
             <option value="">{t("list.allCategories")}</option>
             {(["expense", "income"] as const).map((kind) => {
-              const group = lookups?.categories.filter((c) => c.kind === kind) ?? [];
+              const group = lookups?.categories.filter((c) => c.kind === kind).sort(byUsage) ?? [];
               if (group.length === 0) return null;
               return (
                 <optgroup key={kind} label={t(`settings.categoryKinds.${kind}`)}>
@@ -129,6 +153,39 @@ export function LancamentosView() {
           </Select>
         </div>
       </div>
+
+      {filterList ? (
+        <div className="flex items-center gap-2 self-start rounded-chip bg-surface-2 py-1 pl-3 pr-1 text-[0.85rem]">
+          <span>
+            {t("list.categoriesFilter", {
+              names:
+                categoryNames.length > 3
+                  ? t("list.categoriesMany", { count: categoryNames.length })
+                  : categoryNames.join(", "),
+            })}
+          </span>
+          <button
+            type="button"
+            aria-label={t("list.removeFilter")}
+            onClick={() => {
+              setCategories(null);
+              setCategoryId("");
+            }}
+            className="inline-flex h-[44px] w-[44px] items-center justify-center rounded-chip"
+          >
+            <X size={16} aria-hidden />
+          </button>
+        </div>
+      ) : null}
+
+      {categories !== null && items !== null && items.length > 0 ? (
+        <p className="flex items-baseline justify-between rounded-card bg-surface px-4 py-3">
+          <span className="text-[12px] font-semibold text-muted">{t("list.categoryTotal")}</span>
+          <span data-testid="category-total" className="font-bold tabular-nums">
+            {formatMoney(netSpent(items))}
+          </span>
+        </p>
+      ) : null}
 
       {error ? (
         <div role="alert" className="flex flex-col items-start gap-2 text-err">

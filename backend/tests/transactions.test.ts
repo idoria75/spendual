@@ -600,3 +600,57 @@ describe("category kind rules", () => {
     expect(bad2.status).toBe(400);
   });
 });
+
+describe("list: categories drill-down", () => {
+  const list = async (query: string) => {
+    const res = await ctx.ana.get(`/api/transactions?month=2026-10&${query}`);
+    expect(res.status).toBe(200);
+    return transactionListSchema.parse(res.body).items;
+  };
+
+  it("returns expenses and linked refunds of those categories", async () => {
+    const other = await prisma.category.create({ data: { name: "Outra", kind: "expense" } });
+    const food = await makeExpense({ amount: "100.00" });
+    const away = await makeExpense({ amount: "40.00", categoryId: other.id });
+    // A refund dated in the next month still belongs to its expense's month.
+    const refund = await refundOf(food, "30.00", { transactionDate: "2026-11-02" });
+    expect(refund.status).toBe(201);
+
+    const items = await list(`categories=${ctx.categoryId}`);
+    expect(items.map((t) => t.id).sort()).toEqual([food, refund.body.id].sort());
+    const both = await list(`categories=${ctx.categoryId},${other.id}`);
+    expect(both.map((t) => t.id)).toContain(away);
+    expect(both).toHaveLength(3);
+  });
+
+  it("none returns records without a category", async () => {
+    const id = await makeExpense();
+    const loose = await makeExpense({ amount: "9.00" });
+    await prisma.transaction.update({ where: { id: loose }, data: { categoryId: null } });
+    expect((await list("categories=none")).map((t) => t.id)).toEqual([loose]);
+    expect((await list(`categories=${ctx.categoryId},none`)).map((t) => t.id).sort()).toEqual(
+      [id, loose].sort(),
+    );
+  });
+
+  it("keeps scope and status filters", async () => {
+    await makeExpense({ scope: "personal", ownerId: ctx.anaId });
+    const kept = await makeExpense();
+    const voided = await makeExpense({ amount: "5.00" });
+    await send(ctx.ana, "post", `/api/transactions/${voided}/void`, { reason: "erro" });
+    const items = await list(`categories=${ctx.categoryId}&scope=household&status=confirmed`);
+    expect(items.map((t) => t.id)).toEqual([kept]);
+  });
+
+  it("rejects a bad list", async () => {
+    for (const bad of ["abc", "", "3,,4", "3,x"]) {
+      expect((await ctx.ana.get(`/api/transactions?month=2026-10&categories=${bad}`)).status).toBe(
+        400,
+      );
+    }
+    const many = Array.from({ length: 51 }, (_, i) => i + 1).join(",");
+    expect((await ctx.ana.get(`/api/transactions?month=2026-10&categories=${many}`)).status).toBe(
+      400,
+    );
+  });
+});

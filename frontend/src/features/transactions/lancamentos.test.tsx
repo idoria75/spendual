@@ -58,6 +58,8 @@ function tx(over: Record<string, unknown>) {
 }
 
 let list: unknown[] = [];
+/** usageCount per category id, as the server would send it. */
+let usage: Record<number, number> = {};
 
 type Extra = (req: Parameters<Handler>[0]) => Response | undefined;
 
@@ -66,7 +68,11 @@ function base(extra?: Extra): Handler {
     const path = new URL(req.url, "http://x").pathname;
     if (path === "/api/auth/me") return json(200, user);
     if (path === "/api/auth/csrf") return json(200, { csrfToken: "tok" });
-    if (path === "/api/lookups") return json(200, lookups);
+    if (path === "/api/lookups")
+      return json(200, {
+        ...lookups,
+        categories: lookups.categories.map((c) => ({ ...c, usageCount: usage[c.id] ?? 0 })),
+      });
     if (path === "/api/backup/status")
       return json(200, { configured: false, lastBackupAt: null, lastBackupBytes: null });
     if (path === "/api/transactions" && req.method === "GET") return json(200, { items: list });
@@ -77,6 +83,7 @@ function base(extra?: Extra): Handler {
 beforeEach(() => {
   resetCsrfToken();
   list = [];
+  usage = {};
   localStorage.clear();
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -138,6 +145,45 @@ describe("Novo lançamento fields", () => {
     await userEvent.click(within(dialog).getByRole("button", { name: "todas ›" }));
     expect(within(dialog).getByRole("button", { name: /Viagem/ })).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: /Antiga/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("Categories sorted by use", () => {
+  const chipNames = (dialog: HTMLElement) =>
+    within(dialog)
+      .getAllByRole("button")
+      .map((b) => b.textContent ?? "")
+      .filter((name) => lookups.categories.some((c) => name.includes(c.name)));
+
+  it("shows the 4 most used first, ties by name, and keeps that order under 'todas'", async () => {
+    usage = { 5: 20, 9: 7, 3: 7, 4: 1, 1: 0 };
+    mockFetch(base());
+    renderAt("/lancamentos");
+    const dialog = await openForm();
+    await within(dialog).findByRole("button", { name: /Viagem/ });
+    expect(chipNames(dialog)).toEqual(["Viagem", "Casa e suprimentos", "Saúde", "Lazer"]);
+    await userEvent.click(within(dialog).getByRole("button", { name: "todas ›" }));
+    expect(chipNames(dialog)).toEqual([
+      "Viagem",
+      "Casa e suprimentos",
+      "Saúde",
+      "Lazer",
+      "Mercado",
+      "Transporte",
+    ]);
+  });
+
+  it("loads the counts again after a record is saved", async () => {
+    const mock = mockFetch(base((req) => (req.method === "POST" ? json(201, tx({})) : undefined)));
+    renderAt("/lancamentos");
+    const dialog = await openForm();
+    await userEvent.type(within(dialog).getByLabelText("Valor"), "10");
+    await userEvent.type(within(dialog).getByLabelText("Descrição"), "Feira");
+    await userEvent.click(await within(dialog).findByRole("button", { name: /Mercado/ }));
+    const lookupCalls = () => mock.mock.calls.filter(([u]) => u === "/api/lookups").length;
+    const before = lookupCalls();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(lookupCalls()).toBe(before + 1));
   });
 });
 
@@ -219,6 +265,74 @@ describe("Novo lançamento submit", () => {
     expect(within(dialog).getByLabelText("Valor")).toHaveValue("25,90");
     expect(within(dialog).getByLabelText("Descrição")).toHaveValue("Feira");
     expect(within(dialog).getByRole("button", { name: "Salvar" })).toBeEnabled();
+  });
+});
+
+describe("Lançamentos category drill-down", () => {
+  const listCalls = (mock: ReturnType<typeof mockFetch>) =>
+    mock.mock.calls
+      .map(([u]) => String(u))
+      .filter((u) => u.startsWith("/api/transactions?"))
+      .map((u) => new URLSearchParams(u.split("?")[1]));
+
+  it("reads the filters from the link, asks for those categories, and shows the net total", async () => {
+    list = [
+      tx({ id: 1, amount: "100.00", description: "Feira" }),
+      tx({
+        id: 2,
+        type: "refund",
+        amount: "30.00",
+        description: "Estorno",
+        relatedTransactionId: 1,
+      }),
+      tx({ id: 3, status: "voided", amount: "999.00", description: "Duplicado" }),
+    ];
+    const mock = mockFetch(base());
+    renderAt("/lancamentos?categorias=1,none&escopo=household&status=confirmed");
+    expect(await screen.findByText("Feira")).toBeInTheDocument();
+    const call = listCalls(mock)[0]!;
+    expect(call.get("categories")).toBe("1,none");
+    expect(call.get("scope")).toBe("household");
+    expect(call.get("status")).toBe("confirmed");
+    expect(call.get("categoryId")).toBeNull();
+    expect(screen.getByText("Categorias: Mercado, Sem categoria")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Casa" })).toHaveAttribute("aria-pressed", "true");
+    // 100 expense - 30 refund; the voided row does not count.
+    expect(screen.getByTestId("category-total")).toHaveTextContent("R$ 70,00");
+  });
+
+  it("removes the category filter and drops the total", async () => {
+    list = [tx({})];
+    const mock = mockFetch(base());
+    renderAt("/lancamentos?categorias=1");
+    await screen.findByText("iFood");
+    expect(screen.getByTestId("category-total")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Remover filtro" }));
+    await waitFor(() => expect(screen.queryByTestId("category-total")).not.toBeInTheDocument());
+    expect(screen.queryByText(/^Categorias:/)).not.toBeInTheDocument();
+    const calls = listCalls(mock);
+    expect(calls[calls.length - 1]!.get("categories")).toBeNull();
+  });
+
+  it("shows the total for the category dropdown too, and no total without a filter", async () => {
+    list = [tx({})];
+    mockFetch(base());
+    renderAt("/lancamentos");
+    await screen.findByText("iFood");
+    expect(screen.queryByTestId("category-total")).not.toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText("Categoria"), "1");
+    expect(await screen.findByTestId("category-total")).toHaveTextContent("R$ 64,50");
+    expect(screen.getByText("Categorias: Mercado")).toBeInTheDocument();
+  });
+
+  it("falls back to the defaults on bad parameters", async () => {
+    list = [tx({})];
+    const mock = mockFetch(base());
+    renderAt("/lancamentos?categorias=abc&escopo=x&status=y&categoria=z");
+    await screen.findByText("iFood");
+    const call = listCalls(mock)[0]!;
+    expect([...call.keys()]).toEqual(["month"]);
+    expect(screen.queryByTestId("category-total")).not.toBeInTheDocument();
   });
 });
 

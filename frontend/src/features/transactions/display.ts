@@ -33,6 +33,17 @@ export function dayTotal(items: Transaction[]): string {
   return fromCents(items.reduce((sum, tx) => sum + countedCents(tx), 0n));
 }
 
+/** Confirmed expenses minus confirmed refunds, as the dashboard counts category spending. */
+export function netSpent(items: Transaction[]): string {
+  let cents = 0n;
+  for (const tx of items) {
+    if (tx.status !== "confirmed") continue;
+    if (tx.type === "expense") cents += toCents(tx.amount);
+    else if (tx.type === "refund") cents -= toCents(tx.amount);
+  }
+  return fromCents(cents);
+}
+
 export function groupByDay(items: Transaction[]): { date: string; items: Transaction[] }[] {
   const groups = new Map<string, Transaction[]>();
   for (const tx of items) {

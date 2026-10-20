@@ -7,6 +7,7 @@ import type {
   TransactionListQuery,
   TransactionPatch,
 } from "@spendual/shared";
+import { parseCategoryList } from "@spendual/shared";
 import { AppError } from "../auth/errors.js";
 import { dateOnlyToDate, nextPeriod } from "../lib/period.js";
 import { parseMoney, toAuditDto, toTransactionDto } from "../lib/serialize.js";
@@ -101,15 +102,13 @@ export async function listTransactions(
 ): Promise<Transaction[]> {
   // Planned rows never show in this list.
   if (q.status === "planned") return [];
+  const month = {
+    gte: dateOnlyToDate(`${q.month}-01`),
+    lt: dateOnlyToDate(`${nextPeriod(q.month)}-01`),
+  };
   const where: Prisma.TransactionWhereInput = {
-    transactionDate: {
-      gte: dateOnlyToDate(`${q.month}-01`),
-      lt: dateOnlyToDate(`${nextPeriod(q.month)}-01`),
-    },
     status: q.status ?? { not: "planned" },
     ...(q.scope ? { scope: q.scope } : {}),
-    ...(q.type ? { type: q.type } : {}),
-    ...(q.categoryId ? { categoryId: q.categoryId } : {}),
     ...(q.personId
       ? {
           OR: [
@@ -119,6 +118,23 @@ export async function listTransactions(
         }
       : {}),
   };
+  if (q.categories) {
+    // Drill-down: the month belongs to the expense, so a refund is found through its expense.
+    const { ids, none } = parseCategoryList(q.categories);
+    const expense: Prisma.TransactionWhereInput = {
+      type: "expense",
+      transactionDate: month,
+      OR: [
+        ...(ids.length ? [{ categoryId: { in: ids } }] : []),
+        ...(none ? [{ categoryId: null }] : []),
+      ],
+    };
+    where.AND = [{ OR: [expense, { type: "refund", relatedTransaction: { is: expense } }] }];
+  } else {
+    where.transactionDate = month;
+    if (q.type) where.type = q.type;
+    if (q.categoryId) where.categoryId = q.categoryId;
+  }
   const rows = await prisma.transaction.findMany({
     where,
     orderBy: [{ transactionDate: "desc" }, { id: "desc" }],
