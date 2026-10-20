@@ -7,6 +7,7 @@ import { useAuth } from "../auth/AuthContext";
 import { messageKeyFor } from "../auth/error-messages";
 import { Button } from "../components/ui/button";
 import { Field } from "../components/ui/field";
+import { Logo } from "../components/ui/logo";
 import { ApiError } from "../lib/api-client";
 import { cn } from "../lib/cn";
 
@@ -109,7 +110,8 @@ export function LoginPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-[420px] flex-col justify-center gap-[14px] px-4 py-8">
-      <header className="text-center">
+      <header className="flex flex-col items-center text-center">
+        <Logo size={72} className="mb-2" />
         <h1 className="text-[1.6rem] font-bold">{t("app.title")}</h1>
         <p className="text-[0.8rem] text-muted">{t("app.tagline")}</p>
       </header>

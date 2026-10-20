@@ -17,6 +17,7 @@ import { useTranslation } from "react-i18next";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { Button } from "../components/ui/button";
+import { Logo } from "../components/ui/logo";
 import { ToastProvider } from "../components/ui/toast";
 import { EntryProvider, useEntry } from "../features/transactions/entry";
 import { EntrySheet } from "../features/transactions/EntrySheet";
@@ -113,7 +114,10 @@ function Shell() {
         aria-label={t("nav.main")}
         className="hidden flex-col gap-1 border-r border-line bg-surface p-3 md:flex"
       >
-        <p className="px-3 py-2 text-[1.1rem] font-bold">{t("app.title")}</p>
+        <p className="flex items-center gap-2 px-3 py-2 text-[1.1rem] font-bold">
+          <Logo size={28} />
+          {t("app.title")}
+        </p>
         {SIDEBAR.map((item) => (
           <NavItemLink key={item.key} item={item} layout="side" />
         ))}
@@ -121,7 +125,10 @@ function Shell() {
 
       <div className="flex min-w-0 flex-col pb-24 md:pb-0">
         <header className="flex items-center justify-between gap-2 border-b border-line bg-surface px-4 py-1">
-          <MonthSelector />
+          <div className="flex items-center gap-1">
+            <Logo size={28} label={t("app.title")} className="md:hidden" />
+            <MonthSelector />
+          </div>
           <div className="flex items-center gap-3">
             <Button onClick={openNew} className="hidden md:inline-flex md:items-center md:gap-1">
               <Plus size={16} aria-hidden />
