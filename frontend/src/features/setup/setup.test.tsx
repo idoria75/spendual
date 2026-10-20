@@ -75,7 +75,7 @@ it("skips the setup page once it is completed", async () => {
   completed = true;
   mockFetch(handler());
   renderAt("/configuracao");
-  expect(await screen.findByText("Olá, Ana")).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "Início" })).toBeInTheDocument();
 });
 
 it("saves budgets and allowances, then completes and opens Início", async () => {
@@ -90,7 +90,7 @@ it("saves budgets and allowances, then completes and opens Início", async () =>
   expect(screen.queryByLabelText("Salário")).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Concluir" }));
 
-  expect(await screen.findByText("Olá, Ana")).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "Início" })).toBeInTheDocument();
   const period = currentMonth();
   expect(callsTo(mock, "/api/budgets", "PUT").map(bodyOf)).toEqual([
     { categoryId: null, period, amount: "8000.00", mode: "going_forward" },
@@ -106,7 +106,7 @@ it("completes without saving anything on Pular por agora", async () => {
   const mock = mockFetch(handler());
   renderAt("/");
   await userEvent.click(await screen.findByRole("button", { name: "Pular por agora" }));
-  expect(await screen.findByText("Olá, Ana")).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "Início" })).toBeInTheDocument();
   expect(callsTo(mock, "/api/setup/complete", "POST")).toHaveLength(1);
   expect(callsTo(mock, "/api/budgets", "PUT")).toHaveLength(0);
   expect(callsTo(mock, "/api/allowances", "POST")).toHaveLength(0);
@@ -131,7 +131,7 @@ it("keeps the typed values and shows an error when saving fails, without repeati
   expect(dialog).toHaveTextContent("Algo deu errado");
   failComplete = false;
   await userEvent.click(screen.getByRole("button", { name: "Concluir" }));
-  expect(await screen.findByText("Olá, Ana")).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "Início" })).toBeInTheDocument();
   expect(callsTo(mock, "/api/budgets", "PUT")).toHaveLength(1);
   await waitFor(() => expect(callsTo(mock, "/api/setup/complete", "POST")).toHaveLength(2));
 });
@@ -154,7 +154,7 @@ it("re-sends a step whose amount changed after a failed finish", async () => {
   await userEvent.type(field, "900000");
   failComplete = false;
   await userEvent.click(screen.getByRole("button", { name: "Concluir" }));
-  expect(await screen.findByText("Olá, Ana")).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "Início" })).toBeInTheDocument();
   expect(callsTo(mock, "/api/budgets", "PUT").map(bodyOf)).toMatchObject([
     { amount: "8000.00" },
     { amount: "9000.00" },

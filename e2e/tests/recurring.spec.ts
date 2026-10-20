@@ -16,10 +16,10 @@ const DAY = String(Number(TODAY.slice(8, 10)));
 // One shared user and database: the tests run in order.
 test.describe.configure({ mode: "serial" });
 
-/** The value of one row of the "Realizado" card: the dd right after its dt. */
+/** The value of one row in the folded month result of the "Saldo atual" card: the dd right after its dt. */
 function actualRow(page: Page, label: string) {
   return page
-    .getByRole("region", { name: "Realizado" })
+    .getByRole("region", { name: "Saldo atual" })
     .locator(`xpath=.//dt[normalize-space()="${label}"]/following-sibling::dd[1]`);
 }
 

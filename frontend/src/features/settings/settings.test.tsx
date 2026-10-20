@@ -178,7 +178,7 @@ describe("Ajustes profile", () => {
         <App />
       </MemoryRouter>,
     );
-    await screen.findByText("Olá, Ana");
+    await screen.findByRole("heading", { name: "Início" });
     expect(document.documentElement).toHaveAttribute("data-theme", "light");
   });
 });

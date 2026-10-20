@@ -29,13 +29,13 @@ it("redirects to /entrar when /me returns 401", async () => {
   );
   renderAt("/");
   expect(await screen.findByRole("button", { name: "Entrar", pressed: true })).toBeInTheDocument();
-  expect(screen.queryByText("Olá, Ana")).not.toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Início" })).not.toBeInTheDocument();
 });
 
 it("shows the home page when /me returns the user", async () => {
   mockFetch(({ url }) => shellStubs(url) ?? json(200, user));
   renderAt("/");
-  expect(await screen.findByText("Olá, Ana")).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "Início" })).toBeInTheDocument();
 });
 
 it("login success sends the CSRF header and goes home", async () => {
@@ -49,7 +49,7 @@ it("login success sends the CSRF header and goes home", async () => {
   await fill("Usuário", "ana");
   await fill("Senha", "senha-bem-longa");
   await userEvent.click(screen.getAllByRole("button", { name: "Entrar" }).at(-1)!);
-  expect(await screen.findByText("Olá, Ana")).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "Início" })).toBeInTheDocument();
   const call = mock.mock.calls.find(([u]) => u === "/api/auth/login")!;
   expect(new Headers(call[1]?.headers).get("X-CSRF-Token")).toBe("tok");
   expect(JSON.parse(call[1]?.body as string)).toEqual({

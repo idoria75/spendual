@@ -140,19 +140,46 @@ const callsTo = (mock: ReturnType<typeof mockFetch>, url: string, method: string
   mock.mock.calls.filter(([u, init]) => String(u).startsWith(url) && init?.method === method);
 
 describe("Início", () => {
-  it("shows server numbers, a dash for no savings rate, and valor ? count", async () => {
+  it("shows the month result folded in Saldo atual, and the forecast in Próximas contas", async () => {
     mockFetch(base());
     renderAt("/");
-    const actual = await screen.findByRole("region", { name: "Realizado" });
-    expect(within(actual).getByText("R$ 10.000,00")).toBeInTheDocument();
-    expect(within(actual).getAllByText("R$ 3.000,00")).toHaveLength(2);
-    expect(within(actual).getByText("—")).toBeInTheDocument();
-    const planned = screen.getByRole("region", { name: /Previsão/ });
-    expect(within(planned).getByText("R$ 190,00")).toBeInTheDocument();
-    expect(within(planned).getByText(/mais 2 contas sem valor \(valor \?\)/)).toBeInTheDocument();
+    const block = await screen.findByRole("region", { name: "Saldo atual" });
+    expect(screen.queryByRole("region", { name: "Realizado" })).not.toBeInTheDocument();
+    const saved = within(block).getByText("R$ 3.000,00");
+    expect(saved).toHaveClass("text-pos");
+    const details = block.querySelector("details")!;
+    expect(details).not.toHaveAttribute("open");
+    expect(within(details).getByText("Receitas da casa")).not.toBeVisible();
+    await userEvent.click(within(block).getByText("Detalhes"));
+    expect(details).toHaveAttribute("open");
+    expect(within(details).getByText("R$ 10.000,00")).toBeVisible();
+    expect(within(details).getByText("R$ 5.000,00")).toBeVisible();
+    expect(within(details).getByText("R$ 2.000,00")).toBeVisible();
+    expect(within(details).getByText("Receitas − despesas − mesadas")).toBeVisible();
+    // Goals are not built: "sem destino" equals the savings, so it is not shown. No savings rate.
+    expect(within(block).queryByText("Poupança sem destino")).not.toBeInTheDocument();
+    expect(screen.queryByText("Taxa de poupança")).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Olá/)).not.toBeInTheDocument();
+    const next = screen.getByRole("region", { name: "Próximas contas" });
+    expect(within(next).getByText("Previsão · inclui planejados")).toBeInTheDocument();
+    expect(within(next).getByText("R$ 190,00")).toBeInTheDocument();
+    expect(within(next).getByText(/mais 2 contas sem valor \(valor \?\)/)).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Pessoas" })).not.toBeInTheDocument();
-    expect(screen.queryByText("R$ 800,00")).not.toBeInTheDocument();
     expect(screen.getByText("▲ R$ 1.000,00 acima")).toBeInTheDocument();
+  });
+
+  it("shows 'sem destino' only when it differs from the savings", async () => {
+    mockFetch(
+      base((req) =>
+        req.url.startsWith("/api/dashboard")
+          ? json(200, { ...dashboard, unallocatedSavings: "1500.00" })
+          : undefined,
+      ),
+    );
+    renderAt("/");
+    const block = await screen.findByRole("region", { name: "Saldo atual" });
+    expect(within(block).getByText("Poupança sem destino")).toBeInTheDocument();
+    expect(within(block).getByText("R$ 1.500,00", { selector: "dd" })).toBeInTheDocument();
   });
 
   it("shows negative savings in the warn color with the minus sign", async () => {
@@ -168,14 +195,10 @@ describe("Início", () => {
       ),
     );
     renderAt("/");
-    const actual = await screen.findByRole("region", { name: "Realizado" });
-    const values = await within(actual).findAllByText(/500,00/);
-    expect(values).toHaveLength(2);
-    for (const el of values) {
-      expect(el).toHaveClass("text-warn");
-      expect(el.textContent).toMatch(/^[-\u2212]/);
-    }
-    expect(within(actual).getByText("R$ 10.000,00")).not.toHaveClass("text-warn");
+    const block = await screen.findByRole("region", { name: "Saldo atual" });
+    const value = await within(block).findByText(/500,00$/, { selector: "span.font-bold" });
+    expect(value).toHaveClass("text-warn");
+    expect(value.textContent).toMatch(/^[-\u2212]/);
   });
 
   it("shows the balance of each person on Pessoal", async () => {
@@ -690,9 +713,8 @@ describe("money left in green", () => {
       ),
     );
     renderAt("/");
-    const actual = await screen.findByRole("region", { name: "Realizado" });
-    for (const el of within(actual).getAllByText("R$ 3.000,00")) expect(el).toHaveClass("text-pos");
     const block = await screen.findByRole("region", { name: "Saldo atual" });
+    expect(within(block).getByText("R$ 3.000,00")).toHaveClass("text-pos");
     const zero = within(block).getByText("R$ 0,00");
     expect(zero).not.toHaveClass("text-pos");
     expect(zero).not.toHaveClass("text-warn");
@@ -854,6 +876,22 @@ describe("Início chart and upcoming bills", () => {
       await screen.findByText(/gastos do mês por categoria aparecem aqui/),
     ).toBeInTheDocument();
     expect(screen.getByText("Nenhuma conta prevista para os próximos dias.")).toBeInTheDocument();
+  });
+
+  it("shows a repeating bill once, with its next date", async () => {
+    serve({
+      upcoming: [
+        bill({ id: 1, dueDate: `${month}-20` }),
+        bill({ id: 2, dueDate: `${month}-27` }),
+        bill({ id: 3, dueDate: `${month}-25`, parentId: 99, description: "Luz" }),
+      ],
+    });
+    renderAt("/");
+    const block = await screen.findByRole("region", { name: "Próximas contas" });
+    expect(within(block).getAllByText("Internet")).toHaveLength(1);
+    expect(within(block).getByText("Luz")).toBeInTheDocument();
+    expect(within(block).getByText(/20\/\d\d/)).toBeInTheDocument();
+    expect(within(block).queryByText(/27\/\d\d/)).not.toBeInTheDocument();
   });
 
   it("lists upcoming bills and opens the confirm sheet on tap", async () => {

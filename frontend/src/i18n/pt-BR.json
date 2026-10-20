@@ -10,7 +10,6 @@
   },
   "home": {
     "title": "Início",
-    "welcome": "Olá, {{name}}",
     "logout": "Sair"
   },
   "auth": {
@@ -254,18 +253,18 @@
     "failed": "Não foi possível carregar as análises."
   },
   "dashboard": {
-    "actual": "Realizado",
     "planned": "Previsão · inclui planejados",
     "income": "Receitas da casa",
     "sharedExpenses": "Despesas da casa",
     "allowances": "Mesadas",
     "savings": "Poupança do mês",
     "unallocated": "Poupança sem destino",
-    "savingsRate": "Taxa de poupança",
     "unknownCount_one": "mais {{count}} conta sem valor (valor ?)",
     "unknownCount_other": "mais {{count}} contas sem valor (valor ?)",
     "seeBills": "Ver contas a pagar",
     "balanceNow": "Saldo atual",
+    "details": "Detalhes",
+    "savingsHint": "Receitas − despesas − mesadas",
     "seeCategory": "Ver lançamentos de {{name}}",
     "seeOthers": "Ver lançamentos das outras categorias",
     "spentOfTotal": "Gasto/Total",
