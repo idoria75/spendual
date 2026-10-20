@@ -264,8 +264,8 @@ Required before edit of history, void, cancel and goal withdrawal (guide §8).
 5. Category grid: the 4 most used (count of confirmed records, server side) + `todas ›`. Ties by name.
 6. `Pago por` (default: me) and `Data` (default: today) in one row.
 7. `Método`, full row (default: last used).
-8. If `Método` is a credit card: `Parcelado? Não | Sim`. On `Sim`: `Parcelas`, `1ª parcela`, and a
-   live line `10x R$ 410,00 · soma R$ 4.100,00`. Remainder cents go to the last installment.
+8. If `Método` is a credit card: a `Parcelado` label above `Não | Sim`. On `Sim`: `Parcelas`, `1ª parcela`, and a
+   live line `10x de R$ 410,00` (no last-installment or total text). Remainder cents go to the last installment.
 9. `Mais detalhes` (collapsed): account, notes, related record.
 10. `Salvar`, pinned to the bottom.
 

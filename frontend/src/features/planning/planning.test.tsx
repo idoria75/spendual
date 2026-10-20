@@ -358,9 +358,8 @@ describe("A pagar", () => {
     await userEvent.type(within(dialog).getByLabelText("Descrição"), "TV");
     await userEvent.type(within(dialog).getByLabelText("Valor total"), "10000");
     await userEvent.type(within(dialog).getByLabelText("Parcelas"), "3");
-    expect(
-      within(dialog).getByText(/2x R\$ 33,33 \+ última R\$ 33,34 · soma R\$ 100,00/),
-    ).toBeInTheDocument();
+    expect(within(dialog).getByText("3x R$ 33,33")).toBeInTheDocument();
+    expect(within(dialog).queryByText(/última|soma/)).not.toBeInTheDocument();
     await userEvent.selectOptions(within(dialog).getByLabelText("Categoria"), "1");
     await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
     await waitFor(() => expect(callsTo(mock, "/api/installment-plans", "POST")).toHaveLength(1));

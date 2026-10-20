@@ -149,18 +149,10 @@ function CreateForm({ kind, onSaved }: { kind: CreateKind; onSaved: () => void }
           />
           {preview ? (
             <p className="text-[0.85rem] tabular-nums text-muted">
-              {preview.each === preview.last
-                ? t("bills.create.plan.preview", {
-                    n: preview.n,
-                    each: formatMoney(preview.each),
-                    total: formatMoney(preview.total),
-                  })
-                : t("bills.create.plan.previewLast", {
-                    n: preview.n - 1,
-                    each: formatMoney(preview.each),
-                    last: formatMoney(preview.last),
-                    total: formatMoney(preview.total),
-                  })}
+              {t("bills.create.plan.preview", {
+                n: preview.n,
+                each: formatMoney(preview.each),
+              })}
             </p>
           ) : null}
         </>

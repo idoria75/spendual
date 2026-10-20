@@ -575,7 +575,9 @@ describe("Parcelado in the entry form", () => {
     const count = within(dialog).getByLabelText("Parcelas");
     await userEvent.clear(count);
     await userEvent.type(count, "12");
-    expect(within(dialog).getByText("12x de R$ 83,33 (última R$ 83,37)")).toBeInTheDocument();
+    expect(within(dialog).getByText("12x de R$ 83,33")).toBeInTheDocument();
+    expect(within(dialog).queryByText(/última/)).not.toBeInTheDocument();
+    expect(within(dialog).getByText("Parcelado", { selector: "label" })).toBeInTheDocument();
     expect(within(dialog).getByText("1ª parcela")).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
     await waitFor(() => expect(plans(mock)).toHaveLength(1));

@@ -108,7 +108,6 @@
       "count": "Parcelas",
       "first": "1ª parcela",
       "preview": "{{n}}x de {{each}}",
-      "previewLast": "{{n}}x de {{each}} (última {{last}})",
       "saved": "Compra parcelada criada. Veja em A pagar."
     },
     "date": "Data",
@@ -388,8 +387,7 @@
         "count": "Parcelas",
         "countError": "Informe de 2 a 60 parcelas.",
         "first": "1ª parcela",
-        "preview": "{{n}}x {{each}} · soma {{total}}",
-        "previewLast": "{{n}}x {{each}} + última {{last}} · soma {{total}}"
+        "preview": "{{n}}x {{each}}"
       }
     },
     "emptyInstallments": "As parcelas do mês aparecem aqui."

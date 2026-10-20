@@ -437,15 +437,18 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
 
       {canInstall ? (
         <div className="flex flex-col gap-2">
-          <Segmented
-            label={t("form.installment.label")}
-            value={installment}
-            onChange={setInstallment}
-            options={[
-              { value: "no", label: t("form.installment.no") },
-              { value: "yes", label: t("form.installment.yes") },
-            ]}
-          />
+          <div className="flex flex-col gap-[3px]">
+            <Label>{t("form.installment.label")}</Label>
+            <Segmented
+              label={t("form.installment.label")}
+              value={installment}
+              onChange={setInstallment}
+              options={[
+                { value: "no", label: t("form.installment.no") },
+                { value: "yes", label: t("form.installment.yes") },
+              ]}
+            />
+          </div>
           {installing ? (
             <>
               <Field
@@ -458,16 +461,10 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
               />
               {preview ? (
                 <p className="text-[0.85rem] tabular-nums text-muted">
-                  {preview.each === preview.last
-                    ? t("form.installment.preview", {
-                        n: preview.n,
-                        each: formatMoney(preview.each),
-                      })
-                    : t("form.installment.previewLast", {
-                        n: preview.n,
-                        each: formatMoney(preview.each),
-                        last: formatMoney(preview.last),
-                      })}
+                  {t("form.installment.preview", {
+                    n: preview.n,
+                    each: formatMoney(preview.each),
+                  })}
                 </p>
               ) : null}
             </>
