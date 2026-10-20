@@ -32,10 +32,18 @@ test("recurring bill: one occurrence, confirmed once", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   // The anonymous GET /auth/me returns 401 on purpose and the browser logs it. Nothing else.
+  // A navigation aborts requests in flight; the browser then logs "Failed to fetch". That is not a bug.
+  let aborted = 0;
+  let failedFetches = 0;
+  page.on("requestfailed", (r) => {
+    if (r.failure()?.errorText === "net::ERR_ABORTED") aborted++;
+  });
   page.on("console", (m) => {
     if (m.type() !== "error") return;
     const anonymousMe = m.location().url.endsWith("/api/auth/me") && m.text().includes("401");
-    if (!anonymousMe) errors.push(m.text());
+    if (anonymousMe) return;
+    if (m.text().startsWith("TypeError: Failed to fetch")) failedFetches++;
+    else errors.push(m.text());
   });
 
   // Sign up.
@@ -53,6 +61,8 @@ test("recurring bill: one occurrence, confirmed once", async ({ page }) => {
   // Dashboard starts with no expenses.
   await expect(actualRow(page, "Despesas da casa")).toHaveText(ZERO);
 
+  // A full navigation aborts requests still in flight; the browser logs those as errors.
+  await page.waitForLoadState("networkidle");
   // Create the rule in "A pagar".
   await page.goto("/a-pagar");
   await expect(page.getByRole("heading", { name: "A pagar" })).toBeVisible();
@@ -73,6 +83,7 @@ test("recurring bill: one occurrence, confirmed once", async ({ page }) => {
 
   // Reload twice: generation is idempotent.
   for (let i = 0; i < 2; i++) {
+    await page.waitForLoadState("networkidle");
     await page.reload();
     await expect(page.getByRole("heading", { name: "A pagar" })).toBeVisible();
     await expect(row).toHaveCount(1);
@@ -87,6 +98,7 @@ test("recurring bill: one occurrence, confirmed once", async ({ page }) => {
   await expect(page.getByText("Previsão · inclui planejados")).toBeVisible();
 
   // Confirm the payment.
+  await page.waitForLoadState("networkidle");
   await page.goto("/a-pagar");
   await row.click();
   await page.getByRole("button", { name: "Confirmar pagamento" }).click();
@@ -102,11 +114,11 @@ test("recurring bill: one occurrence, confirmed once", async ({ page }) => {
   // Dashboard: the expense counted once.
   await page.getByRole("link", { name: "Início" }).first().click();
   await expect(actualRow(page, "Despesas da casa")).toHaveText(MONEY);
-  // A reload would abort requests still in flight and log "Failed to fetch".
   await page.waitForLoadState("networkidle");
   await page.reload();
   await expect(actualRow(page, "Despesas da casa")).toHaveText(MONEY);
 
+  expect(failedFetches).toBeLessThanOrEqual(aborted);
   expect(errors).toEqual([]);
 });
 
