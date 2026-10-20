@@ -41,7 +41,7 @@ export function Sheet({ open, onOpenChange, title, children, tall, onOpenAutoFoc
           className={cn(
             "fixed inset-x-0 bottom-0 z-50 flex flex-col overflow-hidden rounded-t-sheet bg-surface text-fg",
             tall ? "h-[92dvh]" : "max-h-[92dvh]",
-            "md:inset-auto md:left-1/2 md:top-1/2 md:h-auto md:max-h-[90dvh] md:w-full md:max-w-[440px] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-card",
+            "md:inset-auto md:left-1/2 md:top-1/2 md:h-auto md:max-h-[min(90dvh,820px)] md:w-full md:max-w-[520px] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-card",
           )}
         >
           <div aria-hidden className="mx-auto mt-2 h-1 w-10 rounded-chip bg-line md:hidden" />
@@ -54,7 +54,9 @@ export function Sheet({ open, onOpenChange, title, children, tall, onOpenAutoFoc
               <X size={20} aria-hidden />
             </Dialog.Close>
           </header>
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-4">{children}</div>
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-4 pb-4 [scrollbar-width:thin]">
+            {children}
+          </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
