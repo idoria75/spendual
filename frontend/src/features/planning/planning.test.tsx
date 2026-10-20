@@ -186,6 +186,20 @@ describe("Início", () => {
     expect(within(people).getByText("Ana")).toBeInTheDocument();
   });
 
+  it("takes the logo to Início and the user name to Pessoal", async () => {
+    mockFetch(base());
+    renderAt("/ajustes");
+    await screen.findByRole("heading", { name: "Ajustes" });
+    for (const logo of screen.getAllByRole("link", { name: /^Spendual$/ })) {
+      expect(logo).toHaveAttribute("href", "/");
+    }
+    const header = screen.getByRole("banner");
+    await userEvent.click(within(header).getByRole("link", { name: "Ana" }));
+    expect(await screen.findByRole("region", { name: "Pessoas" })).toBeInTheDocument();
+    await userEvent.click(within(header).getByRole("link", { name: "Spendual" }));
+    expect(await screen.findByRole("region", { name: "Saldo atual" })).toBeInTheDocument();
+  });
+
   it("links Pessoal from Mais", async () => {
     mockFetch(base());
     renderAt("/mais");

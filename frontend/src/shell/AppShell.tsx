@@ -14,7 +14,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { Button } from "../components/ui/button";
 import { Logo } from "../components/ui/logo";
@@ -114,10 +114,13 @@ function Shell() {
         aria-label={t("nav.main")}
         className="hidden flex-col gap-1 border-r border-line bg-surface p-3 md:flex"
       >
-        <p className="flex items-center gap-2 px-3 py-2 text-[1.1rem] font-bold">
+        <Link
+          to="/"
+          className="flex min-h-[44px] items-center gap-2 px-3 py-2 text-[1.1rem] font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
           <Logo size={28} />
           {t("app.title")}
-        </p>
+        </Link>
         {SIDEBAR.map((item) => (
           <NavItemLink key={item.key} item={item} layout="side" />
         ))}
@@ -126,7 +129,13 @@ function Shell() {
       <div className="flex min-w-0 flex-col pb-24 md:pb-0">
         <header className="flex items-center justify-between gap-2 border-b border-line bg-surface px-4 py-1">
           <div className="flex items-center gap-1">
-            <Logo size={28} label={t("app.title")} className="md:hidden" />
+            <Link
+              to="/"
+              aria-label={t("app.title")}
+              className="flex h-11 w-11 items-center justify-center md:hidden"
+            >
+              <Logo size={28} />
+            </Link>
             <MonthSelector />
           </div>
           <div className="flex items-center gap-3">
@@ -134,14 +143,17 @@ function Shell() {
               <Plus size={16} aria-hidden />
               {t("nav.newEntryLong")}
             </Button>
-            <span className="flex items-center gap-2 text-[0.85rem]">
+            <Link
+              to="/pessoal"
+              className="flex min-h-[44px] items-center gap-2 text-[0.85rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
               <span
                 aria-hidden
                 className="h-3 w-3 rounded-chip"
                 style={{ background: toneColor(tone) }}
               />
               {user?.displayName}
-            </span>
+            </Link>
           </div>
         </header>
         <main className="mx-auto w-full max-w-[720px] p-4">
