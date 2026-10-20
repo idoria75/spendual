@@ -36,6 +36,45 @@ describe("catalog auth", () => {
   });
 });
 
+describe("lookups: usageCount", () => {
+  it("counts confirmed records per category, voided and planned ones excluded", async () => {
+    const lazer = await prisma.category.create({ data: { name: "Lazer" } });
+    const make = (categoryId: number, amount: string) =>
+      send(ctx.ana, "post", "/api/transactions", {
+        type: "expense",
+        scope: "household",
+        amount,
+        description: "x",
+        transactionDate: "2027-03-05",
+        categoryId,
+      });
+    await make(ctx.categoryId, "10.00");
+    await make(ctx.categoryId, "20.00");
+    const voided = await make(ctx.categoryId, "30.00");
+    await send(ctx.ana, "post", `/api/transactions/${voided.body.id}/void`, { reason: "x" });
+    await make(lazer.id, "5.00");
+    await prisma.transaction.create({
+      data: {
+        type: "expense",
+        status: "planned",
+        amount: "9.00",
+        description: "p",
+        transactionDate: new Date("2027-03-09T00:00:00Z"),
+        scope: "household",
+        categoryId: lazer.id,
+        payerId: ctx.anaId,
+        createdById: ctx.anaId,
+        updatedById: ctx.anaId,
+      },
+    });
+    const body = lookupsSchema.parse((await ctx.ana.get("/api/lookups")).body);
+    const count = (id: number) => body.categories.find((c) => c.id === id)?.usageCount;
+    expect(count(ctx.categoryId)).toBe(2);
+    expect(count(lazer.id)).toBe(1);
+    expect(count(ctx.incomeCategoryId)).toBe(0);
+  });
+});
+
 describe("lookups", () => {
   it("returns users and active plus archived catalogs", async () => {
     await prisma.category.create({ data: { name: "Velha", active: false } });

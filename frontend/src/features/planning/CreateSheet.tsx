@@ -12,7 +12,7 @@ import { Select } from "../../components/ui/select";
 import { Sheet } from "../../components/ui/sheet";
 import { formatMoney } from "../../lib/currency";
 import { today } from "../../lib/date";
-import { useLookups } from "../transactions/lookups";
+import { byUsage, useLookups } from "../transactions/lookups";
 import { createPlan, createRule } from "./api";
 import {
   buildPlan,
@@ -102,9 +102,9 @@ function CreateForm({ kind, onSaved }: { kind: CreateKind; onSaved: () => void }
     }
   };
 
-  const categories = (lookups?.categories ?? []).filter(
-    (c) => c.id === v.categoryId || (c.active && c.kind === "expense"),
-  );
+  const categories = (lookups?.categories ?? [])
+    .filter((c) => c.id === v.categoryId || (c.active && c.kind === "expense"))
+    .sort(byUsage);
   const accounts = (lookups?.accounts ?? []).filter((a) => a.active);
   const methods = (lookups?.paymentMethods ?? []).filter((m) => m.active);
   const users = lookups?.users ?? [];

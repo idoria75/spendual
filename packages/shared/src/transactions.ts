@@ -111,9 +111,18 @@ export const lookupUserSchema = z.object({
 });
 export type LookupUser = z.infer<typeof lookupUserSchema>;
 
+/**
+ * A category in /lookups. `usageCount` is how many confirmed records use it (any type, scope or
+ * date). It is derived on read, so it cannot drift. The entry forms sort by it, biggest first.
+ */
+export const lookupCategorySchema = categorySchema.extend({
+  usageCount: z.number().int().default(0),
+});
+export type LookupCategory = z.infer<typeof lookupCategorySchema>;
+
 export const lookupsSchema = z.object({
   users: z.array(lookupUserSchema),
-  categories: z.array(categorySchema),
+  categories: z.array(lookupCategorySchema),
   accounts: z.array(accountSchema),
   paymentMethods: z.array(paymentMethodSchema),
 });
@@ -178,12 +187,35 @@ export type ReasonRequest = z.infer<typeof reasonRequestSchema>;
 
 export const periodKeySchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Invalid period");
 
+export const MAX_CATEGORY_LIST = 50;
+
+/** Splits a validated `categories` query value. */
+export function parseCategoryList(value: string): { ids: number[]; none: boolean } {
+  const parts = value.split(",");
+  return {
+    ids: parts.filter((p) => p !== "none").map(Number),
+    none: parts.includes("none"),
+  };
+}
+
 export const transactionListQuerySchema = z.object({
   month: periodKeySchema,
   scope: Scope.optional(),
   /** Records where this user is owner (personal) or payer (household). */
   personId: z.coerce.number().int().positive().optional(),
   categoryId: z.coerce.number().int().positive().optional(),
+  /**
+   * Spending drill-down: comma list of category ids, `none` for records without a category
+   * (e.g. `3,7,none`, at most 50). Returns the expenses of the month in those categories plus the
+   * confirmed refunds linked to them, by the expense's month. Same rule as the dashboard's
+   * `categorySpending`, so the rows add up to the dashboard amount. Ignores `type`; combine with
+   * `scope` and `status`. Do not combine with `categoryId`.
+   */
+  categories: z
+    .string()
+    .regex(/^(\d+|none)(,(\d+|none))*$/)
+    .refine((v) => v.split(",").length <= MAX_CATEGORY_LIST, "Too many categories")
+    .optional(),
   type: TransactionType.optional(),
   status: TransactionStatus.optional(),
 });

@@ -15,12 +15,7 @@ import { Select } from "../../components/ui/select";
 import { useToast } from "../../components/ui/toast";
 import { formatMoney } from "../../lib/currency";
 import { formatDayMonth, today } from "../../lib/date";
-import {
-  lastMethodId,
-  recentCategoryIds,
-  rememberCategory,
-  rememberMethod,
-} from "../../lib/recent";
+import { lastMethodId, rememberMethod } from "../../lib/recent";
 import { cn } from "../../lib/cn";
 import { confirmBill, createPlan } from "../planning/api";
 import { splitPreview } from "../planning/form-model";
@@ -40,7 +35,7 @@ import {
   type FieldErrors,
   type FormValues,
 } from "./form-model";
-import { useLookups } from "./lookups";
+import { byUsage, useLookups } from "./lookups";
 
 type ErrKey =
   | "form.errors.description"
@@ -126,21 +121,19 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
   const categoryKind = categoryKindFor(type);
   const activeCategories = useMemo(
     () =>
-      (lookups?.categories ?? []).filter(
-        (c) =>
-          c.id === values.categoryId ||
-          ((categoryKind === null || c.kind === categoryKind) && c.active),
-      ),
+      (lookups?.categories ?? [])
+        .filter(
+          (c) =>
+            c.id === values.categoryId ||
+            ((categoryKind === null || c.kind === categoryKind) && c.active),
+        )
+        .sort(byUsage),
     [lookups, values.categoryId, categoryKind],
   );
   const visibleCategories = useMemo(() => {
     if (showAllCategories) return activeCategories;
-    const byId = new Map(activeCategories.map((c) => [c.id, c]));
-    const picked: typeof activeCategories = [];
-    for (const id of [values.categoryId, ...recentCategoryIds()]) {
-      const c = id === null ? undefined : byId.get(id);
-      if (c && !picked.includes(c) && picked.length < 4) picked.push(c);
-    }
+    // The chosen category stays visible, then the most used ones fill the 4 slots.
+    const picked = activeCategories.filter((c) => c.id === values.categoryId);
     for (const c of activeCategories) if (picked.length < 4 && !picked.includes(c)) picked.push(c);
     return picked;
   }, [activeCategories, showAllCategories, values.categoryId]);
@@ -229,7 +222,6 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
     setSubmitting(true);
     try {
       await run();
-      if (!bill && values.categoryId !== null && f.category) rememberCategory(values.categoryId);
       if (!editing && !bill) rememberMethod(values.paymentMethodId);
       showToast(
         t(

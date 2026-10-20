@@ -39,3 +39,9 @@ export function useLookups(): LookupsValue {
   if (!ctx) throw new Error("useLookups must be used inside LookupsProvider");
   return ctx;
 }
+
+/** Most used first, then by name. The order of every category picker in the entry flow. */
+export const byUsage = (
+  a: { usageCount: number; name: string },
+  b: { usageCount: number; name: string },
+): number => b.usageCount - a.usageCount || a.name.localeCompare(b.name, "pt-BR");

@@ -28,17 +28,28 @@ async function mapCatalogErrors<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 export async function getLookups(prisma: PrismaClient): Promise<Lookups> {
-  const [users, categories, accounts, paymentMethods] = await Promise.all([
+  const [users, categories, usage, accounts, paymentMethods] = await Promise.all([
     prisma.user.findMany({
       where: { active: true },
       select: { id: true, displayName: true, tonePalette: true },
       orderBy: { id: "asc" },
     }),
     prisma.category.findMany({ select: categorySelect, orderBy: { name: "asc" } }),
+    prisma.transaction.groupBy({
+      by: ["categoryId"],
+      _count: { _all: true },
+      where: { status: "confirmed", categoryId: { not: null } },
+    }),
     prisma.account.findMany({ select: accountSelect, orderBy: { name: "asc" } }),
     prisma.paymentMethod.findMany({ select: nameSelect, orderBy: { name: "asc" } }),
   ]);
-  return { users, categories, accounts, paymentMethods };
+  const used = new Map(usage.map((u) => [u.categoryId, u._count._all]));
+  return {
+    users,
+    categories: categories.map((c) => ({ ...c, usageCount: used.get(c.id) ?? 0 })),
+    accounts,
+    paymentMethods,
+  };
 }
 
 export const createCategory = (prisma: PrismaClient, data: CategoryInput) =>
