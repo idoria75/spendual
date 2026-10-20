@@ -56,10 +56,10 @@ function NavItemLink({ item, layout }: { item: NavItem; layout: "tab" | "side" }
       end={item.to === "/"}
       className={({ isActive }) =>
         cn(
-          "flex min-h-[44px] items-center rounded-input text-[0.75rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+          "flex items-center rounded-input text-[0.75rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
           layout === "tab"
-            ? "flex-1 flex-col justify-center gap-[2px]"
-            : "gap-3 px-3 text-[0.9rem]",
+            ? "min-h-[64px] flex-1 flex-col justify-center gap-[2px]"
+            : "min-h-[44px] gap-3 px-3 text-[0.9rem]",
           isActive ? "font-bold text-accent" : "text-muted",
         )
       }
@@ -163,7 +163,7 @@ function Shell() {
 
       <nav
         aria-label={t("nav.tabs")}
-        className="fixed inset-x-0 bottom-0 z-30 flex items-end border-t border-line bg-surface px-2 pb-1 md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 flex items-center border-t border-line bg-surface px-2 pb-[env(safe-area-inset-bottom,0px)] md:hidden"
       >
         {TABS_LEFT.map((item) => (
           <NavItemLink key={item.key} item={item} layout="tab" />
@@ -173,7 +173,7 @@ function Shell() {
             type="button"
             aria-label={t("nav.newEntry")}
             onClick={openNew}
-            className="-mt-5 flex h-14 w-14 items-center justify-center rounded-chip bg-accent text-accent-fg shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="flex h-14 w-14 -translate-y-4 items-center justify-center rounded-chip bg-accent text-accent-fg shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             <Plus size={28} aria-hidden />
           </button>

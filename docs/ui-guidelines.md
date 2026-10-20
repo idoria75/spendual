@@ -24,7 +24,7 @@ Treat the structural rules (sections 1, 2, 4 and 6) as fixed.
 
 | Device | Shell |
 |---|---|
-| Phone (< 768 px) | Bottom tab bar: `Início` · `Lançamentos` · `+` · `A pagar` · `Mais`. `+` is a raised center button. |
+| Phone (< 768 px) | Bottom tab bar: `Início` · `Lançamentos` · `+` · `A pagar` · `Mais`. `+` is a raised center button (bar 64 px high, tabs centered, button 16 px up). |
 | Desktop (≥ 768 px) | Left sidebar: `Início`, `Lançamentos`, `A pagar`, `Orçamentos`, `Metas`, then a `Mais` group with `Pessoal` and `Ajustes`. `+ Novo lançamento` button in the top bar. |
 
 - Phone `Mais` opens a list: `Orçamentos`, `Pessoal`, `Metas`, `Ajustes`.
@@ -269,7 +269,7 @@ are transparent cut-outs, so it works on light and dark. The colors are fixed; t
 | `icon-192.png`, `icon-512.png`, `manifest.webmanifest` | Install icon (name, theme color `#1f6f78`) |
 
 `Logo` (`components/ui/logo.tsx`): 28 px next to `Spendual` in the desktop sidebar; 28 px alone (alt
-`Spendual`) at the left of the phone header; 72 px above the title on `Entrar`.
+`Spendual`) at the left of the phone header; 72 px above the title on `Entrar`. In the shell the logo (sidebar and phone header) links to `Início`, and the user name in the top bar links to `Pessoal`; both targets are at least 44 px.
 
 ## 7. Views
 
