@@ -664,6 +664,35 @@ describe("overdue bills", () => {
   });
 });
 
+describe("money left in green", () => {
+  it("shows positive savings in green on Início and zero balance neutral", async () => {
+    mockFetch(
+      base((req) =>
+        req.url.startsWith("/api/dashboard")
+          ? json(200, { ...dashboard, overallBudget: { budget: "500.00", spent: "500.00" } })
+          : undefined,
+      ),
+    );
+    renderAt("/");
+    const actual = await screen.findByRole("region", { name: "Realizado" });
+    for (const el of within(actual).getAllByText("R$ 3.000,00")) expect(el).toHaveClass("text-pos");
+    const block = await screen.findByRole("region", { name: "Saldo atual" });
+    const zero = within(block).getByText("R$ 0,00");
+    expect(zero).not.toHaveClass("text-pos");
+    expect(zero).not.toHaveClass("text-warn");
+  });
+
+  it("shows what is left under a category budget, and nothing when over or equal", async () => {
+    mockFetch(base());
+    renderAt("/orcamentos");
+    // Mock: Mercado 872 of 800 (over), Casa e contas without a budget, overall 1.000 of 4.000.
+    expect(await screen.findByText("▲ R$ 72,00 acima")).toBeInTheDocument();
+    const left = await screen.findByText("R$ 3.000,00 restam");
+    expect(left).toHaveClass("text-pos");
+    expect(screen.getAllByText(/restam$/)).toHaveLength(1);
+  });
+});
+
 describe("Início chart and upcoming bills", () => {
   const serve = (over: Record<string, unknown>) =>
     mockFetch(
@@ -681,9 +710,45 @@ describe("Início chart and upcoming bills", () => {
     expect(items).toHaveLength(2);
     expect(items[0]).toHaveTextContent("Casa e contas");
     expect(items[0]).toHaveTextContent("R$ 3.400,00");
-    expect(items[0]).toHaveTextContent("68%");
+    // Percents are of the month's budget (4.000), not of the spending.
+    expect(items[0]).toHaveTextContent("85%");
     expect(items[1]).toHaveTextContent("Mercado");
-    expect(items[1]).toHaveTextContent("32%");
+    expect(items[1]).toHaveTextContent("40%");
+  });
+
+  it("links each legend row to the household spending of those categories", async () => {
+    serve({
+      categorySpending: [
+        { categoryId: 1, amount: "500.00" },
+        { categoryId: 2, amount: "400.00" },
+        { categoryId: 3, amount: "300.00" },
+        { categoryId: 4, amount: "200.00" },
+        { categoryId: 5, amount: "60.00" },
+        { categoryId: null, amount: "40.00" },
+      ],
+    });
+    renderAt("/");
+    const chart = await screen.findByRole("region", { name: "Gastos por categoria" });
+    const links = within(chart).getAllByRole("link");
+    expect(links.map((a) => a.getAttribute("href"))).toEqual([
+      "/lancamentos?categorias=1&escopo=household&status=confirmed",
+      "/lancamentos?categorias=2&escopo=household&status=confirmed",
+      "/lancamentos?categorias=3&escopo=household&status=confirmed",
+      "/lancamentos?categorias=4&escopo=household&status=confirmed",
+      "/lancamentos?categorias=5,none&escopo=household&status=confirmed",
+    ]);
+    expect(links[0]).toHaveAccessibleName("Ver lançamentos de Mercado");
+    expect(links[4]).toHaveAccessibleName("Ver lançamentos das outras categorias");
+  });
+
+  it("links the no-category row alone", async () => {
+    serve({ categorySpending: [{ categoryId: null, amount: "40.00" }] });
+    renderAt("/");
+    const chart = await screen.findByRole("region", { name: "Gastos por categoria" });
+    expect(within(chart).getByRole("link")).toHaveAttribute(
+      "href",
+      "/lancamentos?categorias=none&escopo=household&status=confirmed",
+    );
   });
 
   it("groups categories after the fourth into Outras (n)", async () => {
@@ -704,7 +769,66 @@ describe("Início chart and upcoming bills", () => {
     expect(items).toHaveLength(5);
     expect(items[4]).toHaveTextContent("Outras (2)");
     expect(items[4]).toHaveTextContent("R$ 100,00");
-    expect(items[4]).toHaveTextContent("7%");
+    expect(items[4]).toHaveTextContent("3%");
+  });
+
+  it("puts the balance first, then spent / total", async () => {
+    serve({ overallBudget: { budget: "8000.00", spent: "7400.00" } });
+    renderAt("/");
+    const block = await screen.findByRole("region", { name: "Saldo atual" });
+    expect(within(block).getByText("R$ 600,00")).toHaveClass("text-pos");
+    expect(within(block).getByText("R$ 600,00")).not.toHaveClass("text-warn");
+    expect(within(block).getByText("Gasto/Total")).toBeInTheDocument();
+    expect(within(block).getByText("R$ 7.400,00")).toBeInTheDocument();
+    expect(within(block).getByText(/\/\s*R\$ 8\.000,00/)).toBeInTheDocument();
+  });
+
+  it("sizes the bar against the budget: two halves of 50 % take 25 % each and the rest stays empty", async () => {
+    serve({
+      overallBudget: { budget: "8000.00", spent: "4000.00" },
+      categorySpending: [
+        { categoryId: 1, amount: "2000.00" },
+        { categoryId: 2, amount: "2000.00" },
+      ],
+    });
+    renderAt("/");
+    const chart = await screen.findByRole("region", { name: "Gastos por categoria" });
+    const segments = within(chart).getAllByTestId("spending-segment");
+    expect(segments.map((s) => s.getAttribute("data-percent"))).toEqual(["25.00", "25.00"]);
+    expect(segments[0]).toHaveStyle({ width: "25%" });
+    const items = within(chart).getAllByRole("listitem");
+    expect(items[0]).toHaveTextContent("25%");
+    expect(items[1]).toHaveTextContent("25%");
+  });
+
+  it("shows a negative balance in warn and fills the bar to the spending when over budget", async () => {
+    serve({
+      overallBudget: { budget: "1000.00", spent: "1500.00" },
+      categorySpending: [
+        { categoryId: 1, amount: "1000.00" },
+        { categoryId: 2, amount: "500.00" },
+      ],
+    });
+    renderAt("/");
+    const block = await screen.findByRole("region", { name: "Saldo atual" });
+    const balance = within(block).getByText(/500,00$/, { selector: "p.text-warn" });
+    expect(balance.textContent).toMatch(/^[-\u2212]/);
+    expect(within(block).getByText("▲ R$ 500,00 acima")).toBeInTheDocument();
+    const segments = within(block).getAllByTestId("spending-segment");
+    expect(segments.map((s) => s.getAttribute("data-percent"))).toEqual(["66.66", "33.33"]);
+  });
+
+  it("without a budget: no balance, a link to set one, and the bar scales to the spending", async () => {
+    serve({ overallBudget: { budget: null, spent: "1600.00" } });
+    renderAt("/");
+    const block = await screen.findByRole("region", { name: "Saldo atual" });
+    expect(within(block).getByRole("link", { name: "Definir orçamento" })).toHaveAttribute(
+      "href",
+      "/orcamentos",
+    );
+    const segments = within(block).getAllByTestId("spending-segment");
+    // 3.400 + 1.600 are the whole bar, so the shares are 68 % and 32 %.
+    expect(segments.map((s) => s.getAttribute("data-percent"))).toEqual(["68.00", "32.00"]);
   });
 
   it("shows empty states for no spending and no upcoming bills", async () => {

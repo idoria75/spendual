@@ -54,6 +54,11 @@ function BudgetRow({
                 {t("budgets.over", { amount: formatMoney(fromCents(spent - (budget ?? 0n))) })}
               </span>
             ) : null}
+            {budget !== null && spent < budget ? (
+              <span className="text-[0.8rem] font-semibold text-pos">
+                {t("budgets.left", { amount: formatMoney(fromCents(budget - spent)) })}
+              </span>
+            ) : null}
           </>
         )}
       </button>

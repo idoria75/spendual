@@ -1,4 +1,5 @@
 import type { Dashboard } from "@spendual/shared";
+import { ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -7,11 +8,12 @@ import { Button } from "../../components/ui/button";
 import { cn } from "../../lib/cn";
 import { formatMoney, fromCents, toCents } from "../../lib/currency";
 import { CategoryTile, categoryColor } from "../transactions/CategoryTile";
+import { spendingLink } from "../transactions/drilldown";
 import { useEntry } from "../transactions/entry";
 import { useLookups } from "../transactions/lookups";
 import { useMonth } from "../transactions/month";
 import { fetchBills, fetchDashboard } from "./api";
-import { Bar, formatRate, percentOf } from "./display";
+import { formatRate, percentOf } from "./display";
 import { BillRow } from "./BillsView";
 import { useLoad } from "./use-load";
 
@@ -20,11 +22,13 @@ function Row({
   value,
   strong,
   warn,
+  pos,
 }: {
   label: string;
   value: ReactNode;
   strong?: boolean;
   warn?: boolean;
+  pos?: boolean;
 }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
@@ -34,6 +38,7 @@ function Row({
           "whitespace-nowrap tabular-nums",
           strong ? "font-bold" : "font-semibold",
           warn && "text-warn",
+          pos && "text-pos",
         )}
       >
         {value}
@@ -49,6 +54,7 @@ function Eyebrow({ children }: { children: ReactNode }) {
 }
 
 const isNegative = (amount: string) => toCents(amount) < 0;
+const isPositive = (amount: string) => toCents(amount) > 0;
 
 function ActualCard({ d }: { d: Dashboard }) {
   const { t } = useTranslation();
@@ -64,11 +70,13 @@ function ActualCard({ d }: { d: Dashboard }) {
         <Row
           strong
           warn={isNegative(d.savingsBeforeGoals)}
+          pos={isPositive(d.savingsBeforeGoals)}
           label={t("dashboard.savings")}
           value={formatMoney(d.savingsBeforeGoals)}
         />
         <Row
           warn={isNegative(d.unallocatedSavings)}
+          pos={isPositive(d.unallocatedSavings)}
           label={t("dashboard.unallocated")}
           value={formatMoney(d.unallocatedSavings)}
         />
@@ -111,52 +119,33 @@ function PlannedCard({ d, overdueCount }: { d: Dashboard; overdueCount: number }
   );
 }
 
-function OverallBudget({ d }: { d: Dashboard }) {
-  const { t } = useTranslation();
-  const { budget, spent } = d.overallBudget;
-  const spentCents = toCents(spent);
-  const budgetCents = budget === null ? 0n : toCents(budget);
-  const over = budget !== null && spentCents > budgetCents;
-  return (
-    <section aria-labelledby="dash-budget" className="rounded-card bg-surface p-4">
-      <Eyebrow>
-        <span id="dash-budget">{t("dashboard.overallBudget")}</span>
-      </Eyebrow>
-      {budget === null ? (
-        <p className="mt-2 text-muted">{t("budgets.none")}</p>
-      ) : (
-        <div className="mt-2 flex flex-col gap-2">
-          <p className="tabular-nums">
-            <span className="font-bold">{formatMoney(spent)}</span>{" "}
-            <span className="text-muted">{t("budgets.of", { amount: formatMoney(budget) })}</span>
-          </p>
-          <Bar
-            label={t("dashboard.overallBudget")}
-            percent={percentOf(spentCents, budgetCents)}
-            over={over}
-          />
-          {over ? (
-            <p className="text-[0.82rem] text-warn">
-              {t("budgets.over", { amount: formatMoney(fromCents(spentCents - budgetCents)) })}
-            </p>
-          ) : null}
-        </div>
-      )}
-    </section>
-  );
-}
-
 const LEGEND_TOP = 4;
+const SEPARATOR = " / ";
+const LEGEND_ROW =
+  "grid min-h-[44px] grid-cols-[28px_1fr_auto_auto_16px] items-center gap-3 rounded-input";
 
-/** One stacked bar of household spending by category, biggest first (ui-guidelines §6.5). */
-function SpendingChart({ d }: { d: Dashboard }) {
+/**
+ * Top block of Início, like a bank app: what is left of the month's budget, what was spent of
+ * the total, and one stacked bar of spending by category in proportion to that budget.
+ * Two categories that are 25 % of the budget each take a quarter of the bar each; the empty rest
+ * is the balance. Over budget, the bar scales to the spending. Without a budget, to the spending.
+ */
+function BalanceCard({ d }: { d: Dashboard }) {
   const { t } = useTranslation();
   const { data: lookups } = useLookups();
+  const { budget, spent } = d.overallBudget;
+  const spentCents = toCents(spent);
+  const budgetCents = budget === null ? null : toCents(budget);
+  const balance = budgetCents === null ? null : budgetCents - spentCents;
+  const over = balance !== null && balance < 0n;
   const items = d.categorySpending
     .map((s) => ({ ...s, cents: toCents(s.amount) }))
     .filter((s) => s.cents > 0n)
     .sort((a, b) => (a.cents === b.cents ? 0 : a.cents > b.cents ? -1 : 1));
-  const total = items.reduce((sum, s) => sum + s.cents, 0n);
+  const itemsTotal = items.reduce((sum, s) => sum + s.cents, 0n);
+  // The bar is 100 % of the budget, or of the spending when that is bigger or there is no budget.
+  const whole = budgetCents !== null && budgetCents > itemsTotal ? budgetCents : itemsTotal;
+  const base = budgetCents !== null && budgetCents > 0n ? budgetCents : itemsTotal;
   const nameOf = (id: number | null) =>
     id === null
       ? t("list.noCategory")
@@ -164,65 +153,124 @@ function SpendingChart({ d }: { d: Dashboard }) {
   const top = items.slice(0, LEGEND_TOP);
   const rest = items.slice(LEGEND_TOP);
   const restCents = rest.reduce((sum, s) => sum + s.cents, 0n);
-  const pct = (cents: bigint) => `${Math.round(percentOf(cents, total))}%`;
+  const pct = (cents: bigint) => `${Math.round(percentOf(cents, base))}%`;
 
   return (
-    <section aria-labelledby="dash-spending" className="rounded-card bg-surface p-4">
-      <Eyebrow>
-        <span id="dash-spending">{t("dashboard.spending")}</span>
-      </Eyebrow>
-      {items.length === 0 ? (
-        <p className="mt-2 text-[0.85rem] text-muted">{t("dashboard.spendingEmpty")}</p>
-      ) : (
-        <>
-          <div aria-hidden className="mt-3 flex h-[10px] gap-[2px] overflow-hidden rounded-chip">
-            {items.map((s) => (
-              <span
-                key={s.categoryId ?? "none"}
-                data-testid="spending-segment"
-                className="h-full min-w-[2px]"
-                style={{
-                  flex: `${percentOf(s.cents, total)} 1 0%`,
-                  background: categoryColor(s.categoryId),
-                }}
-              />
-            ))}
-          </div>
+    <section
+      aria-labelledby="dash-balance"
+      className="flex flex-col gap-3 rounded-card bg-surface p-4 md:col-span-2"
+    >
+      <div>
+        <Eyebrow>
+          <span id="dash-balance">{t("dashboard.balanceNow")}</span>
+        </Eyebrow>
+        {balance === null ? (
+          <p className="mt-1 text-[0.9rem] text-muted">{t("budgets.none")}</p>
+        ) : (
+          <p
+            className={cn(
+              "mt-1 text-[2rem] font-bold leading-none tabular-nums",
+              over && "text-warn",
+              balance > 0n && "text-pos",
+            )}
+          >
+            {formatMoney(fromCents(balance))}
+          </p>
+        )}
+      </div>
+
+      <div>
+        <Eyebrow>{t("dashboard.spentOfTotal")}</Eyebrow>
+        <p className="mt-1 tabular-nums">
+          <span className="text-[1.1rem] font-bold">{formatMoney(spent)}</span>
+          <span className="text-muted">
+            {SEPARATOR}
+            {budget === null ? t("budgets.none") : formatMoney(budget)}
+          </span>
+        </p>
+        {over && budgetCents !== null ? (
+          <p className="text-[0.82rem] text-warn">
+            {t("budgets.over", { amount: formatMoney(fromCents(spentCents - budgetCents)) })}
+          </p>
+        ) : null}
+        {budget === null ? (
+          <Link
+            to="/orcamentos"
+            className="inline-flex min-h-[44px] items-center text-[0.85rem] font-semibold text-accent"
+          >
+            {t("dashboard.setBudget")}
+          </Link>
+        ) : null}
+      </div>
+
+      <section aria-label={t("dashboard.spending")}>
+        <div
+          aria-hidden
+          data-testid="spending-track"
+          className="flex h-[10px] gap-[2px] overflow-hidden rounded-chip bg-surface-2"
+        >
+          {items.map((s) => (
+            <span
+              key={s.categoryId ?? "none"}
+              data-testid="spending-segment"
+              data-percent={percentOf(s.cents, whole).toFixed(2)}
+              className="h-full min-w-[2px] shrink"
+              style={{
+                width: `${percentOf(s.cents, whole)}%`,
+                background: categoryColor(s.categoryId),
+              }}
+            />
+          ))}
+        </div>
+        {items.length === 0 ? (
+          <p className="mt-2 text-[0.85rem] text-muted">{t("dashboard.spendingEmpty")}</p>
+        ) : (
           <ul className="mt-3 flex flex-col gap-2">
             {top.map((s) => (
-              <li
-                key={s.categoryId ?? "none"}
-                className="grid grid-cols-[28px_1fr_auto_auto] items-center gap-3"
-              >
-                <CategoryTile id={s.categoryId} />
-                <span className="text-[0.88rem] leading-tight [overflow-wrap:anywhere]">
-                  {nameOf(s.categoryId)}
-                </span>
-                <span className="whitespace-nowrap text-[0.88rem] font-semibold tabular-nums">
-                  {formatMoney(s.amount)}
-                </span>
-                <span className="w-10 whitespace-nowrap text-right text-[0.78rem] tabular-nums text-muted">
-                  {pct(s.cents)}
-                </span>
+              <li key={s.categoryId ?? "none"}>
+                <Link
+                  to={spendingLink([s.categoryId])}
+                  aria-label={t("dashboard.seeCategory", { name: nameOf(s.categoryId) })}
+                  className={LEGEND_ROW}
+                >
+                  <CategoryTile id={s.categoryId} />
+                  <span className="text-[0.88rem] leading-tight [overflow-wrap:anywhere]">
+                    {nameOf(s.categoryId)}
+                  </span>
+                  <span className="whitespace-nowrap text-[0.88rem] font-semibold tabular-nums">
+                    {formatMoney(s.amount)}
+                  </span>
+                  <span className="w-10 whitespace-nowrap text-right text-[0.78rem] tabular-nums text-muted">
+                    {pct(s.cents)}
+                  </span>
+                  <ChevronRight size={16} aria-hidden className="text-muted" />
+                </Link>
               </li>
             ))}
             {rest.length > 0 ? (
-              <li className="grid grid-cols-[28px_1fr_auto_auto] items-center gap-3">
-                <span aria-hidden className="mx-auto h-3 w-3 rounded-tile bg-muted" />
-                <span className="text-[0.88rem] leading-tight">
-                  {t("dashboard.others", { count: rest.length })}
-                </span>
-                <span className="whitespace-nowrap text-[0.88rem] font-semibold tabular-nums">
-                  {formatMoney(fromCents(restCents))}
-                </span>
-                <span className="w-10 whitespace-nowrap text-right text-[0.78rem] tabular-nums text-muted">
-                  {pct(restCents)}
-                </span>
+              <li>
+                <Link
+                  to={spendingLink(rest.map((s) => s.categoryId))}
+                  aria-label={t("dashboard.seeOthers")}
+                  className={LEGEND_ROW}
+                >
+                  <span aria-hidden className="mx-auto h-3 w-3 rounded-tile bg-muted" />
+                  <span className="text-[0.88rem] leading-tight">
+                    {t("dashboard.others", { count: rest.length })}
+                  </span>
+                  <span className="whitespace-nowrap text-[0.88rem] font-semibold tabular-nums">
+                    {formatMoney(fromCents(restCents))}
+                  </span>
+                  <span className="w-10 whitespace-nowrap text-right text-[0.78rem] tabular-nums text-muted">
+                    {pct(restCents)}
+                  </span>
+                  <ChevronRight size={16} aria-hidden className="text-muted" />
+                </Link>
               </li>
             ) : null}
           </ul>
-        </>
-      )}
+        )}
+      </section>
     </section>
   );
 }
@@ -284,11 +332,10 @@ export function DashboardView() {
         </p>
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
+          <BalanceCard d={data} />
           <ActualCard d={data} />
           <PlannedCard d={data} overdueCount={bills.data?.overdue.length ?? 0} />
-          <SpendingChart d={data} />
           <UpcomingBills d={data} />
-          <OverallBudget d={data} />
         </div>
       )}
     </section>
