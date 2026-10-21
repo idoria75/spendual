@@ -315,6 +315,77 @@ on the Ubuntu box serves the app at `spendual.local` on the LAN, no public ingre
   service container, Vitest+RTL frontend, Playwright against a built preview, `npm run build`
   both workspaces, secret scan (gitleaks/trufflehog). No real data/credentials in CI.
 
+### P1-1 — Shared savings goals (`Metas`) (planned 2026-10-21, not started)
+
+Deliverable: `/metas` lists goals with balances; users allocate to and withdraw from a goal;
+Início shows unallocated savings and the amount in goals. Built and checked on the dev stack
+(hot reload). The prod build and first prod run wait until the P1 features are done.
+
+Decisions (user, 2026-10-21):
+- Either user may close or archive a goal. Every change records its actor.
+- `completed` can go back to `active`. `archived` is final and read-only.
+- Target amount and target date are optional and editable (schema columns are nullable).
+- `/metas` card "Poupança sem destino" is the amount left for the current month, the same
+  number as Início. It is not a total over all months: a total would have to match the bank
+  account exactly. Revisit how to show it later.
+
+Rules (guide §7):
+- Balance = ALLOCATION − WITHDRAWAL ± CORRECTION, derived on read, never stored.
+- Allocation and withdrawal are never income or expense.
+- A withdrawal goes only back to unallocated savings and must not exceed the goal's balance.
+- Allocate and withdraw only on `active` goals.
+- `complete` and `archive` need a zero balance, else 409 `goal_has_balance`. The UI offers
+  "Retirar tudo e concluir": one WITHDRAWAL, then close.
+- CORRECTION entries: no UI this round.
+
+Schema exists: `SavingsGoal`, `GoalEntry` (`backend/prisma/schema.prisma:354`, append-only). No
+migration needed; a CHECK `amount > 0` on ALLOCATION and WITHDRAWAL is optional.
+
+Work items, one commit or more each, in this order:
+1. Contract: `packages/shared/src/goals.ts`, exported from `index.ts`. Goal DTO (`balance`,
+   `status`, optional target), entry DTO, Zod schemas for create, patch, allocate, withdraw
+   (`positiveMoneySchema`, `effectiveDate` inside the month window, `notes`). Error code
+   `goal_has_balance`. Fix the "Goals are not in P0" comment in `planning.ts`.
+2. Service: `backend/src/services/goals.ts`. Pattern from `services/allowance.ts`: `withRetry`
+   plus `SELECT … FOR UPDATE` on the goal row before a withdrawal or a close. Move the audit
+   helper from `services/transactions.ts` to `backend/src/lib/audit.ts` and share it with
+   `services/bills.ts`.
+3. Dashboard: replace `const goalNet = 0n` in `backend/src/services/dashboard.ts` with
+   ALLOCATION − WITHDRAWAL whose `effectiveDate` is in the month. `unallocatedSavings` in
+   `domain/accounting.ts` already takes it.
+4. Routes: `backend/src/routes/goals.ts`, mounted like `planning.ts`.
+   - `GET /goals` (with balances), `POST /goals`, `PATCH /goals/:id`
+   - `POST /goals/:id/allocations`, `POST /goals/:id/withdrawals`
+   - `POST /goals/:id/complete`, `/reopen`, `/archive`
+   - `GET /goals/:id/entries`
+5. Frontend: `frontend/src/features/goals`, `frontend/src/pages/MetasPage.tsx`, route `/metas`
+   in `App.tsx`, item in `MaisPage.tsx` and the desktop sidebar (ui-guidelines §2).
+   - Cards: "Poupança sem destino", then one card per goal (balance, progress bar only with a
+     target, history).
+   - `Alocar` and `Retirar` sheets. Withdrawal needs a confirmation dialog (ui-guidelines §6.8).
+   - Closing with money left offers to withdraw the rest first.
+   - Início: add an "Em metas" line next to "Poupança sem destino" (`DashboardView.tsx`).
+   - pt-BR strings in `frontend/src/i18n/pt-BR.json`.
+6. E2E: `e2e/tests/goals.spec.ts`: create a goal, allocate, check Início, withdraw, close.
+7. Docs: `CURRENT_STATE.md`, `docs/open-points.md`. Tag `p1-goals`.
+
+Testing: `backend/tests/goals.test.ts`. The disk is slow (about 11 s per test), so few tests
+with many asserts each.
+- Guide §7 example: 10.000 − 5.000 − 2.000 = 3.000; allocate 1.000 and 500; unallocated 1.500;
+  unallocated + goals = 3.000.
+- Withdrawal over the balance is rejected. Two parallel withdrawals: one fails.
+- Close with money left gives 409. Reopen works. Archived rejects every write.
+- Goals change no income, expense, analytics or category total.
+- Sign-off: `make lint typecheck test e2e` exit 0. On the dev stack, after `make backup-dev`, run
+  the §7 numbers by hand and check Início and `/metas` on the phone.
+
+Way of working: one session on `dev`, no worktrees unless the user asks (slow disk, shared RAM).
+
+Later P1 items (order from `docs/open-points.md`): audit history (events on transaction create
+and rule create/patch, then a viewer), monthly savings target, CSV export. Then the prod work:
+own project name, build check, first run on `jobs`, move dev data with backup and restore,
+mDNS, backup timer, reboot test.
+
 ## Version control workflow
 
 - Work happens on a new branch off `main`: `dev`. Nothing lands on `main` directly during

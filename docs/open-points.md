@@ -81,15 +81,21 @@ Início merge and P1 next steps (2026-10-21):
   4. CSV export (not started); CSV import with preview and duplicate detection is Phase 7.
   5. Later: fuller personal budget screens, spending pace (this month vs same elapsed part of last month), duplicate and correction workflows.
 - Questions to answer before planning Metas: target amount and date from the start? Who may close a goal? Can a goal be reopened?
+  - DECIDED (2026-10-21): target amount and date optional and editable; either user may close or archive; `completed` can reopen, `archived` is final. Plan: [plan.md](plan.md), section "P1-1 — Shared savings goals".
+- DECIDED (2026-10-21): "Poupança sem destino" stays the amount left for the month, not a total over all months (a total needs exact sync with the bank account). Revisit how to show it later.
+- DECIDED (2026-10-21): stay on the dev stack (hot reload) until the P1 features are done; check the prod build after.
+- Audit note above ("nothing writes to it") is out of date. `services/transactions.ts` and `services/bills.ts` write events on patch, void and cancel. Still missing: transaction create, rule create/patch, a viewer.
 - Not checked: production build (`make build`; `npm run -w frontend build` fails in the container with "Failed to resolve entry for @spendual/shared"), anything on a real phone.
-- Stale: `spendual_stacktest` stack (port 8080) may still run. Remove with `down -v`? Not answered.
+- DONE (2026-10-21): the `spendual_stacktest` stack (port 8080) was removed with `down -v`, volume included.
 
 Deploy box learnings (2026-10-21). Measured on host `jobs`. ⚠ Assumes this box is the production host; unconfirmed:
 - Hardware: 4 CPUs, 7.2 GiB RAM, one 2.5" spinning disk (`sda`, 466 GB, `ROTA=1`, Apple/Hitachi HTS547). `/` has 204 GB free (13% used). Ubuntu 26.04, kernel 7.0, Docker 29.9, Compose 5.6, MySQL image `mysql:8.4`.
 - ⚠ Disk is slow on sync writes: `dd bs=4k oflag=dsync` gives about 120 kB/s (about 30 syncs/s, about 34 ms each). `/tmp` is tmpfs, so do not measure there.
 - Effect: MySQL with `innodb_flush_log_at_trx_commit=1` and `sync_binlog=1` makes each commit wait on the disk. Backend tests take about 11 s each, `TRUNCATE` is slow. Normal use (a few writes per click) should be fine; bulk work (CSV import, big backfills) will be slow.
 - Decision needed for production: keep durable settings (1/1, safe on power loss) or relax them. Dev containers were relaxed to 2/0 for test runs only, then restored. Do not relax in production without the user's yes. For CSV import, write rows in one transaction (one sync), not one commit per row.
-- Dev runs here too: `spendual-mysql-1`, `spendual-app-run-*` and the old `spendual_stacktest` stack all use this disk and 7 GiB of RAM. Remove the stack when not needed.
+- Dev runs here too: `spendual-mysql-1` and `spendual-app-run-*` use this disk and 7 GiB of RAM. Stop them when not needed.
 - `avahi-daemon` is inactive, so `spendual.local` is not published. `make mdns-install` prints the sudo commands (not run).
 - Not checked here: reboot restart of the containers, the systemd backup timer (`make backup-timer-install`), restore from a backup on this disk, the production build (`make build`), CI on GitHub (remote is `git@github.com:idoria75/spendual.git`, nothing pushed).
 - Other containers share the host (Plex, Metabase, smart_house, b1a-devc images are present). Ports and RAM are shared; check `docker ps` before choosing a port.
+- DECIDED (2026-10-21): `jobs` is the production host. Move the dev data to prod with backup, then restore.
+- ⚠ Dev (`compose.dev.yml`) and prod (`deployment/docker-compose.yml`) both use project name `spendual`, so both use the volume `spendual_mysql_data`. Give prod its own name (e.g. `spendual-prod`) before the first prod run on this host.
