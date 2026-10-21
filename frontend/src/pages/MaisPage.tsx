@@ -1,8 +1,8 @@
-import { ChartColumn, ChevronRight, Settings, User, Wallet } from "lucide-react";
+import { ChartColumn, ChevronRight, PiggyBank, Settings, User, Wallet } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
-/** Phone "Mais" list: Orçamentos, Análises, Pessoal and Ajustes. */
+/** Phone "Mais" list: Orçamentos, Análises, Pessoal, Metas and Ajustes. */
 export function MaisPage() {
   const { t } = useTranslation();
   return (
@@ -44,6 +44,19 @@ export function MaisPage() {
             <span className="flex-1">
               <span className="block font-semibold">{t("nav.pessoal")}</span>
               <span className="block text-[12px] text-muted">{t("nav.pessoalHint")}</span>
+            </span>
+            <ChevronRight size={16} aria-hidden />
+          </Link>
+        </li>
+        <li>
+          <Link
+            to="/metas"
+            className="flex min-h-[56px] items-center gap-3 rounded-input bg-surface px-3"
+          >
+            <PiggyBank size={20} aria-hidden />
+            <span className="flex-1">
+              <span className="block font-semibold">{t("nav.metas")}</span>
+              <span className="block text-[12px] text-muted">{t("nav.metasHint")}</span>
             </span>
             <ChevronRight size={16} aria-hidden />
           </Link>

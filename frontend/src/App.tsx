@@ -9,6 +9,7 @@ import { HomePage } from "./pages/HomePage";
 import { LancamentosPage } from "./pages/LancamentosPage";
 import { LoginPage } from "./pages/LoginPage";
 import { PessoalPage } from "./pages/PessoalPage";
+import { MetasPage } from "./pages/MetasPage";
 import { MaisPage } from "./pages/MaisPage";
 import { SetupGate } from "./features/setup/SetupGate";
 import { SetupPage } from "./features/setup/SetupPage";
@@ -27,6 +28,7 @@ export function App() {
               <Route path="/lancamentos" element={<LancamentosPage />} />
               <Route path="/a-pagar" element={<BillsPage />} />
               <Route path="/orcamentos" element={<BudgetsPage />} />
+              <Route path="/metas" element={<MetasPage />} />
               <Route path="/analises" element={<AnalisesPage />} />
               <Route path="/pessoal" element={<PessoalPage />} />
               <Route path="/mais" element={<MaisPage />} />

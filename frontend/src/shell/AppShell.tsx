@@ -5,6 +5,7 @@ import {
   House,
   List,
   MoreHorizontal,
+  PiggyBank,
   Plus,
   Receipt,
   Settings,
@@ -28,7 +29,15 @@ import { cn } from "../lib/cn";
 import { formatMonth, shiftMonth } from "../lib/date";
 
 type NavKey =
-  "inicio" | "analises" | "pessoal" | "lancamentos" | "aPagar" | "orcamentos" | "mais" | "ajustes";
+  | "inicio"
+  | "analises"
+  | "pessoal"
+  | "lancamentos"
+  | "aPagar"
+  | "orcamentos"
+  | "metas"
+  | "mais"
+  | "ajustes";
 interface NavItem {
   to: string;
   key: NavKey;
@@ -40,6 +49,7 @@ const SIDEBAR: NavItem[] = [
   { to: "/lancamentos", key: "lancamentos", icon: List },
   { to: "/a-pagar", key: "aPagar", icon: Receipt },
   { to: "/orcamentos", key: "orcamentos", icon: Wallet },
+  { to: "/metas", key: "metas", icon: PiggyBank },
   { to: "/analises", key: "analises", icon: ChartColumn },
   { to: "/pessoal", key: "pessoal", icon: User },
   { to: "/ajustes", key: "ajustes", icon: Settings },
