@@ -44,7 +44,6 @@ export function Sheet({ open, onOpenChange, title, children, tall, onOpenAutoFoc
             "md:inset-auto md:left-1/2 md:top-1/2 md:h-auto md:max-h-[min(90dvh,820px)] md:w-full md:max-w-[520px] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-card",
           )}
         >
-          <div aria-hidden className="mx-auto mt-2 h-1 w-10 rounded-chip bg-line md:hidden" />
           <header className="flex items-center justify-between gap-2 px-4 pb-2 pt-3">
             <Dialog.Title className="text-[17px] font-bold">{title}</Dialog.Title>
             <Dialog.Close
