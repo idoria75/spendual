@@ -154,12 +154,18 @@ describe("GET /backup/status", () => {
     expect(JSON.stringify(res.body)).not.toContain(dir);
   });
 
-  it("is not configured when the dir is unset or missing", async () => {
-    for (const backupDir of [undefined, join(dir, "nope")]) {
-      await setup(backupDir);
-      const res = await ana.get("/api/backup/status");
-      expect(res.body).toEqual({ configured: false, lastBackupAt: null, lastBackupBytes: null });
-    }
+  const notConfigured = { configured: false, lastBackupAt: null, lastBackupBytes: null };
+
+  it("is not configured when the dir is unset", async () => {
+    await setup(undefined);
+    const res = await ana.get("/api/backup/status");
+    expect(res.body).toEqual(notConfigured);
+  });
+
+  it("is not configured when the dir is missing", async () => {
+    await setup(join(dir, "nope"));
+    const res = await ana.get("/api/backup/status");
+    expect(res.body).toEqual(notConfigured);
   });
 
   it("is configured with nulls when the dir exists but is unreadable", async () => {
