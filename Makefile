@@ -6,7 +6,7 @@ export COMPOSE_PROJECT_NAME ?= spendual
 COMPOSE = docker compose -f compose.dev.yml
 RUN = mkdir -p node_modules && $(COMPOSE) run --rm app
 
-.PHONY: install dev lint typecheck test build migrate e2e down test-restore format format-check backup-dev restore-dev reset-dev mdns-install mdns-remove backup-timer-install
+.PHONY: demo-data install dev lint typecheck test build migrate e2e down test-restore format format-check backup-dev restore-dev reset-dev mdns-install mdns-remove backup-timer-install
 
 install:
 	$(RUN) npm install
@@ -57,6 +57,13 @@ restore-dev:
 # The only target that deletes the dev database. Takes a backup first.
 reset-dev:
 	CONFIRM="$(CONFIRM)" ./deployment/dev-data.sh reset
+
+# Replaces the records of the DEV database with 6 months of demo data. Users stay. Takes a backup first.
+# Thai gets a new random password, written to backups/thai-demo-password.txt.
+demo-data:
+	@[ "$(CONFIRM)" = yes ] || { echo "demo-data DELETES the dev records (users stay). Add CONFIRM=yes to go on." >&2; exit 1; }
+	./deployment/dev-data.sh backup
+	$(RUN) env DEMO_CONFIRM=yes DEMO_PASSWORD_FILE=/workspace/backups/thai-demo-password.txt npm run demo -w backend
 
 # Needs the compose project to be up. Applies migrations and seed, then runs the restore test.
 test-restore:

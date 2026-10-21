@@ -108,3 +108,7 @@ P1-1 Metas done (2026-10-21):
 - `Em metas` on Início is the month's net (allocations − withdrawals), not the total in goals. Revisit with the "Poupança sem destino" question.
 - No CORRECTION UI. `archived` goals are read only. The e2e spec needs `recurring.spec.ts` first (shared `E2E_RUN_ID` in `e2e/playwright.config.ts`).
 - Next P1: audit history (create events, then a viewer), monthly savings target, CSV export.
+
+Demo data (2026-10-21):
+- `make demo-data CONFIRM=yes` fills the dev DB with May to Oct demo data. Undo with `make restore-dev FILE=<backup> CONFIRM=yes`.
+- ⚠ User `thai` uses the second household account. Remove it (or restore) before a real partner signs up.
