@@ -119,7 +119,7 @@ function Shell() {
   }, [version, reloadLookups]);
   const tone = data?.users.find((u) => u.id === user?.id)?.tonePalette ?? user?.tonePalette;
   return (
-    <div className="min-h-screen md:grid md:grid-cols-[220px_1fr]">
+    <div className="min-h-dvh md:grid md:grid-cols-[220px_1fr]">
       <nav
         aria-label={t("nav.main")}
         className="hidden flex-col gap-1 border-r border-line bg-surface p-3 md:flex"
@@ -136,7 +136,7 @@ function Shell() {
         ))}
       </nav>
 
-      <div className="flex min-w-0 flex-col pb-24 md:pb-0">
+      <div className="flex min-w-0 flex-col pb-[calc(64px+env(safe-area-inset-bottom,0px))] md:pb-0">
         <header className="flex items-center justify-between gap-2 border-b border-line bg-surface px-4 py-1">
           <div className="flex items-center gap-1">
             <Link
