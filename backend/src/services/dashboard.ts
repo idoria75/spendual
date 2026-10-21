@@ -276,6 +276,27 @@ async function goalEntrySums(db: Db, range: Range) {
   return { allocated: sum("ALLOCATION"), withdrawn: sum("WITHDRAWAL") };
 }
 
+/**
+ * Savings of a month not yet in a goal (Appendix A), from the ledgers only. Same numbers as
+ * getDashboard, without generating bills. Used to refuse an allocation above it.
+ */
+export async function unallocatedForMonth(db: Db, month: string): Promise<bigint> {
+  const range = monthRange(month);
+  const household = { scope: "household" as const };
+  const [income, sharedNet, allowanceAgg, goals] = await Promise.all([
+    sumTx(db, { ...household, type: "income", transactionDate: range }),
+    netSpent(db, household, range),
+    db.personalAllowanceEntry.aggregate({ _sum: { amount: true }, where: { periodKey: month } }),
+    goalEntrySums(db, range),
+  ]);
+  const savings = savingsBeforeGoals({
+    householdIncome: income,
+    sharedExpensesNet: sharedNet,
+    allowanceAllocations: cents(allowanceAgg._sum.amount),
+  });
+  return unallocatedSavings(savings, goals.allocated - goals.withdrawn);
+}
+
 export async function getBudgetOverview(db: Db, month: string): Promise<BudgetOverview> {
   const range = monthRange(month);
   const household = { scope: "household" as const };

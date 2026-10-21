@@ -7,10 +7,13 @@ import type {
   GoalPatch,
 } from "@spendual/shared";
 import { AppError } from "../auth/errors.js";
+import { moneyToCents } from "../domain/accounting.js";
 import { writeAudit } from "../lib/audit.js";
+import { HOUSEHOLD_ID } from "../lib/household.js";
 import { currentDate, dateOnlyToDate, dateToDateOnly } from "../lib/period.js";
 import { moneyToString } from "../lib/serialize.js";
 import { withRetry } from "../lib/withRetry.js";
+import { unallocatedForMonth } from "./dashboard.js";
 
 type Db = Prisma.TransactionClient;
 
@@ -186,9 +189,29 @@ function move(kind: "ALLOCATION" | "WITHDRAWAL") {
   ): Promise<Goal> =>
     withRetry(() =>
       prisma.$transaction(async (tx) => {
+        // Allocations of different goals share one pool of savings: serialize them on the household row.
+        if (kind === "ALLOCATION") {
+          await tx.$queryRaw(
+            Prisma.sql`SELECT id FROM Household WHERE id = ${HOUSEHOLD_ID} FOR UPDATE`,
+          );
+        }
         const cur = await lockGoal(tx, id);
         requireStatus(cur, "active");
         const amount = new Prisma.Decimal(input.amount);
+        const effectiveDate = input.effectiveDate ?? currentDate(now);
+        if (kind === "ALLOCATION") {
+          const free = await unallocatedForMonth(tx, effectiveDate.slice(0, 7));
+          if (moneyToCents(amount.toFixed(2)) > free) {
+            throw new AppError(
+              409,
+              "insufficient_savings",
+              "Allocation is above the unallocated savings",
+              {
+                amount: "Above the unallocated savings",
+              },
+            );
+          }
+        }
         const before = await goalBalance(tx, id);
         if (kind === "WITHDRAWAL" && amount.gt(before)) {
           throw new AppError(409, "insufficient_balance", "Withdrawal is above the goal balance", {
@@ -201,7 +224,7 @@ function move(kind: "ALLOCATION" | "WITHDRAWAL") {
             kind,
             amount,
             currency: cur.currency,
-            effectiveDate: dateOnlyToDate(input.effectiveDate ?? currentDate(now)),
+            effectiveDate: dateOnlyToDate(effectiveDate),
             actorId,
             notes: input.notes ?? null,
           },

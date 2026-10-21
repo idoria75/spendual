@@ -21,6 +21,7 @@ import { positiveMoneySchema } from "./transactions.js";
  *  - `balance` = ALLOCATION - WITHDRAWAL +/- CORRECTION, derived on read, never stored.
  *  - Allocation and withdrawal are not income and not expense.
  *  - A withdrawal goes back to unallocated savings only. Over the balance -> 409 insufficient_balance.
+ *  - An allocation above the unallocated savings of the entry month -> 409 insufficient_savings.
  *  - A write on a goal in the wrong status -> 409 invalid_state. `archived` is final and read only.
  *  - complete and archive need a zero balance, else 409 goal_has_balance.
  *  - `effectiveDate` decides the month an entry counts in on Inicio. Its month must be inside
