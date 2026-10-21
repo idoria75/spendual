@@ -58,6 +58,8 @@ export const ApiErrorCode = z.enum([
   "has_refunds",
   "refund_exceeds",
   "allocation_exists",
+  "goal_has_balance",
+  "insufficient_balance",
   "tone_taken",
   "internal_error",
 ]);

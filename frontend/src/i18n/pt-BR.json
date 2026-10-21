@@ -46,6 +46,8 @@
     "has_refunds": "Este lançamento tem reembolsos. Anule os reembolsos primeiro.",
     "refund_exceeds": "O reembolso passa do valor da despesa.",
     "allocation_exists": "Já existe uma mesada deste mês para esta pessoa.",
+    "goal_has_balance": "A meta ainda tem saldo. Retire o valor antes de encerrar.",
+    "insufficient_balance": "O valor é maior que o saldo da meta.",
     "tone_taken": "Esse tom já é da outra pessoa.",
     "internal_error": "Algo deu errado. Tente de novo em instantes.",
     "network": "Sem conexão com o servidor. Tente de novo."
