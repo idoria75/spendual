@@ -26,6 +26,12 @@ import { periodKeySchema, positiveMoneySchema } from "./transactions.js";
  *   GET  /recurrence-rules            -> 200 RecurrenceRuleList
  *   PATCH /recurrence-rules/:id       -> 200 RecurrenceRule     body RecurrenceRulePatch
  *   POST /installment-plans           -> 201 InstallmentPlanDetail   body InstallmentPlanCreate
+ *   GET  /installment-plans           -> 200 InstallmentPlanList   (newest first, every status)
+ *   PATCH /installment-plans/:id      -> 200 InstallmentPlanSummary   body InstallmentPlanPatch
+ *        `description` renames the plan. `installmentAmount` sets the expected amount of every
+ *        PLANNED installment (paid ones stay). Without planned installments -> 409 invalid_state.
+ *   POST /installment-plans/:id/cancel -> 200 InstallmentPlanSummary   body ReasonRequest
+ *        Cancels every planned installment. Paid ones stay. No planned left -> 409 invalid_state.
  *   POST /bills/:kind/:id/confirm     -> 200 Bill   body BillConfirm (kind = recurrence | installment)
  *        Creates ONE confirmed Transaction (type expense, linked to the occurrence) and
  *        marks the occurrence confirmed, in one transaction. Already confirmed -> 409 invalid_state.
@@ -331,3 +337,32 @@ export const categoryTrendsSchema = z.object({
   categories: z.array(trendSeriesSchema),
 });
 export type CategoryTrends = z.infer<typeof categoryTrendsSchema>;
+
+export const installmentPlanPatchSchema = z
+  .object({ description: descriptionSchema, installmentAmount: positiveMoneySchema })
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, "Empty patch");
+export type InstallmentPlanPatch = z.infer<typeof installmentPlanPatchSchema>;
+
+export const PlanStatus = z.enum(["active", "finished", "cancelled"]);
+export type PlanStatus = z.infer<typeof PlanStatus>;
+
+export const installmentPlanSummarySchema = z.object({
+  id: z.number().int(),
+  description: z.string(),
+  totalAmount: moneySchema,
+  installmentCount: z.number().int(),
+  firstDueDate: dateOnlySchema,
+  paidCount: z.number().int(),
+  plannedCount: z.number().int(),
+  cancelledCount: z.number().int(),
+  /** Sum of the planned installments. */
+  remainingAmount: moneySchema,
+  /** Expected amount of the next planned installment; null when none is planned. */
+  nextAmount: moneySchema.nullable(),
+  /** active: something is planned. finished: all paid. cancelled: nothing planned, none paid. */
+  status: PlanStatus,
+});
+export type InstallmentPlanSummary = z.infer<typeof installmentPlanSummarySchema>;
+export const installmentPlanListSchema = z.object({ items: z.array(installmentPlanSummarySchema) });
+export type InstallmentPlanList = z.infer<typeof installmentPlanListSchema>;

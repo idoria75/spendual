@@ -9,9 +9,11 @@ import {
   categoryTrendsQuerySchema,
   dashboardQuerySchema,
   installmentPlanCreateSchema,
+  installmentPlanPatchSchema,
   reasonRequestSchema,
   recurrenceRuleCreateSchema,
   recurrenceRulePatchSchema,
+  type InstallmentPlanList,
   type RecurrenceRuleList,
 } from "@spendual/shared";
 import { AppError, asyncHandler } from "../auth/errors.js";
@@ -182,6 +184,30 @@ export function planningRouter(prisma: PrismaClient, clock: () => Date = () => n
     asyncHandler(async (req, res) => {
       const input = installmentPlanCreateSchema.parse(req.body);
       res.status(201).json(await bills.createInstallmentPlan(prisma, actorId(req), input));
+    }),
+  );
+
+  r.get(
+    "/installment-plans",
+    asyncHandler(async (_req, res) => {
+      const body: InstallmentPlanList = { items: await bills.listPlans(prisma) };
+      res.json(body);
+    }),
+  );
+
+  r.patch(
+    "/installment-plans/:id",
+    asyncHandler(async (req, res) => {
+      const patch = installmentPlanPatchSchema.parse(req.body);
+      res.json(await bills.patchPlan(prisma, actorId(req), idParam(req), patch));
+    }),
+  );
+
+  r.post(
+    "/installment-plans/:id/cancel",
+    asyncHandler(async (req, res) => {
+      const { reason } = reasonRequestSchema.parse(req.body);
+      res.json(await bills.cancelPlan(prisma, actorId(req), idParam(req), reason));
     }),
   );
 

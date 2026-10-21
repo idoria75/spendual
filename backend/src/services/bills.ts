@@ -13,6 +13,8 @@ import type {
   BillList,
   InstallmentPlanCreate,
   InstallmentPlanDetail,
+  InstallmentPlanPatch,
+  InstallmentPlanSummary,
   RecurrenceRule as RuleDto,
   RecurrenceRuleCreate,
   RecurrenceRulePatch,
@@ -259,6 +261,14 @@ export function patchRule(
           data: { status: "cancelled" },
         });
       }
+      await writeAudit(tx, {
+        actorId,
+        entityType: "RecurrenceRule",
+        entityId: id,
+        action: "rule.update",
+        before: ruleDto(cur),
+        after: ruleDto(row),
+      });
       return ruleDto(row);
     }),
   );
@@ -455,6 +465,120 @@ export function cancelBill(
       const after: Bill = { ...cur, status: "cancelled" };
       await auditBill(tx, actorId, "bill.cancel", cur, after, reason);
       return after;
+    }),
+  );
+}
+
+type PlanWithRows = InstallmentPlan & { occurrences: InstallmentOccurrence[] };
+
+function planSummary(p: PlanWithRows): InstallmentPlanSummary {
+  const rows = [...p.occurrences].sort((a, b) => a.sequenceNumber - b.sequenceNumber);
+  const planned = rows.filter((o) => o.status === "planned");
+  const paidCount = rows.filter((o) => o.status === "confirmed").length;
+  const remaining = planned.reduce((sum, o) => sum + moneyToCents(o.expectedAmount.toFixed(2)), 0n);
+  return {
+    id: p.id,
+    description: p.description,
+    totalAmount: p.totalAmount.toFixed(2),
+    installmentCount: p.installmentCount,
+    firstDueDate: dateToDateOnly(p.firstDueDate),
+    paidCount,
+    plannedCount: planned.length,
+    cancelledCount: rows.filter((o) => o.status === "cancelled").length,
+    remainingAmount: centsToMoney(remaining),
+    nextAmount: planned[0] ? planned[0].expectedAmount.toFixed(2) : null,
+    status: planned.length > 0 ? "active" : paidCount > 0 ? "finished" : "cancelled",
+  };
+}
+
+export async function listPlans(prisma: PrismaClient): Promise<InstallmentPlanSummary[]> {
+  const plans = await prisma.installmentPlan.findMany({
+    orderBy: { id: "desc" },
+    include: { occurrences: true },
+  });
+  return plans.map(planSummary);
+}
+
+/** Lock the plan row, then read it fresh with its installments. Throws 404 if missing. */
+async function lockPlan(tx: Db, id: number): Promise<PlanWithRows> {
+  const locked = await tx.$queryRaw<{ id: number }[]>(
+    Prisma.sql`SELECT id FROM InstallmentPlan WHERE id = ${id} FOR UPDATE`,
+  );
+  const plan = locked.length
+    ? await tx.installmentPlan.findUnique({ where: { id }, include: { occurrences: true } })
+    : null;
+  if (!plan) throw new AppError(404, "not_found", "Installment plan not found");
+  return plan;
+}
+
+export function patchPlan(
+  prisma: PrismaClient,
+  actorId: number,
+  id: number,
+  patch: InstallmentPlanPatch,
+): Promise<InstallmentPlanSummary> {
+  return withRetry(() =>
+    prisma.$transaction(async (tx) => {
+      const cur = await lockPlan(tx, id);
+      const hasPlanned = cur.occurrences.some((o) => o.status === "planned");
+      if (patch.installmentAmount !== undefined && !hasPlanned) {
+        throw new AppError(409, "invalid_state", "The plan has no planned installments");
+      }
+      await tx.installmentPlan.update({
+        where: { id },
+        data: {
+          ...(patch.description !== undefined ? { description: patch.description } : {}),
+          updatedById: actorId,
+        },
+      });
+      if (patch.installmentAmount !== undefined) {
+        await tx.installmentOccurrence.updateMany({
+          where: { planId: id, status: "planned" },
+          data: { expectedAmount: parseMoney(patch.installmentAmount) },
+        });
+      }
+      const after = await lockPlan(tx, id);
+      await writeAudit(tx, {
+        actorId,
+        entityType: "InstallmentPlan",
+        entityId: id,
+        action: "plan.update",
+        before: planSummary(cur),
+        after: planSummary(after),
+      });
+      return planSummary(after);
+    }),
+  );
+}
+
+export function cancelPlan(
+  prisma: PrismaClient,
+  actorId: number,
+  id: number,
+  reason: string,
+): Promise<InstallmentPlanSummary> {
+  return withRetry(() =>
+    prisma.$transaction(async (tx) => {
+      const cur = await lockPlan(tx, id);
+      if (!cur.occurrences.some((o) => o.status === "planned")) {
+        throw new AppError(409, "invalid_state", "The plan has no planned installments");
+      }
+      await tx.installmentOccurrence.updateMany({
+        where: { planId: id, status: "planned" },
+        data: { status: "cancelled" },
+      });
+      await tx.installmentPlan.update({ where: { id }, data: { updatedById: actorId } });
+      const after = await lockPlan(tx, id);
+      await writeAudit(tx, {
+        actorId,
+        entityType: "InstallmentPlan",
+        entityId: id,
+        action: "plan.cancel",
+        before: planSummary(cur),
+        after: planSummary(after),
+        reason,
+      });
+      return planSummary(after);
     }),
   );
 }
