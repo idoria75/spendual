@@ -71,7 +71,7 @@ Início merge and P1 next steps (2026-10-21):
 - ⚠ `Saldo atual` (budget minus spending), `Poupança do mês` (income − expenses − allowances) and `Sem destino` (savings − goal allocations) differ. `Sem destino` equals the savings until goals exist, so Início hides it when equal.
 - Not decided: rename `Poupança do mês`.
 - P1 list: [guide](household-finance-reference-guide.md), "P1 — Important follow-up" and phases 6–7. Proposed order:
-  1. Shared savings goals (`/metas`). Tables `SavingsGoal` and `GoalEntry` exist (`backend/prisma/schema.prisma:354`); `domain/accounting.ts` and `services/dashboard.ts` already read `goalAllocationsNet` (always 0). Missing:
+  1. DONE (2026-10-21, tag `p1-goals`): shared savings goals (`/metas`). Not checked on a real phone. Was: Tables `SavingsGoal` and `GoalEntry` exist (`backend/prisma/schema.prisma:354`); `domain/accounting.ts` and `services/dashboard.ts` already read `goalAllocationsNet` (always 0). Missing:
      - services and routes: create, edit, close, archive; allocate, withdraw; history and balances
      - rules: allocation and withdrawal are not income or expense; withdraw only back to unallocated money; closing with money left asks for a transfer
      - reconciliation tests (the guide requires them)
@@ -99,3 +99,11 @@ Deploy box learnings (2026-10-21). Measured on host `jobs`. ⚠ Assumes this box
 - Other containers share the host (Plex, Metabase, smart_house, b1a-devc images are present). Ports and RAM are shared; check `docker ps` before choosing a port.
 - DECIDED (2026-10-21): `jobs` is the production host. Move the dev data to prod with backup, then restore.
 - ⚠ Dev (`compose.dev.yml`) and prod (`deployment/docker-compose.yml`) both use project name `spendual`, so both use the volume `spendual_mysql_data`. Give prod its own name (e.g. `spendual-prod`) before the first prod run on this host.
+
+P1-1 Metas done (2026-10-21):
+- Built per [plan.md](plan.md) "P1-1". Commits `7e57298` to `a736cff`, tag `p1-goals`.
+- ⚠ `make test` has one timeout: `backend/tests/settings.test.ts` "is not configured when the dir is unset or missing" (two `setup()` calls, about 35 s here, limit 30 s). Not related to goals. Fix: split the test or raise `testTimeout`. Not done.
+- Allocate and withdraw from the UI use today's date, so they count in the current month, even when Início is on another month.
+- `Em metas` on Início is the month's net (allocations − withdrawals), not the total in goals. Revisit with the "Poupança sem destino" question.
+- No CORRECTION UI. `archived` goals are read only. The e2e spec needs `recurring.spec.ts` first (shared `E2E_RUN_ID` in `e2e/playwright.config.ts`).
+- Next P1: audit history (create events, then a viewer), monthly savings target, CSV export.

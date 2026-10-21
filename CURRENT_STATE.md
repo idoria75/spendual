@@ -38,8 +38,9 @@ Post-Phase-2 commits on `dev` (not in the tag): run-as-host-user dev container, 
 | Análises | `backend/src/services/analytics.ts`, `GET /analytics/categories?from=&to=`, `frontend/src/features/analytics` | Spending per month and category with the budget in force. Contract: `packages/shared/src/planning.ts`. Plain SVG chart. |
 | Category usage | `getLookups` in `backend/src/services/catalog.ts` | `usageCount` per category (confirmed records, derived on read). Entry forms sort by it; `/lookups` itself stays by name. Replaces the browser-only recent list. |
 | Category drill-down | `categories` in `transactionListQuerySchema` (`packages/shared/src/transactions.ts`), `listTransactions` in `backend/src/services/transactions.ts`, `frontend/src/features/transactions/drilldown.ts` | Início legend rows open Lançamentos filtered by `?categorias=3,7,none&escopo=household&status=confirmed`. Rows add up to the Início amount (refunds follow their expense's month). `Total do mês` = `netSpent`. |
-| E2E | `e2e/`, `make e2e` | Playwright 1.49.1 pinned (image tag in compose and CI), own DB `spendual_e2e`. Two flows: recurring bill confirmed once; Análises and the Início balance block (`trends.spec.ts`, runs after `recurring.spec.ts`). `SCREENSHOTS=1` takes the matrix. |
-| Tests | `backend/tests`, `frontend/src/**/*.test.*` | 209 backend, 108 frontend, 20 shared, 1 e2e. All pass. |
+| Savings goals (P1-1) | `packages/shared/src/goals.ts`, `backend/src/services/goals.ts`, `backend/src/routes/goals.ts`, `backend/src/lib/audit.ts`, `frontend/src/features/goals`, `/metas` | Create, edit, allocate, withdraw, complete, reopen, archive. Balance derived from `GoalEntry`; row lock on withdraw and close; 409 `goal_has_balance` / `insufficient_balance`; audit on every change. Início shows `Em metas` + `Poupança sem destino` (month only). No CORRECTION UI. Tag `p1-goals`. |
+| E2E | `e2e/`, `make e2e` | Playwright 1.49.1 pinned (image tag in compose and CI), own DB `spendual_e2e`. Three flows: recurring bill confirmed once; goals (`savings-goals.spec.ts`, signs in as the `recurring` user via `E2E_RUN_ID`); Análises and the Início balance block (`trends.spec.ts`). Specs run in file order after `recurring.spec.ts`. `SCREENSHOTS=1` takes the matrix. |
+| Tests | `backend/tests`, `frontend/src/**/*.test.*` | Backend 4 new goals tests, frontend 206, 20 shared, 3 e2e. ⚠ On 2026-10-21 `settings.test.ts` "is not configured when the dir is unset or missing" times out (30 s; it runs `setup()` twice, ~35 s on the slow disk). Not caused by goals. |
 
 ## Verified (2026-10-14)
 
@@ -52,7 +53,7 @@ Post-Phase-2 commits on `dev` (not in the tag): run-as-host-user dev container, 
 ## Missing
 
 - Phase 6 built (see `deployment/README.md`): `Dockerfile`, `deployment/docker-compose.yml`, systemd timer, avahi file, gitleaks and docker build jobs in CI. Verified locally with curl. Not verified: mDNS, Windows, reboot restart, systemd timer on the deploy box, CI on GitHub.
-- AuditEvent table exists; nothing writes to it yet.
+- AuditEvent: written on transaction patch/void/cancel, bill confirm/cancel and every goal change. Still missing: transaction create, rule create/patch, a viewer.
 
 ## Phase 4 (2026-10-14)
 
