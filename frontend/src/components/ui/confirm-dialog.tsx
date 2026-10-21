@@ -40,6 +40,8 @@ export function ConfirmDialog({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    // React events bubble through portals: without this, a confirm inside a form submits that form too.
+    event.stopPropagation();
     if (locked.current) return;
     const trimmed = reason.trim();
     if (reasonRequired && trimmed === "") {
