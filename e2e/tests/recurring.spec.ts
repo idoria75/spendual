@@ -7,7 +7,7 @@ const MONEY = "R$ 123,45";
 const ZERO = "R$ 0,00";
 const PASSWORD = "senha-e2e-1234";
 // Unique per run, so a leftover database cannot break signup.
-const USERNAME = `ana_${Date.now()}`;
+const USERNAME = `ana_${process.env.E2E_RUN_ID ?? Date.now()}`;
 // The rule starts today and runs on today's day, so its first bill is in the current month.
 const TODAY = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
 const MONTH = TODAY.slice(0, 7);

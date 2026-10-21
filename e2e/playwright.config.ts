@@ -12,6 +12,8 @@ if (!databaseName(databaseUrl).includes("e2e")) {
     `Refusing to reset database "${databaseName(databaseUrl)}": name must contain "e2e".`,
   );
 }
+// One id per run, shared by the spec files (the config loads before the workers start).
+process.env.E2E_RUN_ID ??= String(Date.now());
 const env = {
   DATABASE_URL: databaseUrl,
   SESSION_SECRET: process.env.SESSION_SECRET ?? "e2e-only-secret-0123456789-0123456789",
