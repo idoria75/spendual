@@ -240,6 +240,8 @@
     "months": "{{count}} meses",
     "category": "Categoria",
     "all": "Todas",
+    "showCategories": "Mostrar categorias ›",
+    "hideCategories": "‹ Ocultar categorias",
     "average_one": "média, {{count}} mês",
     "average_other": "média, {{count}} meses",
     "averageTitle": "Média: {{amount}}",

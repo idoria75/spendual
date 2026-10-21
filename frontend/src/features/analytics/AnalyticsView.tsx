@@ -9,6 +9,7 @@ import { formatMoney, fromCents, toCents } from "../../lib/currency";
 import { currentMonth } from "../../lib/date";
 import { fetchCategoryTrends } from "../planning/api";
 import { useLoad } from "../planning/use-load";
+import { CategoryPicker } from "../transactions/CategoryPicker";
 import { categoryColor } from "../transactions/CategoryTile";
 import { useLookups } from "../transactions/lookups";
 import { useMonth } from "../transactions/month";
@@ -64,6 +65,7 @@ export function AnalyticsView() {
   const { data: lookups } = useLookups();
   const [range, setRange] = useState<RangeMonths>(6);
   const [selected, setSelected] = useState<Selection>("all");
+  const [pickerOpen, setPickerOpen] = useState(false);
   const current = currentMonth();
   const { from, to } = trendWindow(month, current, range);
   const { data, failed, reload } = useLoad(() => fetchCategoryTrends(from, to), [from, to]);
@@ -84,6 +86,7 @@ export function AnalyticsView() {
         : (categories.find((s) => seriesKey(s) === selected) ?? data.overall);
   const isAll = series !== undefined && series === data?.overall;
   const effective: Selection = series === undefined || isAll ? "all" : seriesKey(series);
+  const title = isAll ? t("analytics.all") : nameOf(series?.categoryId ?? null);
   const color = isAll ? "var(--accent)" : categoryColor(series?.categoryId ?? null);
 
   return (
@@ -119,27 +122,44 @@ export function AnalyticsView() {
         </p>
       ) : (
         <>
-          <div
-            role="group"
-            aria-label={t("analytics.category")}
-            className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1"
-          >
-            <Chip active={effective === "all"} onClick={() => setSelected("all")}>
-              {t("analytics.all")}
-            </Chip>
-            {categories.map((s) => (
-              <Chip
-                key={seriesKey(s)}
-                active={effective === seriesKey(s)}
-                onClick={() => setSelected(seriesKey(s))}
-              >
-                {nameOf(s.categoryId)}
+          <div role="group" aria-label={t("analytics.category")} className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Chip active={effective === "all"} onClick={() => setSelected("all")}>
+                {t("analytics.all")}
               </Chip>
-            ))}
+              {!pickerOpen && effective !== "all" ? (
+                <Chip active onClick={() => setSelected("all")}>
+                  {title}
+                </Chip>
+              ) : null}
+              <button
+                type="button"
+                aria-expanded={pickerOpen}
+                onClick={() => setPickerOpen((open) => !open)}
+                className="min-h-[44px] text-[0.82rem] font-semibold text-accent"
+              >
+                {pickerOpen ? t("analytics.hideCategories") : t("analytics.showCategories")}
+              </button>
+            </div>
+            {pickerOpen ? (
+              <CategoryPicker
+                categories={categories.flatMap((s) =>
+                  s.categoryId === null ? [] : [{ id: s.categoryId, name: nameOf(s.categoryId) }],
+                )}
+                selected={effective === "all" ? [] : [effective === "none" ? null : effective]}
+                onSelect={(id) =>
+                  setSelected((cur) => {
+                    const next: Selection = id === null ? "none" : id;
+                    return cur === next ? "all" : next;
+                  })
+                }
+                showNone={categories.some((s) => s.categoryId === null)}
+              />
+            ) : null}
           </div>
           <Details
             series={series}
-            title={isAll ? t("analytics.all") : nameOf(series.categoryId)}
+            title={title}
             color={color}
             from={from}
             to={to}

@@ -120,6 +120,7 @@ test("Análises: bars, average line and budget line for a category", async ({ pa
   await expect(page.getByRole("img", { name: /Gasto mensal de Todas/ })).toBeVisible();
   await expect(page.getByTestId("trend-bar")).toHaveCount(6);
 
+  await page.getByRole("button", { name: "Mostrar categorias ›" }).click();
   await page.getByRole("button", { name: "Mercado" }).click();
   await expect(page.getByRole("img", { name: /Gasto mensal de Mercado/ })).toBeVisible();
   // Flat lines have no height, so Playwright calls them hidden. Check that they are drawn.

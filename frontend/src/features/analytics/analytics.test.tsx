@@ -82,6 +82,8 @@ describe("Análises", () => {
     expect(await screen.findByRole("img", { name: /Gasto mensal de Todas/ })).toBeInTheDocument();
     expect(queries[0]).toBe(`from=${shiftMonth(to, -5)}&to=${to}`);
     expect(screen.getByRole("button", { name: "Todas" })).toHaveAttribute("aria-pressed", "true");
+    // The category tiles stay hidden until asked for.
+    expect(screen.queryByRole("button", { name: "Mercado" })).not.toBeInTheDocument();
     // 4 bars, the last one is the month in progress.
     const bars = screen.getAllByTestId("trend-bar");
     expect(bars).toHaveLength(4);
@@ -98,7 +100,8 @@ describe("Análises", () => {
   it("shows average, current budget and months above for a category", async () => {
     mockFetch(handler);
     renderAnalises();
-    await userEvent.click(await screen.findByRole("button", { name: "Mercado" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Mostrar categorias ›" }));
+    await userEvent.click(screen.getByRole("button", { name: "Mercado" }));
     const chart = await screen.findByRole("img", { name: /Gasto mensal de Mercado/ });
     expect(chart).toBeInTheDocument();
     expect(screen.getByText("R$ 123,33")).toBeInTheDocument();
@@ -118,11 +121,24 @@ describe("Análises", () => {
   it("says 'sem orçamento' and draws no budget line when the category has none", async () => {
     mockFetch(handler);
     renderAnalises();
-    await userEvent.click(await screen.findByRole("button", { name: "Lazer" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Mostrar categorias ›" }));
+    await userEvent.click(screen.getByRole("button", { name: "Lazer" }));
     await screen.findByRole("img", { name: /Gasto mensal de Lazer/ });
     expect(screen.queryByTestId("trend-budget")).not.toBeInTheDocument();
     expect(screen.getAllByText("sem orçamento").length).toBeGreaterThan(0);
     expect(screen.queryByText("Orçamento")).not.toBeInTheDocument();
+  });
+
+  it("goes back to Todas when the chosen tile is tapped again", async () => {
+    mockFetch(handler);
+    renderAnalises();
+    await userEvent.click(await screen.findByRole("button", { name: "Mostrar categorias ›" }));
+    await userEvent.click(screen.getByRole("button", { name: "Mercado" }));
+    await screen.findByRole("img", { name: /Gasto mensal de Mercado/ });
+    await userEvent.click(screen.getByRole("button", { name: "Mercado", pressed: true }));
+    expect(await screen.findByRole("img", { name: /Gasto mensal de Todas/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "‹ Ocultar categorias" }));
+    expect(screen.queryByRole("button", { name: "Mercado" })).not.toBeInTheDocument();
   });
 
   it("asks for 12 months when chosen", async () => {
