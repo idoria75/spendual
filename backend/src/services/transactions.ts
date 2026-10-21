@@ -9,6 +9,7 @@ import type {
 } from "@spendual/shared";
 import { parseCategoryList } from "@spendual/shared";
 import { AppError } from "../auth/errors.js";
+import { writeAudit } from "../lib/audit.js";
 import { dateOnlyToDate, nextPeriod } from "../lib/period.js";
 import { parseMoney, toAuditDto, toTransactionDto } from "../lib/serialize.js";
 import { withRetry } from "../lib/withRetry.js";
@@ -209,28 +210,6 @@ export function createTransaction(
   );
 }
 
-function audit(
-  tx: Db,
-  actorId: number,
-  id: number,
-  action: string,
-  before: Transaction,
-  after: Transaction,
-  reason: string | null,
-) {
-  return tx.auditEvent.create({
-    data: {
-      actorId,
-      entityType: ENTITY,
-      entityId: String(id),
-      action,
-      before: before,
-      after: after,
-      reason,
-    },
-  });
-}
-
 function requireStatus(row: TxRow, status: TxRow["status"]): void {
   if (row.status !== status) {
     throw new AppError(409, "invalid_state", `Transaction is ${row.status}, not ${status}`);
@@ -312,7 +291,14 @@ export function patchTransaction(
         },
       });
       const after = toTransactionDto(row);
-      await audit(tx, actorId, id, "transaction.update", toTransactionDto(cur), after, null);
+      await writeAudit(tx, {
+        actorId,
+        entityType: ENTITY,
+        entityId: id,
+        action: "transaction.update",
+        before: toTransactionDto(cur),
+        after,
+      });
       return after;
     }),
   );
@@ -344,15 +330,15 @@ function closeTransaction(
         data: { status: to, voidReason: reason, updatedById: actorId },
       });
       const after = toTransactionDto(row);
-      await audit(
-        tx,
+      await writeAudit(tx, {
         actorId,
-        id,
-        `transaction.${to === "voided" ? "void" : "cancel"}`,
-        toTransactionDto(cur),
+        entityType: ENTITY,
+        entityId: id,
+        action: `transaction.${to === "voided" ? "void" : "cancel"}`,
+        before: toTransactionDto(cur),
         after,
         reason,
-      );
+      });
       return after;
     }),
   );

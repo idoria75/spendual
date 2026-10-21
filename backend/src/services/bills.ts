@@ -27,6 +27,7 @@ import {
   nextPeriod,
 } from "../lib/period.js";
 import { parseMoney } from "../lib/serialize.js";
+import { writeAudit } from "../lib/audit.js";
 import { withRetry } from "../lib/withRetry.js";
 import { generateForAllRules } from "./dashboard.js";
 import { buildInstallmentRows } from "./installments.js";
@@ -354,16 +355,14 @@ function auditBill(
   after: Bill,
   reason: string | null,
 ) {
-  return tx.auditEvent.create({
-    data: {
-      actorId,
-      entityType: before.kind === "recurrence" ? "RecurrenceOccurrence" : "InstallmentOccurrence",
-      entityId: String(before.id),
-      action,
-      before: before,
-      after: after,
-      reason,
-    },
+  return writeAudit(tx, {
+    actorId,
+    entityType: before.kind === "recurrence" ? "RecurrenceOccurrence" : "InstallmentOccurrence",
+    entityId: before.id,
+    action,
+    before,
+    after,
+    reason,
   });
 }
 
