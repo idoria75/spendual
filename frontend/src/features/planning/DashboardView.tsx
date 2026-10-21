@@ -184,8 +184,9 @@ function BalanceCard({ d }: { d: Dashboard }) {
 function MonthResult({ d }: { d: Dashboard }) {
   const { t } = useTranslation();
   const savings = toCents(d.savingsBeforeGoals);
-  // Goals are not built yet, so the two savings numbers match; show the second one only when they differ.
-  const showUnallocated = toCents(d.unallocatedSavings) !== savings;
+  // With no goal money in the month the two savings numbers match; show the split only then.
+  const goalNet = toCents(d.goalAllocationsNet);
+  const showUnallocated = goalNet !== 0n;
   return (
     <details className="group border-t border-line pt-1">
       <summary className="flex min-h-[44px] cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
@@ -211,7 +212,13 @@ function MonthResult({ d }: { d: Dashboard }) {
         <ResultRow label={t("dashboard.sharedExpenses")} value={formatMoney(d.sharedExpensesNet)} />
         <ResultRow label={t("dashboard.allowances")} value={formatMoney(d.allowanceAllocations)} />
         {showUnallocated ? (
-          <ResultRow label={t("dashboard.unallocated")} value={formatMoney(d.unallocatedSavings)} />
+          <>
+            <ResultRow label={t("dashboard.inGoals")} value={formatMoney(d.goalAllocationsNet)} />
+            <ResultRow
+              label={t("dashboard.unallocated")}
+              value={formatMoney(d.unallocatedSavings)}
+            />
+          </>
         ) : null}
       </dl>
       <p className="pb-1 text-[0.78rem] text-muted">{t("dashboard.savingsHint")}</p>

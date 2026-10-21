@@ -156,7 +156,7 @@ describe("Início", () => {
     expect(within(details).getByText("R$ 5.000,00")).toBeVisible();
     expect(within(details).getByText("R$ 2.000,00")).toBeVisible();
     expect(within(details).getByText("Receitas − despesas − mesadas")).toBeVisible();
-    // Goals are not built: "sem destino" equals the savings, so it is not shown. No savings rate.
+    // No goal money this month: "sem destino" equals the savings, so it is not shown. No savings rate.
     expect(within(block).queryByText("Poupança sem destino")).not.toBeInTheDocument();
     expect(screen.queryByText("Taxa de poupança")).not.toBeInTheDocument();
     expect(screen.queryByText(/^Olá/)).not.toBeInTheDocument();
@@ -168,17 +168,23 @@ describe("Início", () => {
     expect(screen.getByText("▲ R$ 1.000,00 acima")).toBeInTheDocument();
   });
 
-  it("shows 'sem destino' only when it differs from the savings", async () => {
+  it("shows 'Em metas' and 'sem destino' only when goals hold money this month", async () => {
     mockFetch(
       base((req) =>
         req.url.startsWith("/api/dashboard")
-          ? json(200, { ...dashboard, unallocatedSavings: "1500.00" })
+          ? json(200, {
+              ...dashboard,
+              goalAllocationsNet: "500.00",
+              unallocatedSavings: "1500.00",
+            })
           : undefined,
       ),
     );
     renderAt("/");
     const block = await screen.findByRole("region", { name: "Saldo atual" });
     expect(within(block).getByText("Poupança sem destino")).toBeInTheDocument();
+    expect(within(block).getByText("Em metas")).toBeInTheDocument();
+    expect(within(block).getByText("R$ 500,00", { selector: "dd" })).toBeInTheDocument();
     expect(within(block).getByText("R$ 1.500,00", { selector: "dd" })).toBeInTheDocument();
   });
 
