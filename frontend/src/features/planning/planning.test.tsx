@@ -104,6 +104,7 @@ function base(extra?: Extra): Handler {
     if (path === "/api/bills")
       return json(200, { month, items: bills, overdue, plannedTotal: "190.00", unknownCount: 1 });
     if (path === "/api/recurrence-rules") return json(200, { items: [] });
+    if (path === "/api/installment-plans" && req.method === "GET") return json(200, { items: [] });
     if (path === "/api/budgets" && req.method === "GET")
       return json(200, {
         month,

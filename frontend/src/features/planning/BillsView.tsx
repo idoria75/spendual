@@ -1,4 +1,4 @@
-import type { Bill, RecurrenceRule } from "@spendual/shared";
+import type { Bill, InstallmentPlanSummary, RecurrenceRule } from "@spendual/shared";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -15,12 +15,17 @@ import { toneColor } from "../transactions/display";
 import { useEntry } from "../transactions/entry";
 import { useLookups, useSingleUser } from "../transactions/lookups";
 import { useMonth } from "../transactions/month";
-import { cancelBill, fetchBills, fetchRules } from "./api";
+import { cancelBill, fetchBills, fetchPlans, fetchRules } from "./api";
 import { CreateSheet, type CreateKind } from "./CreateSheet";
+import { PlanSheet, RuleSheet } from "./EditSheets";
 import { MoneyOrUnknown } from "./display";
 import { useLoad } from "./use-load";
 
 type Tab = "upcoming" | "recurring" | "installments";
+
+/** Paid is green, cancelled is red; the word is always written too. */
+const statusColor = (status: Bill["status"]): string =>
+  status === "confirmed" ? "text-pos" : status === "cancelled" ? "text-err" : "";
 
 export function BillRow({ bill, onOpen, late }: { bill: Bill; onOpen: () => void; late: boolean }) {
   const { t } = useTranslation();
@@ -29,6 +34,7 @@ export function BillRow({ bill, onOpen, late }: { bill: Bill; onOpen: () => void
     (u) => u.id === (bill.scope === "personal" ? bill.ownerId : bill.payerId),
   );
   const done = bill.status !== "planned";
+  const doneText = done ? ` · ${t(`bills.status.${bill.status}`)}` : "";
   const seq =
     bill.sequenceNumber !== null && bill.installmentCount !== null
       ? ` · ${bill.sequenceNumber}/${bill.installmentCount}`
@@ -54,7 +60,9 @@ export function BillRow({ bill, onOpen, late }: { bill: Bill; onOpen: () => void
           <span className={cn("block truncate text-[12px] text-muted", late && "text-warn")}>
             {t("bills.due", { date: formatDayMonth(bill.dueDate) })}
             {late ? ` · ${t("bills.late")}` : ""}
-            {done ? ` · ${t(`bills.status.${bill.status}`)}` : ""}
+            {done ? (
+              <span className={cn("font-semibold", statusColor(bill.status))}>{doneText}</span>
+            ) : null}
           </span>
         </span>
         <span className="whitespace-nowrap text-[15px] font-semibold tabular-nums">
@@ -144,7 +152,13 @@ function Upcoming({
   );
 }
 
-function Rules({ rules }: { rules: RecurrenceRule[] }) {
+function Rules({
+  rules,
+  onOpen,
+}: {
+  rules: RecurrenceRule[];
+  onOpen: (r: RecurrenceRule) => void;
+}) {
   const { t } = useTranslation();
   if (rules.length === 0) return <p className="text-muted">{t("bills.noRules")}</p>;
   return (
@@ -155,21 +169,77 @@ function Rules({ rules }: { rules: RecurrenceRule[] }) {
           t(`bills.ruleState.${r.state}`),
         ].join(" · ");
         return (
-          <li
-            key={r.id}
-            className="grid min-h-[56px] grid-cols-[1fr_auto] items-center gap-3 rounded-input bg-surface px-3 py-2"
-          >
-            <span className="min-w-0">
-              <span className="block truncate font-semibold">{r.description}</span>
-              <span className="block truncate text-[12px] text-muted">{meta}</span>
-            </span>
-            <span className="whitespace-nowrap font-semibold tabular-nums">
-              <MoneyOrUnknown value={r.expectedAmount} />
-            </span>
+          <li key={r.id}>
+            <button
+              type="button"
+              onClick={() => onOpen(r)}
+              className="grid min-h-[56px] w-full grid-cols-[1fr_auto] items-center gap-3 rounded-input bg-surface px-3 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <span className="min-w-0">
+                <span className="block truncate font-semibold">{r.description}</span>
+                <span className="block truncate text-[12px] text-muted">{meta}</span>
+              </span>
+              <span className="whitespace-nowrap font-semibold tabular-nums">
+                <MoneyOrUnknown value={r.expectedAmount} />
+              </span>
+            </button>
           </li>
         );
       })}
     </ul>
+  );
+}
+
+const PLAN_COLOR: Record<InstallmentPlanSummary["status"], string> = {
+  active: "text-muted",
+  finished: "text-pos",
+  cancelled: "text-err",
+};
+
+function PlanStatus({ status }: { status: InstallmentPlanSummary["status"] }) {
+  const { t } = useTranslation();
+  const text = ` · ${t(`bills.plans.status.${status}`)}`;
+  return <span className={cn("font-semibold", PLAN_COLOR[status])}>{text}</span>;
+}
+
+function Plans({
+  plans,
+  onOpen,
+}: {
+  plans: InstallmentPlanSummary[];
+  onOpen: (p: InstallmentPlanSummary) => void;
+}) {
+  const { t } = useTranslation();
+  if (plans.length === 0) return null;
+  return (
+    <section aria-label={t("bills.plans.title")} className="flex flex-col gap-2">
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.07em] text-muted">
+        {t("bills.plans.title")}
+      </h2>
+      <ul className="flex flex-col gap-2">
+        {plans.map((p) => (
+          <li key={p.id}>
+            <button
+              type="button"
+              onClick={() => onOpen(p)}
+              className="grid min-h-[56px] w-full grid-cols-[1fr_auto] items-center gap-3 rounded-input bg-surface px-3 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <span className="min-w-0">
+                <span className="block truncate font-semibold">{p.description}</span>
+                <span className="block truncate text-[12px] text-muted">
+                  {t("bills.plans.progress", { paid: p.paidCount, count: p.installmentCount })}
+                  <PlanStatus status={p.status} />
+                </span>
+              </span>
+              <span className="whitespace-nowrap text-right tabular-nums">
+                <span className="block font-semibold">{formatMoney(p.remainingAmount)}</span>
+                <span className="block text-[12px] text-muted">{t("bills.plans.remaining")}</span>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -227,7 +297,9 @@ function BillDetail({
               <Button onClick={() => onConfirm(bill)}>{t("bills.confirm")}</Button>
             </div>
           ) : (
-            <p className="text-muted">{t(`bills.status.${bill.status}`)}</p>
+            <p className={cn("font-semibold", statusColor(bill.status))}>
+              {t(`bills.status.${bill.status}`)}
+            </p>
           )}
         </div>
       ) : null}
@@ -247,6 +319,9 @@ export function BillsView() {
   const [creating, setCreating] = useState<CreateKind | null>(null);
   const bills = useLoad(() => fetchBills(month), [month, version]);
   const rules = useLoad(() => fetchRules(), [version]);
+  const plans = useLoad(() => fetchPlans(), [version]);
+  const [editingRule, setEditingRule] = useState<RecurrenceRule | null>(null);
+  const [editingPlan, setEditingPlan] = useState<InstallmentPlanSummary | null>(null);
 
   const failed = tab === "recurring" ? rules.failed : bills.failed;
   const retry = tab === "recurring" ? rules.reload : bills.reload;
@@ -316,7 +391,7 @@ export function BillsView() {
             {t("common.loading")}
           </p>
         ) : (
-          <Rules rules={rules.data.items} />
+          <Rules rules={rules.data.items} onOpen={setEditingRule} />
         )
       ) : list === null ? (
         <p role="status" className="py-6 text-muted">
@@ -331,13 +406,16 @@ export function BillsView() {
           onOpen={setSelected}
         />
       ) : (
-        <Upcoming
-          bills={shown}
-          overdue={overdue}
-          grouped={month === currentMonth()}
-          emptyKey="bills.emptyInstallments"
-          onOpen={setSelected}
-        />
+        <>
+          {plans.data ? <Plans plans={plans.data.items} onOpen={setEditingPlan} /> : null}
+          <Upcoming
+            bills={shown}
+            overdue={overdue}
+            grouped={month === currentMonth()}
+            emptyKey="bills.emptyInstallments"
+            onOpen={setSelected}
+          />
+        </>
       )}
 
       <BillDetail
@@ -369,6 +447,24 @@ export function BillsView() {
           await cancelBill(cancelling.kind, cancelling.id, reason);
           setCancelling(null);
           showToast(t("bills.cancelled"));
+          notifySaved();
+        }}
+      />
+      <RuleSheet
+        rule={editingRule}
+        onClose={() => setEditingRule(null)}
+        onSaved={(message) => {
+          setEditingRule(null);
+          if (message) showToast(message);
+          notifySaved();
+        }}
+      />
+      <PlanSheet
+        plan={editingPlan}
+        onClose={() => setEditingPlan(null)}
+        onSaved={(message) => {
+          setEditingPlan(null);
+          if (message) showToast(message);
           notifySaved();
         }}
       />

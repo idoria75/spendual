@@ -6,6 +6,9 @@ import {
   categoryTrendsSchema,
   dashboardSchema,
   installmentPlanDetailSchema,
+  installmentPlanListSchema,
+  installmentPlanSummarySchema,
+  recurrenceRuleSchema,
   recurrenceRuleListSchema,
   setupStatusSchema,
   type AllowanceCreate,
@@ -20,6 +23,11 @@ import {
   type Dashboard,
   type InstallmentPlanCreate,
   type InstallmentPlanDetail,
+  type InstallmentPlanList,
+  type InstallmentPlanPatch,
+  type InstallmentPlanSummary,
+  type RecurrenceRule,
+  type RecurrenceRulePatch,
   type RecurrenceRuleCreate,
   type RecurrenceRuleList,
   type SetupStatus,
@@ -43,6 +51,17 @@ export const fetchBills = (month: string): Promise<BillList> =>
   api.get(`/bills?month=${month}`, billListSchema);
 export const fetchRules = (): Promise<RecurrenceRuleList> =>
   api.get("/recurrence-rules", recurrenceRuleListSchema);
+export const patchRule = (id: number, body: RecurrenceRulePatch): Promise<RecurrenceRule> =>
+  api.patch(`/recurrence-rules/${id}`, body, recurrenceRuleSchema);
+export const fetchPlans = (): Promise<InstallmentPlanList> =>
+  api.get("/installment-plans", installmentPlanListSchema);
+export const patchPlan = (
+  id: number,
+  body: InstallmentPlanPatch,
+): Promise<InstallmentPlanSummary> =>
+  api.patch(`/installment-plans/${id}`, body, installmentPlanSummarySchema);
+export const cancelPlan = (id: number, reason: string): Promise<InstallmentPlanSummary> =>
+  api.post(`/installment-plans/${id}/cancel`, { reason }, installmentPlanSummarySchema);
 export const createRule = (body: RecurrenceRuleCreate): Promise<BillList> =>
   api.post("/recurrence-rules", body, billListSchema);
 export const createPlan = (body: InstallmentPlanCreate): Promise<InstallmentPlanDetail> =>
