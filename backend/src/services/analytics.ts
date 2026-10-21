@@ -6,7 +6,8 @@ import { budgetKey } from "./budget.js";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
-export const MAX_TREND_MONTHS = 12;
+/** Longest range, and how far back it may start. Plenty for a household; the query stays small. */
+export const MAX_TREND_MONTHS = 60;
 
 const cents = (d: Prisma.Decimal): bigint => moneyToCents(d.toFixed(2));
 

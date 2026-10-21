@@ -43,8 +43,10 @@ describe("category trends", () => {
     expect((await bad("from=2027-13&to=2027-03")).status).toBe(400);
     expect((await bad("from=2027-03&to=2027-01")).status).toBe(400); // from after to
     expect((await bad("from=2027-01&to=2027-04")).status).toBe(400); // to after the current month
-    expect((await bad("from=2025-01&to=2027-03")).status).toBe(400); // outside the window
-    expect((await bad("from=2026-03&to=2027-03")).status).toBe(400); // 13 months
+    expect((await bad("from=2021-02&to=2027-03")).status).toBe(400); // 62 months, too far back
+    expect((await bad("from=2022-03&to=2027-03")).status).toBe(400); // 61 months
+    expect((await bad("from=2022-04&to=2027-03")).status).toBe(200); // 60 months
+    expect((await bad("from=2026-03&to=2027-03")).status).toBe(200); // 13 months now fine
     expect((await bad("from=2026-04&to=2027-03")).status).toBe(200); // 12 months
   });
 

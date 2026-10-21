@@ -65,6 +65,9 @@ export function currentPeriod(now: Date = new Date()): PeriodKey {
 export const MONTHS_BACK = 12;
 export const MONTHS_AHEAD = 24;
 
+/** Análises may start this many months back (own limit, longer than the usual window). */
+export const TREND_MONTHS_BACK = 60;
+
 export function isMonthInWindow(key: PeriodKey, now: Date = new Date()): boolean {
   const cur = currentPeriod(now);
   return key >= addPeriods(cur, -MONTHS_BACK) && key <= addPeriods(cur, MONTHS_AHEAD);

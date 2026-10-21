@@ -17,7 +17,14 @@ import {
   type RecurrenceRuleList,
 } from "@spendual/shared";
 import { AppError, asyncHandler } from "../auth/errors.js";
-import { MONTHS_AHEAD, MONTHS_BACK, currentPeriod, isMonthInWindow } from "../lib/period.js";
+import {
+  MONTHS_AHEAD,
+  MONTHS_BACK,
+  TREND_MONTHS_BACK,
+  addPeriods,
+  currentPeriod,
+  isMonthInWindow,
+} from "../lib/period.js";
 import { MAX_TREND_MONTHS, getCategoryTrends, monthsBetween } from "../services/analytics.js";
 import * as bills from "../services/bills.js";
 import {
@@ -61,7 +68,9 @@ export function planningRouter(prisma: PrismaClient, clock: () => Date = () => n
       const { from, to } = categoryTrendsQuerySchema.parse(req.query);
       const now = clock();
       const problems: Record<string, string> = {};
-      if (!isMonthInWindow(from, now)) problems.from = `Must be within ${MONTHS_BACK} months back`;
+      if (from < addPeriods(currentPeriod(now), -TREND_MONTHS_BACK)) {
+        problems.from = `Must be within ${TREND_MONTHS_BACK} months back`;
+      }
       if (to > currentPeriod(now)) problems.to = "Must not be after the current month";
       if (from > to) problems.to = "Must not be before from";
       else if (monthsBetween(from, to).length > MAX_TREND_MONTHS) {

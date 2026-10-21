@@ -297,8 +297,8 @@ export type SetupStatus = z.infer<typeof setupStatusSchema>;
  *   GET /analytics/categories?from=&to=   -> 200 CategoryTrends
  *
  * Rules:
- *  - `from` and `to` are period keys, `from <= to`, at most 12 months, `to` not after the
- *    current month, both inside the usual month window.
+ *  - `from` and `to` are period keys, `from <= to`, at most 60 months, `to` not after the
+ *    current month, `from` at most 60 months before the current month.
  *  - Amounts are household expenses, confirmed, net of linked refunds. A refund counts in the
  *    month of its expense. Personal spending is not included. Same rule as the dashboard chart.
  *  - `overall` covers every household expense (also those with no category); its budget is the
