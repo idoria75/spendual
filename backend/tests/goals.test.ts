@@ -30,6 +30,11 @@ const tx = (body: Record<string, unknown>) =>
     description: "x",
     ...body,
   });
+/** Household income of the month, so there is something to deposit. */
+const fund = async (amount: string) => {
+  const res = await tx({ type: "income", amount, categoryId: ctx.incomeCategoryId });
+  expect(res.status).toBe(201);
+};
 const newGoal = async (name: string, extra: Record<string, unknown> = {}) => {
   const res = await send(ctx.ana, "post", "/api/goals", { name, ...extra });
   expect(res.status).toBe(201);
@@ -82,6 +87,16 @@ describe("goals", () => {
     // Another month is not touched.
     expect((await dash("2027-04")).goalAllocationsNet).toBe("0.00");
 
+    // Money you do not have: 1.500,00 is free, so 1.500,01 is refused and 1.500,00 is not.
+    const broke = await move(trip.id, "allocations", "1500.01");
+    expect(broke.status).toBe(409);
+    expect(broke.body.error.code).toBe("insufficient_savings");
+    expect((await dash()).unallocatedSavings).toBe("1500.00");
+    expect((await move(trip.id, "allocations", "1500.00")).body.balance).toBe("2500.00");
+    expect((await dash()).unallocatedSavings).toBe("0.00");
+    expect((await move(trip.id, "withdrawals", "1500.00")).body.balance).toBe("1000.00");
+    expect((await dash()).unallocatedSavings).toBe("1500.00");
+
     // Withdrawal: over the balance fails, within it returns money to unallocated.
     const over = await move(trip.id, "withdrawals", "1000.01");
     expect(over.status).toBe(409);
@@ -107,19 +122,30 @@ describe("goals", () => {
     expect(trends.body.overall.points[0].amount).toBe("5000.00");
   });
 
-  it("allows only one of two parallel withdrawals", async () => {
+  it("lets only one of two parallel over-allocations or withdrawals win", async () => {
+    await fund("100.00");
     const g = await newGoal("Reserva");
-    await move(g.id, "allocations", "100.00");
+    const h = await newGoal("Outra");
+    // Two goals race for the same 100,00: one wins.
+    const race = await Promise.all([
+      move(g.id, "allocations", "100.00", ctx.ana),
+      move(h.id, "allocations", "100.00", ctx.beto),
+    ]);
+    expect(race.map((r) => r.status).sort()).toEqual([201, 409]);
+    expect((await dash()).unallocatedSavings).toBe("0.00");
+    const won = race[0]!.status === 201 ? g : h;
+
     const [a, b] = await Promise.all([
-      move(g.id, "withdrawals", "80.00", ctx.ana),
-      move(g.id, "withdrawals", "80.00", ctx.beto),
+      move(won.id, "withdrawals", "80.00", ctx.ana),
+      move(won.id, "withdrawals", "80.00", ctx.beto),
     ]);
     expect([a.status, b.status].sort()).toEqual([201, 409]);
     const list = goalListSchema.parse((await ctx.ana.get("/api/goals")).body).items;
-    expect(list[0]!.balance).toBe("20.00");
+    expect(list.find((x) => x.id === won.id)!.balance).toBe("20.00");
   });
 
   it("closes only at zero, reopens, and treats archived as final", async () => {
+    await fund("100.00");
     const g = await newGoal("Casa");
     await move(g.id, "allocations", "50.00");
     const blocked = await act(g.id, "complete");

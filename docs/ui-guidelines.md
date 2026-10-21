@@ -283,7 +283,7 @@ are transparent cut-outs, so it works on light and dark. The colors are fixed; t
 | Orçamentos | `/orcamentos` | Overall budget card, then one row per category. | Edit asks `Só <mês>` or `De <mês> em diante`. Past months never change. |
 | Análises | `/analises` | Category chips, 3 number tiles (average, budget, months above), trend chart, month list. `6 meses | 12 meses`. | Reached from `Mais` (phone) and the sidebar. Household spending only. Month selector sets the last month. No budget: no gray line, text `sem orçamento`. |
 | Pessoal | `/pessoal` | Phone: segmented per person. Desktop: two columns. | Reached only from `Mais`. Balance, previous balance, allowance, spending, then the person's records. Both people see everything. |
-| Metas (P1) | `/metas` | Unallocated savings card, then one card per goal with progress. | `Alocar` / `Retirar`. Closing a goal with money left asks for a transfer first. |
+| Metas (P1) | `/metas` | Unallocated savings card, then one card per goal with progress. | `Depositar` / `Retirar`. Closing a goal with money left asks for a transfer first. |
 | Ajustes | `/ajustes` | Profile card, then list rows. | Name, user tone (taken tone disabled), theme, categories, accounts, payment methods, allowance, backup status, `Sair`. |
 | Mais (phone) | `/mais` | List with icon, name, one-line description. | Items: Orçamentos, Pessoal, Metas, Ajustes. |
 

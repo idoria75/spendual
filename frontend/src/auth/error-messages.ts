@@ -18,6 +18,7 @@ export const errorMessageKey = {
   allocation_exists: "errors.allocation_exists",
   goal_has_balance: "errors.goal_has_balance",
   insufficient_balance: "errors.insufficient_balance",
+  insufficient_savings: "errors.insufficient_savings",
   tone_taken: "errors.tone_taken",
   internal_error: "errors.internal_error",
 } as const satisfies Record<ApiErrorCode, string>;

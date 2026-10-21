@@ -8,8 +8,8 @@ import { Button } from "../../components/ui/button";
 import { ConfirmDialog } from "../../components/ui/confirm-dialog";
 import { Field } from "../../components/ui/field";
 import { Sheet } from "../../components/ui/sheet";
-import { formatAmountInput, formatMoney, parseAmountInput } from "../../lib/currency";
-import { formatDate, parseDateInput, today } from "../../lib/date";
+import { formatAmountInput, formatMoney, parseAmountInput, toCents } from "../../lib/currency";
+import { formatDate, today } from "../../lib/date";
 import { allocateGoal, createGoal, patchGoal, withdrawGoal } from "./api";
 
 type ErrorKey = ReturnType<typeof messageKeyFor>;
@@ -48,12 +48,14 @@ function useSubmit() {
 interface MoveProps {
   goal: Goal | null;
   kind: "allocate" | "withdraw";
+  /** Unallocated savings: a deposit cannot be above it. */
+  free: string | null;
   onClose: () => void;
   onSaved: () => void;
 }
 
-/** `Alocar` and `Retirar`. A withdrawal asks for a confirmation first (ui-guidelines §6.8). */
-export function MoveSheet({ goal, kind, onClose, onSaved }: MoveProps) {
+/** `Depositar` and `Retirar`. A withdrawal asks for a confirmation first (ui-guidelines §6.8). */
+export function MoveSheet({ goal, kind, free, onClose, onSaved }: MoveProps) {
   const { t } = useTranslation();
   return (
     <Sheet
@@ -61,12 +63,17 @@ export function MoveSheet({ goal, kind, onClose, onSaved }: MoveProps) {
       onOpenChange={(open) => !open && onClose()}
       title={goal ? t(`goals.${kind}Title`, { name: goal.name }) : ""}
     >
-      {goal ? <MoveForm goal={goal} kind={kind} onSaved={onSaved} /> : null}
+      {goal ? <MoveForm goal={goal} kind={kind} free={free} onSaved={onSaved} /> : null}
     </Sheet>
   );
 }
 
-function MoveForm({ goal, kind, onSaved }: Omit<MoveProps, "goal" | "onClose"> & { goal: Goal }) {
+function MoveForm({
+  goal,
+  kind,
+  free,
+  onSaved,
+}: Omit<MoveProps, "goal" | "onClose"> & { goal: Goal }) {
   const { t } = useTranslation();
   const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
@@ -87,7 +94,8 @@ function MoveForm({ goal, kind, onSaved }: Omit<MoveProps, "goal" | "onClose"> &
       amount: parseAmountInput(amount) ?? "",
       ...(notes.trim() !== "" ? { notes } : {}),
     });
-    if (!parsed.success) {
+    const limit = kind === "allocate" ? free : goal.balance;
+    if (!parsed.success || (limit !== null && toCents(parsed.data.amount) > toCents(limit))) {
       setAmountError(true);
       return;
     }
@@ -102,17 +110,23 @@ function MoveForm({ goal, kind, onSaved }: Omit<MoveProps, "goal" | "onClose"> &
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-3">
-      {kind === "withdraw" ? (
-        <p className="text-[0.85rem] text-muted">
-          {t("goals.available", { amount: formatMoney(goal.balance) })}
-        </p>
-      ) : null}
+      <p className="text-[0.85rem] text-muted">
+        {kind === "withdraw"
+          ? t("goals.available", { amount: formatMoney(goal.balance) })
+          : free !== null
+            ? t("goals.availableFree", { amount: formatMoney(free) })
+            : null}
+      </p>
       <AmountField
         label={t("goals.amount")}
         placeholder={t("form.amountPlaceholder")}
         value={amount}
         onValueChange={setAmount}
-        error={amountError ? t("form.errors.amount") : undefined}
+        error={
+          amountError
+            ? t(kind === "allocate" ? "goals.errors.overFree" : "goals.errors.overBalance")
+            : undefined
+        }
       />
       <Field
         label={t("form.notes")}
@@ -172,14 +186,14 @@ function GoalForm({ goal, onSaved }: { goal: Goal | null; onSaved: () => void })
   const [target, setTarget] = useState(
     goal?.targetAmount ? formatAmountInput(goal.targetAmount) : "",
   );
-  const [date, setDate] = useState(goal?.targetDate ? formatDate(goal.targetDate) : "");
-  const [errors, setErrors] = useState<{ name?: boolean; target?: boolean; date?: boolean }>({});
+  const [date, setDate] = useState(goal?.targetDate ?? "");
+  const [errors, setErrors] = useState<{ name?: boolean; target?: boolean }>({});
   const { busy, error, run } = useSubmit();
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const targetAmount = target.trim() === "" ? null : parseAmountInput(target);
-    const targetDate = date.trim() === "" ? null : parseDateInput(date);
+    const targetDate = date === "" ? null : date;
     const body = {
       name,
       description: description.trim() === "" ? null : description,
@@ -190,10 +204,9 @@ function GoalForm({ goal, onSaved }: { goal: Goal | null; onSaved: () => void })
     const bad = {
       name: !parsed.success && parsed.error.issues.some((i) => i.path[0] === "name"),
       target: target.trim() !== "" && targetAmount === null,
-      date: date.trim() !== "" && targetDate === null,
     };
     setErrors(bad);
-    if (!parsed.success || bad.target || bad.date) return;
+    if (!parsed.success || bad.target) return;
     void run(async () => {
       await (goal ? patchGoal(goal.id, parsed.data) : createGoal(parsed.data));
       onSaved();
@@ -225,13 +238,10 @@ function GoalForm({ goal, onSaved }: { goal: Goal | null; onSaved: () => void })
         error={errors.target ? t("form.errors.amount") : undefined}
       />
       <Field
+        type="date"
         label={t("goals.targetDate")}
-        placeholder={t("goals.datePlaceholder")}
-        inputMode="numeric"
         value={date}
         onChange={(e) => setDate(e.target.value)}
-        autoComplete="off"
-        error={errors.date ? t("goals.dateInvalid") : undefined}
       />
       <FormError error={error} />
       <Button type="submit" disabled={busy} className="w-full">

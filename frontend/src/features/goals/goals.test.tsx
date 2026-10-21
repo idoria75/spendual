@@ -39,6 +39,25 @@ const handler: Handler = (req) => {
     }
     return json(path?.endsWith("s") ? 201 : 200, goal());
   }
+  if (path === "/api/dashboard") {
+    const zero = "0.00";
+    return json(200, {
+      month: "2026-10",
+      householdIncome: zero,
+      sharedExpensesNet: zero,
+      allowanceAllocations: zero,
+      savingsBeforeGoals: "300.00",
+      goalAllocationsNet: zero,
+      unallocatedSavings: "300.00",
+      savingsRate: null,
+      plannedBillsTotal: zero,
+      plannedBillsUnknownCount: 0,
+      overallBudget: { budget: null, spent: zero },
+      categorySpending: [],
+      upcoming: [],
+      people: [],
+    });
+  }
   return shellStubs(req.url) ?? json(404, {});
 };
 
@@ -77,9 +96,16 @@ describe("Metas", () => {
     await screen.findByRole("heading", { name: "Viagem" });
     const card = screen.getByRole("heading", { name: "Viagem" }).closest("li")!;
 
-    await userEvent.click(within(card).getByRole("button", { name: "Alocar" }));
+    await userEvent.click(within(card).getByRole("button", { name: "Depositar" }));
+    expect(await screen.findByText("Poupança sem destino: R$ 300,00")).toBeInTheDocument();
+    // Money you do not have cannot be deposited.
+    await userEvent.type(screen.getByLabelText("Valor"), "300,01");
+    await userEvent.click(screen.getByRole("button", { name: "Depositar valor" }));
+    expect(screen.getByText("Informe um valor até a poupança sem destino.")).toBeInTheDocument();
+    expect(calls).toHaveLength(0);
+    await userEvent.clear(screen.getByLabelText("Valor"));
     await userEvent.type(screen.getByLabelText("Valor"), "250,00");
-    await userEvent.click(screen.getByRole("button", { name: "Alocar valor" }));
+    await userEvent.click(screen.getByRole("button", { name: "Depositar valor" }));
     expect(calls.map((c) => c.url)).toEqual(["/api/goals/1/allocations"]);
     expect(calls[0]!.body).toMatchObject({ amount: "250.00" });
 

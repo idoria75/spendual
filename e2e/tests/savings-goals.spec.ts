@@ -5,7 +5,8 @@ const PASSWORD = "senha-e2e-1234";
 // Same user as recurring.spec.ts (alphabetical order: this file runs after it). The household
 // holds two accounts, so this file signs in and does not sign up.
 const USERNAME = `ana_${process.env.E2E_RUN_ID}`;
-const MONTH = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 7);
+const TODAY = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+const MONTH = TODAY.slice(0, 7);
 
 /** 123456 -> "R$ 1.234,56". Whole reais are enough here. */
 const brl = (cents: number) =>
@@ -37,6 +38,25 @@ test("Metas: create, allocate, see it on Início, withdraw, close", async ({ pag
     (await (await page.request.get(`/api/dashboard?month=${MONTH}`)).json()) as {
       unallocatedSavings: string;
     };
+  // Income first: a deposit cannot be above the unallocated savings.
+  const lookups = (await (await page.request.get("/api/lookups")).json()) as {
+    users: { id: number }[];
+    categories: { id: number; kind: string }[];
+  };
+  const csrf = (await (await page.request.get("/api/auth/csrf")).json()) as { csrfToken: string };
+  const income = await page.request.post("/api/transactions", {
+    headers: { "X-CSRF-Token": csrf.csrfToken },
+    data: {
+      type: "income",
+      scope: "household",
+      amount: "5000.00",
+      description: "e2e metas",
+      transactionDate: TODAY,
+      categoryId: lookups.categories.find((c) => c.kind === "income")!.id,
+      payerId: lookups.users[0]!.id,
+    },
+  });
+  expect(income.ok(), await income.text()).toBe(true);
   const free0 = Math.round(Number((await dash()).unallocatedSavings) * 100);
 
   await page.goto("/metas");
@@ -52,9 +72,9 @@ test("Metas: create, allocate, see it on Início, withdraw, close", async ({ pag
   await expect(card).toBeVisible();
   await expect(card.getByRole("progressbar")).toBeVisible();
 
-  await card.getByRole("button", { name: "Alocar" }).click();
+  await card.getByRole("button", { name: "Depositar" }).click();
   await page.getByRole("dialog").getByLabel("Valor").fill("1000,00");
-  await page.getByRole("dialog").getByRole("button", { name: "Alocar valor" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Depositar valor" }).click();
   await expect(card.getByText(brl(100000), { exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Poupança sem destino" })).toContainText(
     brl(free0 - 100000),
@@ -84,7 +104,7 @@ test("Metas: create, allocate, see it on Início, withdraw, close", async ({ pag
 
   // History has both movements, then the goal closes.
   await card.getByText("Histórico").click();
-  await expect(card.getByText("Alocação")).toBeVisible();
+  await expect(card.getByText("Depósito")).toBeVisible();
   await expect(card.getByText("Retirada")).toBeVisible();
   await card.getByRole("button", { name: "Concluir" }).click();
   await expect(card.getByText("Concluída")).toBeVisible();

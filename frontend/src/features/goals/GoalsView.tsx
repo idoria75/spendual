@@ -7,13 +7,12 @@ import { Button } from "../../components/ui/button";
 import { ConfirmDialog } from "../../components/ui/confirm-dialog";
 import { useToast } from "../../components/ui/toast";
 import { formatMoney, toCents } from "../../lib/currency";
-import { formatDate, today } from "../../lib/date";
+import { currentMonth, formatDate, today } from "../../lib/date";
 import { fetchDashboard } from "../planning/api";
 import { Bar, percentOf } from "../planning/display";
 import { useLoad } from "../planning/use-load";
 import { useEntry } from "../transactions/entry";
 import { useLookups } from "../transactions/lookups";
-import { useMonth } from "../transactions/month";
 import { fetchGoalEntries, fetchGoals, goalAction, withdrawGoal } from "./api";
 import { GoalFormSheet, MoveSheet } from "./GoalSheets";
 
@@ -154,7 +153,8 @@ function GoalCard({
 /** Metas: unallocated savings of the month, then one card per shared goal. */
 export function GoalsView() {
   const { t } = useTranslation();
-  const { month } = useMonth();
+  // Deposits are dated today, so the pool is the current month, whatever month the bar shows.
+  const month = currentMonth();
   const { notifySaved } = useEntry();
   const { showToast } = useToast();
   const goals = useLoad(fetchGoals, []);
@@ -274,6 +274,7 @@ export function GoalsView() {
       <MoveSheet
         goal={moving?.goal ?? null}
         kind={moving?.kind ?? "allocate"}
+        free={dashboard.data?.unallocatedSavings ?? null}
         onClose={() => setMoving(null)}
         onSaved={() => {
           setMoving(null);
