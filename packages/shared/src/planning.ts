@@ -47,7 +47,8 @@ import { periodKeySchema, positiveMoneySchema } from "./transactions.js";
  *    completed. Skipping is allowed and still calls complete. Budgets use PUT /budgets.
  *  - Installments from the entry form use POST /installment-plans. The entry form offers
  *    "Parcelado" when the chosen payment method is a credit card.
- *  - Goals are not in P0, so goal allocations are 0 and unallocated savings = savings.
+ *  - `goalAllocationsNet` = goal ALLOCATION minus WITHDRAWAL entries whose effectiveDate is in
+ *    the month (see goals.ts). Unallocated savings = savings before goals - that number.
  */
 
 export const dashboardQuerySchema = z.object({ month: periodKeySchema });
