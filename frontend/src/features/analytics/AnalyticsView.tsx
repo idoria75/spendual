@@ -4,9 +4,10 @@ import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/button";
 import { Chip } from "../../components/ui/chip";
 import { Segmented } from "../../components/ui/segmented";
+import { Select } from "../../components/ui/select";
 import { cn } from "../../lib/cn";
 import { formatMoney, fromCents, toCents } from "../../lib/currency";
-import { currentMonth } from "../../lib/date";
+import { currentMonth, formatMonth } from "../../lib/date";
 import { fetchCategoryTrends } from "../planning/api";
 import { useLoad } from "../planning/use-load";
 import { CategoryPicker } from "../transactions/CategoryPicker";
@@ -18,12 +19,15 @@ import {
   RANGES,
   averageCents,
   averagedPoints,
+  cumulativeNet,
   formatRange,
   isOver,
+  monthOptions,
   monthsAbove,
+  periodNet,
   shortMonth,
   trendWindow,
-  type RangeMonths,
+  type RangeChoice,
 } from "./trend";
 
 /** "all" is the household total; a number is a category id; "none" has no category. */
@@ -63,11 +67,23 @@ export function AnalyticsView() {
   const { t } = useTranslation();
   const { month } = useMonth();
   const { data: lookups } = useLookups();
-  const [range, setRange] = useState<RangeMonths>(6);
+  const [range, setRange] = useState<RangeChoice>(6);
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   const [selected, setSelected] = useState<Selection>("all");
   const [pickerOpen, setPickerOpen] = useState(false);
   const current = currentMonth();
-  const { from, to } = trendWindow(month, current, range);
+  const { from, to } =
+    range === "custom" ? { from: customFrom, to: customTo } : trendWindow(month, current, range);
+  const options = monthOptions(current);
+  const chooseRange = (value: string) => {
+    if (value === "custom") {
+      // Start from the window on screen. The pickers keep from <= to by moving the other end.
+      setCustomFrom(from);
+      setCustomTo(to);
+      setRange("custom");
+    } else setRange(Number(value) as 6 | 12);
+  };
   const { data, failed, reload } = useLoad(() => fetchCategoryTrends(from, to), [from, to]);
 
   const nameOf = (id: number | null): string =>
@@ -91,23 +107,54 @@ export function AnalyticsView() {
 
   return (
     <section className="flex flex-col gap-3">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-[17px] font-bold">{t("analytics.title")}</h1>
-          <p className="text-[0.85rem] text-muted">{t("analytics.subtitle")}</p>
-        </div>
-        <div className="w-[9.5rem] shrink-0">
-          <Segmented
-            label={t("analytics.range")}
-            value={String(range)}
-            options={RANGES.map((n) => ({
-              value: String(n),
-              label: t("analytics.months", { count: n }),
-            }))}
-            onChange={(v) => setRange(Number(v) as RangeMonths)}
-          />
-        </div>
+      <div>
+        <h1 className="text-[17px] font-bold">{t("analytics.title")}</h1>
+        <p className="text-[0.85rem] text-muted">{t("analytics.subtitle")}</p>
       </div>
+      <Segmented
+        label={t("analytics.range")}
+        value={String(range)}
+        options={[
+          ...RANGES.map((n) => ({
+            value: String(n),
+            label: t("analytics.months", { count: n }),
+          })),
+          { value: "custom", label: t("analytics.custom") },
+        ]}
+        onChange={chooseRange}
+      />
+      {range === "custom" ? (
+        <div className="grid grid-cols-2 gap-3">
+          <Select
+            label={t("analytics.from")}
+            value={from}
+            onChange={(e) => {
+              setCustomFrom(e.target.value);
+              if (e.target.value > customTo) setCustomTo(e.target.value);
+            }}
+          >
+            {options.map((m) => (
+              <option key={m} value={m}>
+                {formatMonth(m)}
+              </option>
+            ))}
+          </Select>
+          <Select
+            label={t("analytics.until")}
+            value={to}
+            onChange={(e) => {
+              setCustomTo(e.target.value);
+              if (e.target.value < customFrom) setCustomFrom(e.target.value);
+            }}
+          >
+            {options.map((m) => (
+              <option key={m} value={m}>
+                {formatMonth(m)}
+              </option>
+            ))}
+          </Select>
+        </div>
+      ) : null}
 
       {failed ? (
         <div role="alert" className="flex flex-col items-start gap-2 text-err">
@@ -171,6 +218,10 @@ export function AnalyticsView() {
   );
 }
 
+/** "+R$ 70,00" or "−R$ 20,00": the sign is always written. */
+const signedMoney = (cents: bigint): string =>
+  cents < 0n ? formatMoney(fromCents(-cents), "minus") : formatMoney(fromCents(cents), "plus");
+
 function Details({
   series,
   title,
@@ -192,6 +243,8 @@ function Details({
   const last = points[points.length - 1];
   const { above, withBudget } = monthsAbove(points);
   const hasBudget = points.some((p) => p.budget !== null);
+  const cumulative = cumulativeNet(points);
+  const net = periodNet(points);
 
   if (!hasData) {
     return (
@@ -202,7 +255,7 @@ function Details({
   }
   return (
     <>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <Stat
           value={avg === null ? "–" : formatMoney(fromCents(avg))}
           label={t("analytics.average", { count: averagedPoints(points).length })}
@@ -215,6 +268,11 @@ function Details({
           value={withBudget === 0 ? "–" : t("analytics.aboveOf", { above, count: withBudget })}
           label={t("analytics.monthsAbove")}
           warn={above > 0}
+        />
+        <Stat
+          value={net === null || net.months === 0 ? "–" : signedMoney(net.total)}
+          label={t("analytics.periodNet", { count: net?.months ?? 0 })}
+          warn={net !== null && net.months > 0 && net.total < 0n}
         />
       </div>
 
@@ -258,6 +316,7 @@ function Details({
             const diff = p.budget === null ? null : toCents(p.amount) - toCents(p.budget);
             // Money saved shows in green once the month is closed. The month in progress is not final.
             const saved = diff !== null && diff < 0n && !p.partial;
+            const sum = cumulative.get(p.month);
             return (
               <li
                 key={p.month}
@@ -268,20 +327,27 @@ function Details({
                   {p.partial ? "*" : ""}
                 </span>
                 <span className="font-semibold tabular-nums">{formatMoney(p.amount)}</span>
-                <span
-                  className={cn(
-                    "whitespace-nowrap text-right text-[0.78rem] tabular-nums text-muted",
-                    isOver(p) && "font-semibold text-warn",
-                    saved && "font-semibold text-pos",
+                <span className="flex flex-col items-end text-right text-[0.78rem] tabular-nums">
+                  <span
+                    className={cn(
+                      "whitespace-nowrap text-muted",
+                      isOver(p) && "font-semibold text-warn",
+                      saved && "font-semibold text-pos",
+                    )}
+                  >
+                    {diff === null
+                      ? t("budgets.none")
+                      : diff > 0n
+                        ? t("budgets.over", { amount: formatMoney(fromCents(diff)) })
+                        : diff === 0n
+                          ? t("analytics.onBudget")
+                          : t("analytics.below", { amount: formatMoney(fromCents(-diff)) })}
+                  </span>
+                  {sum === undefined ? null : (
+                    <span className={cn("whitespace-nowrap", sum < 0n ? "text-warn" : "text-pos")}>
+                      {t("analytics.cumulative", { amount: signedMoney(sum) })}
+                    </span>
                   )}
-                >
-                  {diff === null
-                    ? t("budgets.none")
-                    : diff > 0n
-                      ? t("budgets.over", { amount: formatMoney(fromCents(diff)) })
-                      : diff === 0n
-                        ? t("analytics.onBudget")
-                        : t("analytics.below", { amount: formatMoney(fromCents(-diff)) })}
                 </span>
               </li>
             );

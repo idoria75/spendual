@@ -220,7 +220,16 @@ spending. Without a budget, it scales to the spending. Legend below: top 4 categ
 Plain SVG, no library. One bar per month in the category color, a dashed line for the average
 of the closed months, a gray step line for the budget in force each month. A bar above its
 budget is `--warn`. The month in progress is hatched and not in the average. The average starts
-at the first month with spending. Value labels above the bars up to 7 months.
+at the first month with spending. Value labels sit above every bar.
+
+Each month column is at least 44 px wide. When the months do not fit, the y axis stays in place
+and the plot scrolls sideways (swipe on a phone, mouse drag on desktop). It opens on the newest
+month and shows `← Arraste o gráfico…` under it. A range that crosses a year shows the year
+under the first bar and under every January.
+
+`Mês a mês` adds a second line per closed month, `acumulado +R$ 70,00`: the running sum of
+budget minus spent, from the first month with spending (same months as the average). A month
+without a budget adds 0. The month in progress has none. A fourth tile shows the period total.
 
 ### 6.6 Chips and segmented control
 
@@ -281,7 +290,7 @@ are transparent cut-outs, so it works on light and dark. The colors are fixed; t
 | Novo lançamento | sheet from `+` | Full-height sheet (phone), dialog (desktop). | See 7.1. |
 | A pagar | `/a-pagar` | Segmented `Próximas | Recorrentes | Parcelas`. | `Próximas` groups: `Vencidas`, `Esta semana`, then by month. `Confirmar pagamento` opens the entry form pre-filled. `Informar valor` for unknown amounts. Never auto-confirm. |
 | Orçamentos | `/orcamentos` | Overall budget card, then one row per category. | Edit asks `Só <mês>` or `De <mês> em diante`. Past months never change. |
-| Análises | `/analises` | Category chips, 3 number tiles (average, budget, months above), trend chart, month list. `6 meses | 12 meses`. | Reached from `Mais` (phone) and the sidebar. Household spending only. Month selector sets the last month. No budget: no gray line, text `sem orçamento`. |
+| Análises | `/analises` | Category chips, 3 number tiles (average, budget, months above), trend chart, month list. `6 meses | 12 meses | Personalizado` (two month pickers, up to 60 months back). | Reached from `Mais` (phone) and the sidebar. Household spending only. Month selector sets the last month. No budget: no gray line, text `sem orçamento`. |
 | Pessoal | `/pessoal` | Phone: segmented per person. Desktop: two columns. | Reached only from `Mais`. Balance, previous balance, allowance, spending, then the person's records. Both people see everything. |
 | Metas (P1) | `/metas` | Unallocated savings card, then one card per goal with progress. | `Depositar` / `Retirar`. Closing a goal with money left asks for a transfer first. |
 | Ajustes | `/ajustes` | Profile card, then list rows. | Name, user tone (taken tone disabled), theme, categories, accounts, payment methods, allowance, backup status, `Sair`. |

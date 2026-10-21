@@ -141,6 +141,74 @@ describe("Análises", () => {
     expect(screen.queryByRole("button", { name: "Mercado" })).not.toBeInTheDocument();
   });
 
+  it("adds up budget minus spent in the month list and in a tile", async () => {
+    mockFetch(handler);
+    renderAnalises();
+    await userEvent.click(await screen.findByRole("button", { name: "Mostrar categorias ›" }));
+    await userEvent.click(screen.getByRole("button", { name: "Mercado" }));
+    const list = await screen.findByRole("region", { name: "Mês a mês" });
+    // Closed months: +20, 0, -20, so the running sum is +20, +20, 0. The month in progress has none.
+    expect(
+      within(list)
+        .getAllByText(/acumulado/)
+        .map((e) => e.textContent?.replace(/\s/g, " ")),
+    ).toEqual(["acumulado +R$ 0,00", "acumulado +R$ 20,00", "acumulado +R$ 20,00"]);
+    expect(screen.getByText("acumulado no período, 3 meses com orçamento")).toBeInTheDocument();
+  });
+
+  it("takes a custom period and keeps From before Until", async () => {
+    mockFetch((req) => {
+      const [path, query = ""] = req.url.split("?");
+      if (path !== "/api/analytics/categories") return handler(req);
+      queries.push(query);
+      const q = new URLSearchParams(query);
+      const from = q.get("from") ?? to;
+      const end = q.get("to") ?? to;
+      const list: string[] = [];
+      for (let m = from; m <= end; m = shiftMonth(m, 1)) list.push(m);
+      return json(200, {
+        from,
+        to: end,
+        overall: {
+          categoryId: null,
+          points: list.map((month) => ({
+            month,
+            amount: "100.00",
+            budget: "120.00",
+            partial: month === to,
+          })),
+        },
+        categories: [],
+      });
+    });
+    renderAnalises();
+    await screen.findByRole("img", { name: /Gasto mensal/ });
+    // 6 months fit the phone; no sideways scroll.
+    expect(screen.getByTestId("trend-scroll")).toHaveAttribute("data-scrolls", "false");
+
+    await userEvent.click(screen.getByRole("radio", { name: "Personalizado" }));
+    expect(queries.at(-1)).toBe(`from=${shiftMonth(to, -5)}&to=${to}`);
+    const fromBox = screen.getByLabelText("De");
+    const untilBox = screen.getByLabelText("Até");
+    expect(fromBox).toHaveValue(shiftMonth(to, -5));
+    expect(untilBox).toHaveValue(to);
+
+    await userEvent.selectOptions(fromBox, shiftMonth(to, -17));
+    await screen.findAllByTestId("trend-bar");
+    await vi.waitFor(() => expect(queries.at(-1)).toBe(`from=${shiftMonth(to, -17)}&to=${to}`));
+    expect(await screen.findAllByTestId("trend-bar")).toHaveLength(18);
+    // 18 months do not fit: the chart scrolls and says so.
+    expect(screen.getByTestId("trend-scroll")).toHaveAttribute("data-scrolls", "true");
+    expect(screen.getByText(/Arraste o gráfico/)).toBeInTheDocument();
+
+    // Until before From moves From back, so the pair is always valid.
+    await userEvent.selectOptions(untilBox, shiftMonth(to, -20));
+    await vi.waitFor(() =>
+      expect(queries.at(-1)).toBe(`from=${shiftMonth(to, -20)}&to=${shiftMonth(to, -20)}`),
+    );
+    expect(fromBox).toHaveValue(shiftMonth(to, -20));
+  });
+
   it("asks for 12 months when chosen", async () => {
     mockFetch(handler);
     renderAnalises();

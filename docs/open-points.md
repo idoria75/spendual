@@ -118,3 +118,8 @@ A pagar edit sheets (2026-10-21):
 - Paid bills show green and cancelled bills red, with the word.
 - Not done: edit a plan's total or count; edit day of month, category or payer of a rule; the sheet handle bar is gone from all sheets (shared `Sheet`).
 - Not checked on a phone.
+
+Análises period and cumulative net (2026-10-21):
+- DONE: `Personalizado` range (two month pickers, 60 months back, `to` not after this month); chart scrolls sideways; `Mês a mês` shows `acumulado` (budget − spent) and a period tile.
+- The cumulative leaves out the month in progress and months before the first spending. A month without a budget adds 0, so it can look better than it is.
+- Not checked on a phone: drag feel, the fixed y axis next to the scrolling plot.
