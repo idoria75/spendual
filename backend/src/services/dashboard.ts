@@ -217,6 +217,7 @@ export async function getDashboard(
     overall,
     spending,
     upcoming,
+    goalSums,
   ] = await Promise.all([
     sumTx(prisma, { ...household, type: "income", transactionDate: range }),
     netSpent(prisma, household, range),
@@ -232,6 +233,7 @@ export async function getDashboard(
     budgetFor(prisma, null, month),
     categorySpending(prisma, month),
     upcomingBills(prisma, now),
+    goalEntrySums(prisma, range),
   ]);
   const allocations = cents(allocationAgg._sum.amount);
   const savings = savingsBeforeGoals({
@@ -239,7 +241,7 @@ export async function getDashboard(
     sharedExpensesNet: sharedNet,
     allowanceAllocations: allocations,
   });
-  const goalNet = 0n; // Goals are not in P0.
+  const goalNet = goalSums.allocated - goalSums.withdrawn;
   return {
     month,
     householdIncome: centsToMoney(income),
@@ -261,6 +263,17 @@ export async function getDashboard(
     upcoming,
     people,
   };
+}
+
+/** Goal ALLOCATION and WITHDRAWAL totals by effectiveDate. Not income, not expense. */
+async function goalEntrySums(db: Db, range: Range) {
+  const rows = await db.goalEntry.groupBy({
+    by: ["kind"],
+    where: { kind: { in: ["ALLOCATION", "WITHDRAWAL"] }, effectiveDate: range },
+    _sum: { amount: true },
+  });
+  const sum = (kind: string) => cents(rows.find((r) => r.kind === kind)?._sum.amount);
+  return { allocated: sum("ALLOCATION"), withdrawn: sum("WITHDRAWAL") };
 }
 
 export async function getBudgetOverview(db: Db, month: string): Promise<BudgetOverview> {
