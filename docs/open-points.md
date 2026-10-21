@@ -112,3 +112,9 @@ P1-1 Metas done (2026-10-21):
 Demo data (2026-10-21):
 - `make demo-data CONFIRM=yes` fills the dev DB with May to Oct demo data. Undo with `make restore-dev FILE=<backup> CONFIRM=yes`.
 - ⚠ User `thai` uses the second household account. Remove it (or restore) before a real partner signs up.
+
+A pagar edit sheets (2026-10-21):
+- DONE: tap a rule in `Recorrentes` to edit name, amount, end date; pause, resume or end it (end is final, asks first). `Parcelas` tab lists plans; tap one to rename, change the amount of the installments still to pay, or cancel the rest (reason required). New API: `GET /installment-plans`, `PATCH /installment-plans/:id`, `POST /installment-plans/:id/cancel`. Rule and plan changes write AuditEvents.
+- Paid bills show green and cancelled bills red, with the word.
+- Not done: edit a plan's total or count; edit day of month, category or payer of a rule; the sheet handle bar is gone from all sheets (shared `Sheet`).
+- Not checked on a phone.
