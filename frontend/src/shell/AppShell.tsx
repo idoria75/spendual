@@ -137,7 +137,7 @@ function Shell() {
       </nav>
 
       <div className="flex min-w-0 flex-col pb-[calc(64px+env(safe-area-inset-bottom,0px))] md:pb-0">
-        <header className="flex items-center justify-between gap-2 border-b border-line bg-surface px-4 py-1">
+        <header className="sticky top-0 z-20 flex items-center justify-between gap-2 border-b border-line bg-surface px-4 py-1">
           <div className="flex items-center gap-1">
             <Link
               to="/"
