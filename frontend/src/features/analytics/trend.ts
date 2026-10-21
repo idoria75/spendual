@@ -4,6 +4,25 @@ import { toCents } from "../../lib/currency";
 
 export const RANGES = [6, 12] as const;
 export type RangeMonths = (typeof RANGES)[number];
+/** A preset number of months, or two months chosen by the person. */
+export type RangeChoice = RangeMonths | "custom";
+
+/** How far back the pickers go. Same limit as the API. */
+export const MAX_BACK_MONTHS = 60;
+
+/** Months for the pickers, newest first, from the current month back. */
+export function monthOptions(current: string, back: number = MAX_BACK_MONTHS): string[] {
+  return Array.from({ length: back + 1 }, (_, i) => shiftMonth(current, -i));
+}
+
+/** A custom window is valid when `from <= to <= current`. Otherwise null. */
+export function customWindow(
+  from: string,
+  to: string,
+  current: string,
+): { from: string; to: string } | null {
+  return from <= to && to <= current ? { from, to } : null;
+}
 
 /** The window ends at the selected month, or at the current month when that is later. */
 export function trendWindow(
@@ -36,6 +55,34 @@ export function averageCents(points: TrendPoint[]): bigint | null {
   const sum = used.reduce((total, p) => total + toCents(p.amount), 0n);
   const n = BigInt(used.length);
   return (sum * 2n + n) / (2n * n);
+}
+
+/** Budget minus spent for one month. A month without a budget counts 0. */
+export const netVsBudget = (p: TrendPoint): bigint =>
+  p.budget === null ? 0n : toCents(p.budget) - toCents(p.amount);
+
+/**
+ * Running sum of budget minus spent. It starts at the first closed month with spending (the same
+ * months as the average) and leaves out the month in progress. Those months have no entry.
+ */
+export function cumulativeNet(points: TrendPoint[]): Map<string, bigint> {
+  const out = new Map<string, bigint>();
+  let sum = 0n;
+  for (const p of averagedPoints(points)) {
+    sum += netVsBudget(p);
+    out.set(p.month, sum);
+  }
+  return out;
+}
+
+/** Total over the period and how many of its months had a budget. null when no month counts. */
+export function periodNet(points: TrendPoint[]): { total: bigint; months: number } | null {
+  const used = averagedPoints(points);
+  if (used.length === 0) return null;
+  return {
+    total: used.reduce((sum, p) => sum + netVsBudget(p), 0n),
+    months: used.filter((p) => p.budget !== null).length,
+  };
 }
 
 /** Over budget: spent more than the budget in force that month. No budget is never over. */

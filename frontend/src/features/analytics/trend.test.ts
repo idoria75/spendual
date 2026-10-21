@@ -4,9 +4,13 @@ import {
   averageCents,
   averagedPoints,
   axisScale,
+  cumulativeNet,
+  customWindow,
   formatRange,
   isOver,
+  monthOptions,
   monthsAbove,
+  periodNet,
   shortMonth,
   trendWindow,
   wholeReais,
@@ -100,5 +104,46 @@ describe("month labels", () => {
   it("shows the year once, or on both ends when they differ", () => {
     expect(formatRange("2026-05", "2026-10")).toBe("Mai – Out 2026");
     expect(formatRange("2025-11", "2026-04")).toBe("Nov 2025 – Abr 2026");
+  });
+});
+
+describe("cumulative net (budget minus spent)", () => {
+  const pts = [
+    point({ month: "2026-04", amount: "0.00", budget: "100.00" }), // before the first spending
+    point({ month: "2026-05", amount: "80.00", budget: "100.00" }), // +20
+    point({ month: "2026-06", amount: "130.00", budget: "100.00" }), // -30
+    point({ month: "2026-07", amount: "50.00", budget: null }), // no budget: 0
+    point({ month: "2026-08", amount: "60.00", budget: "100.00", partial: true }), // in progress
+  ];
+  it("adds up from the first month with spending and skips the month in progress", () => {
+    const net = cumulativeNet(pts);
+    expect([...net.entries()]).toEqual([
+      ["2026-05", 2000n],
+      ["2026-06", -1000n],
+      ["2026-07", -1000n],
+    ]);
+  });
+  it("gives the period total and how many months had a budget", () => {
+    expect(periodNet(pts)).toEqual({ total: -1000n, months: 2 });
+    expect(periodNet([point({ partial: true })])).toBeNull();
+  });
+});
+
+describe("custom range", () => {
+  it("lists the current month first, 60 months back", () => {
+    const list = monthOptions("2026-10");
+    expect(list[0]).toBe("2026-10");
+    expect(list[1]).toBe("2026-09");
+    expect(list).toHaveLength(61);
+    expect(list.at(-1)).toBe("2021-10");
+  });
+  it("accepts from <= to <= current and refuses the rest", () => {
+    expect(customWindow("2026-01", "2026-10", "2026-10")).toEqual({
+      from: "2026-01",
+      to: "2026-10",
+    });
+    expect(customWindow("2026-10", "2026-10", "2026-10")).not.toBeNull();
+    expect(customWindow("2026-10", "2026-09", "2026-10")).toBeNull();
+    expect(customWindow("2026-01", "2026-11", "2026-10")).toBeNull();
   });
 });
