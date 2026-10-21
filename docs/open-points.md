@@ -65,3 +65,31 @@ Category drill-down from Início (2026-10-20):
 - `categories` (from Início) follows the linked expense for refunds, like the dashboard. The old dropdown `categoryId` uses the refund's own category, so its total can differ from Início when a refund has another category.
 - Filters are read from the URL once; changing them in the UI does not write the URL back. Reload resets them.
 - The new `categories` filter ignores `type`.
+
+Início merge and P1 next steps (2026-10-21):
+- DONE: `Realizado` is folded into `Saldo atual` (details element); one dashed `Próximas contas` card; no greeting. Commit `d35b9b1`.
+- ⚠ `Saldo atual` (budget minus spending), `Poupança do mês` (income − expenses − allowances) and `Sem destino` (savings − goal allocations) differ. `Sem destino` equals the savings until goals exist, so Início hides it when equal.
+- Not decided: rename `Poupança do mês`.
+- P1 list: [guide](household-finance-reference-guide.md), "P1 — Important follow-up" and phases 6–7. Proposed order:
+  1. Shared savings goals (`/metas`). Tables `SavingsGoal` and `GoalEntry` exist (`backend/prisma/schema.prisma:354`); `domain/accounting.ts` and `services/dashboard.ts` already read `goalAllocationsNet` (always 0). Missing:
+     - services and routes: create, edit, close, archive; allocate, withdraw; history and balances
+     - rules: allocation and withdrawal are not income or expense; withdraw only back to unallocated money; closing with money left asks for a transfer
+     - reconciliation tests (the guide requires them)
+     - `/metas` page (`Alocar` / `Retirar`) and a goals line on Início
+  2. Audit history: `AuditEvent` exists but nothing writes to it (see Phase 4 note above). Write events on edit, void, cancel; then a viewer.
+  3. Monthly savings target (not started).
+  4. CSV export (not started); CSV import with preview and duplicate detection is Phase 7.
+  5. Later: fuller personal budget screens, spending pace (this month vs same elapsed part of last month), duplicate and correction workflows.
+- Questions to answer before planning Metas: target amount and date from the start? Who may close a goal? Can a goal be reopened?
+- Not checked: production build (`make build`; `npm run -w frontend build` fails in the container with "Failed to resolve entry for @spendual/shared"), anything on a real phone.
+- Stale: `spendual_stacktest` stack (port 8080) may still run. Remove with `down -v`? Not answered.
+
+Deploy box learnings (2026-10-21). Measured on host `jobs`. ⚠ Assumes this box is the production host; unconfirmed:
+- Hardware: 4 CPUs, 7.2 GiB RAM, one 2.5" spinning disk (`sda`, 466 GB, `ROTA=1`, Apple/Hitachi HTS547). `/` has 204 GB free (13% used). Ubuntu 26.04, kernel 7.0, Docker 29.9, Compose 5.6, MySQL image `mysql:8.4`.
+- ⚠ Disk is slow on sync writes: `dd bs=4k oflag=dsync` gives about 120 kB/s (about 30 syncs/s, about 34 ms each). `/tmp` is tmpfs, so do not measure there.
+- Effect: MySQL with `innodb_flush_log_at_trx_commit=1` and `sync_binlog=1` makes each commit wait on the disk. Backend tests take about 11 s each, `TRUNCATE` is slow. Normal use (a few writes per click) should be fine; bulk work (CSV import, big backfills) will be slow.
+- Decision needed for production: keep durable settings (1/1, safe on power loss) or relax them. Dev containers were relaxed to 2/0 for test runs only, then restored. Do not relax in production without the user's yes. For CSV import, write rows in one transaction (one sync), not one commit per row.
+- Dev runs here too: `spendual-mysql-1`, `spendual-app-run-*` and the old `spendual_stacktest` stack all use this disk and 7 GiB of RAM. Remove the stack when not needed.
+- `avahi-daemon` is inactive, so `spendual.local` is not published. `make mdns-install` prints the sudo commands (not run).
+- Not checked here: reboot restart of the containers, the systemd backup timer (`make backup-timer-install`), restore from a backup on this disk, the production build (`make build`), CI on GitHub (remote is `git@github.com:idoria75/spendual.git`, nothing pushed).
+- Other containers share the host (Plex, Metabase, smart_house, b1a-devc images are present). Ports and RAM are shared; check `docker ps` before choosing a port.
