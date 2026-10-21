@@ -44,12 +44,18 @@ const trends = (from: string) => ({
   ],
 });
 
+// Months with spending: every month of the last 2 years but 2 gaps.
+const gaps = [shiftMonth(to, -3), shiftMonth(to, -9)];
+const dataMonths = Array.from({ length: 24 }, (_, i) => shiftMonth(to, -i)).filter(
+  (m) => !gaps.includes(m),
+);
 let queries: string[] = [];
 const handler: Handler = (req) => {
   const [path, query = ""] = req.url.split("?");
   if (path === "/api/auth/me") return json(200, user);
   if (path === "/api/auth/csrf") return json(200, { csrfToken: "tok" });
   if (path === "/api/lookups") return json(200, lookups);
+  if (path === "/api/analytics/months") return json(200, { months: dataMonths });
   if (path === "/api/analytics/categories") {
     queries.push(query);
     return json(200, trends(new URLSearchParams(query).get("from") ?? to));
@@ -141,19 +147,20 @@ describe("Análises", () => {
     expect(screen.queryByRole("button", { name: "Mercado" })).not.toBeInTheDocument();
   });
 
-  it("adds up budget minus spent in the month list and in a tile", async () => {
+  it("shows the net once, next to the Mês a mês title", async () => {
     mockFetch(handler);
     renderAnalises();
     await userEvent.click(await screen.findByRole("button", { name: "Mostrar categorias ›" }));
     await userEvent.click(screen.getByRole("button", { name: "Mercado" }));
     const list = await screen.findByRole("region", { name: "Mês a mês" });
-    // Closed months: +20, 0, -20, so the running sum is +20, +20, 0. The month in progress has none.
+    // Closed months: +20, 0, -20 against the budget, so the period nets 0. One line, not per month.
+    expect(within(list).getAllByText(/Acumulado/)).toHaveLength(1);
     expect(
       within(list)
-        .getAllByText(/acumulado/)
-        .map((e) => e.textContent?.replace(/\s/g, " ")),
-    ).toEqual(["acumulado +R$ 0,00", "acumulado +R$ 20,00", "acumulado +R$ 20,00"]);
-    expect(screen.getByText("acumulado no período, 3 meses com orçamento")).toBeInTheDocument();
+        .getByText(/Acumulado/)
+        .textContent?.replace(/\s/g, " "),
+    ).toBe("Acumulado +R$ 0,00");
+    expect(within(list).getByText(/3 meses com orçamento/)).toBeInTheDocument();
   });
 
   it("takes a custom period and keeps From before Until", async () => {
@@ -190,6 +197,12 @@ describe("Análises", () => {
     expect(queries.at(-1)).toBe(`from=${shiftMonth(to, -5)}&to=${to}`);
     const fromBox = screen.getByLabelText("De");
     const untilBox = screen.getByLabelText("Até");
+    // Only months that have spending are offered.
+    const offered = within(fromBox)
+      .getAllByRole("option")
+      .map((o) => (o as HTMLOptionElement).value);
+    expect(offered).toEqual(dataMonths);
+    expect(offered).not.toContain(gaps[0]);
     expect(fromBox).toHaveValue(shiftMonth(to, -5));
     expect(untilBox).toHaveValue(to);
 

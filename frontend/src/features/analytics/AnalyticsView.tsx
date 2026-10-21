@@ -8,7 +8,7 @@ import { Select } from "../../components/ui/select";
 import { cn } from "../../lib/cn";
 import { formatMoney, fromCents, toCents } from "../../lib/currency";
 import { currentMonth, formatMonth } from "../../lib/date";
-import { fetchCategoryTrends } from "../planning/api";
+import { fetchCategoryTrends, fetchTrendMonths } from "../planning/api";
 import { useLoad } from "../planning/use-load";
 import { CategoryPicker } from "../transactions/CategoryPicker";
 import { categoryColor } from "../transactions/CategoryTile";
@@ -19,10 +19,9 @@ import {
   RANGES,
   averageCents,
   averagedPoints,
-  cumulativeNet,
   formatRange,
   isOver,
-  monthOptions,
+  dataWindow,
   monthsAbove,
   periodNet,
   shortMonth,
@@ -75,12 +74,16 @@ export function AnalyticsView() {
   const current = currentMonth();
   const { from, to } =
     range === "custom" ? { from: customFrom, to: customTo } : trendWindow(month, current, range);
-  const options = monthOptions(current);
+  const monthsWithData = useLoad(fetchTrendMonths, []);
+  const options = monthsWithData.data?.months ?? [];
   const chooseRange = (value: string) => {
     if (value === "custom") {
-      // Start from the window on screen. The pickers keep from <= to by moving the other end.
-      setCustomFrom(from);
-      setCustomTo(to);
+      // Start from the window on screen, moved onto months that have data. The pickers keep
+      // from <= to by moving the other end.
+      const start = dataWindow(options, from, to);
+      if (!start) return;
+      setCustomFrom(start.from);
+      setCustomTo(start.to);
       setRange("custom");
     } else setRange(Number(value) as 6 | 12);
   };
@@ -243,7 +246,6 @@ function Details({
   const last = points[points.length - 1];
   const { above, withBudget } = monthsAbove(points);
   const hasBudget = points.some((p) => p.budget !== null);
-  const cumulative = cumulativeNet(points);
   const net = periodNet(points);
 
   if (!hasData) {
@@ -255,7 +257,7 @@ function Details({
   }
   return (
     <>
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+      <div className="grid grid-cols-3 gap-2">
         <Stat
           value={avg === null ? "–" : formatMoney(fromCents(avg))}
           label={t("analytics.average", { count: averagedPoints(points).length })}
@@ -268,11 +270,6 @@ function Details({
           value={withBudget === 0 ? "–" : t("analytics.aboveOf", { above, count: withBudget })}
           label={t("analytics.monthsAbove")}
           warn={above > 0}
-        />
-        <Stat
-          value={net === null || net.months === 0 ? "–" : signedMoney(net.total)}
-          label={t("analytics.periodNet", { count: net?.months ?? 0 })}
-          warn={net !== null && net.months > 0 && net.total < 0n}
         />
       </div>
 
@@ -310,13 +307,29 @@ function Details({
       </section>
 
       <section aria-label={t("analytics.byMonth")} className="rounded-card bg-surface p-4">
-        <h2 className="font-bold">{t("analytics.byMonth")}</h2>
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="font-bold">{t("analytics.byMonth")}</h2>
+          {net === null || net.months === 0 ? null : (
+            <span
+              className={cn(
+                "whitespace-nowrap font-semibold tabular-nums",
+                net.total < 0n ? "text-warn" : "text-pos",
+              )}
+            >
+              {t("analytics.accumulated", { amount: signedMoney(net.total) })}
+            </span>
+          )}
+        </div>
+        {net === null || net.months === 0 ? null : (
+          <p className="text-[0.75rem] text-muted">
+            {t("analytics.accumulatedHint", { count: net.months })}
+          </p>
+        )}
         <ul className="mt-2 flex flex-col">
           {[...points].reverse().map((p) => {
             const diff = p.budget === null ? null : toCents(p.amount) - toCents(p.budget);
             // Money saved shows in green once the month is closed. The month in progress is not final.
             const saved = diff !== null && diff < 0n && !p.partial;
-            const sum = cumulative.get(p.month);
             return (
               <li
                 key={p.month}
@@ -343,11 +356,6 @@ function Details({
                           ? t("analytics.onBudget")
                           : t("analytics.below", { amount: formatMoney(fromCents(-diff)) })}
                   </span>
-                  {sum === undefined ? null : (
-                    <span className={cn("whitespace-nowrap", sum < 0n ? "text-warn" : "text-pos")}>
-                      {t("analytics.cumulative", { amount: signedMoney(sum) })}
-                    </span>
-                  )}
                 </span>
               </li>
             );

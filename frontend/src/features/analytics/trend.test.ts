@@ -4,11 +4,10 @@ import {
   averageCents,
   averagedPoints,
   axisScale,
-  cumulativeNet,
   customWindow,
   formatRange,
   isOver,
-  monthOptions,
+  dataWindow,
   monthsAbove,
   periodNet,
   shortMonth,
@@ -107,7 +106,7 @@ describe("month labels", () => {
   });
 });
 
-describe("cumulative net (budget minus spent)", () => {
+describe("net over the period (budget minus spent)", () => {
   const pts = [
     point({ month: "2026-04", amount: "0.00", budget: "100.00" }), // before the first spending
     point({ month: "2026-05", amount: "80.00", budget: "100.00" }), // +20
@@ -115,27 +114,20 @@ describe("cumulative net (budget minus spent)", () => {
     point({ month: "2026-07", amount: "50.00", budget: null }), // no budget: 0
     point({ month: "2026-08", amount: "60.00", budget: "100.00", partial: true }), // in progress
   ];
-  it("adds up from the first month with spending and skips the month in progress", () => {
-    const net = cumulativeNet(pts);
-    expect([...net.entries()]).toEqual([
-      ["2026-05", 2000n],
-      ["2026-06", -1000n],
-      ["2026-07", -1000n],
-    ]);
-  });
-  it("gives the period total and how many months had a budget", () => {
+  it("sums closed months from the first spending, and counts months with a budget", () => {
     expect(periodNet(pts)).toEqual({ total: -1000n, months: 2 });
     expect(periodNet([point({ partial: true })])).toBeNull();
   });
 });
 
 describe("custom range", () => {
-  it("lists the current month first, 60 months back", () => {
-    const list = monthOptions("2026-10");
-    expect(list[0]).toBe("2026-10");
-    expect(list[1]).toBe("2026-09");
-    expect(list).toHaveLength(61);
-    expect(list.at(-1)).toBe("2021-10");
+  const months = ["2026-10", "2026-08", "2026-07", "2026-05"];
+  it("moves the window onto months that have data", () => {
+    expect(dataWindow(months, "2026-05", "2026-10")).toEqual({ from: "2026-05", to: "2026-10" });
+    expect(dataWindow(months, "2026-06", "2026-09")).toEqual({ from: "2026-07", to: "2026-08" });
+    expect(dataWindow(months, "2026-09", "2026-09")).toEqual({ from: "2026-08", to: "2026-08" });
+    expect(dataWindow(months, "2020-01", "2020-02")).toEqual({ from: "2026-05", to: "2026-05" });
+    expect(dataWindow([], "2026-05", "2026-10")).toBeNull();
   });
   it("accepts from <= to <= current and refuses the rest", () => {
     expect(customWindow("2026-01", "2026-10", "2026-10")).toEqual({

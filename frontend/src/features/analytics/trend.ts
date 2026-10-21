@@ -7,12 +7,22 @@ export type RangeMonths = (typeof RANGES)[number];
 /** A preset number of months, or two months chosen by the person. */
 export type RangeChoice = RangeMonths | "custom";
 
-/** How far back the pickers go. Same limit as the API. */
-export const MAX_BACK_MONTHS = 60;
-
-/** Months for the pickers, newest first, from the current month back. */
-export function monthOptions(current: string, back: number = MAX_BACK_MONTHS): string[] {
-  return Array.from({ length: back + 1 }, (_, i) => shiftMonth(current, -i));
+/**
+ * Moves a window onto months that have data: `from` to the first such month at or after it,
+ * `to` to the last one at or before it. null when no month has data.
+ */
+export function dataWindow(
+  months: string[],
+  from: string,
+  to: string,
+): { from: string; to: string } | null {
+  const asc = [...months].sort();
+  const last = asc[asc.length - 1];
+  const first = asc[0];
+  if (first === undefined || last === undefined) return null;
+  const lo = asc.find((m) => m >= from) ?? last;
+  const hi = [...asc].reverse().find((m) => m <= to) ?? first;
+  return { from: lo <= hi ? lo : hi, to: hi };
 }
 
 /** A custom window is valid when `from <= to <= current`. Otherwise null. */
@@ -60,20 +70,6 @@ export function averageCents(points: TrendPoint[]): bigint | null {
 /** Budget minus spent for one month. A month without a budget counts 0. */
 export const netVsBudget = (p: TrendPoint): bigint =>
   p.budget === null ? 0n : toCents(p.budget) - toCents(p.amount);
-
-/**
- * Running sum of budget minus spent. It starts at the first closed month with spending (the same
- * months as the average) and leaves out the month in progress. Those months have no entry.
- */
-export function cumulativeNet(points: TrendPoint[]): Map<string, bigint> {
-  const out = new Map<string, bigint>();
-  let sum = 0n;
-  for (const p of averagedPoints(points)) {
-    sum += netVsBudget(p);
-    out.set(p.month, sum);
-  }
-  return out;
-}
 
 /** Total over the period and how many of its months had a budget. null when no month counts. */
 export function periodNet(points: TrendPoint[]): { total: bigint; months: number } | null {

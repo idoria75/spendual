@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import request from "supertest";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { categoryTrendsSchema } from "@spendual/shared";
+import { categoryTrendsSchema, trendMonthsSchema } from "@spendual/shared";
 import { editBudget } from "../src/services/budget.js";
 import { makeApp } from "./helpers/authApp.js";
 import { resetDb, testPrisma } from "./helpers/testDb.js";
@@ -86,6 +86,47 @@ describe("category trends", () => {
     const lazer = t.categories.find((c) => c.categoryId === other.id)!;
     expect(amounts(main)).toEqual(["80.00", "0.00", "50.00"]);
     expect(amounts(lazer)).toEqual(["0.00", "0.00", "30.00"]);
+  });
+
+  it("lists only months that have household spending", async () => {
+    expect((await ctx.ana.get("/api/analytics/months")).body).toEqual({ months: [] });
+    await tx({ type: "expense", amount: "10.00", transactionDate: "2027-03-02" });
+    await tx({ type: "expense", amount: "10.00", transactionDate: "2027-03-20" });
+    await tx({ type: "expense", amount: "10.00", transactionDate: "2027-01-10" });
+    // Not counted: income, personal, voided, and spending before the 60 month limit.
+    await tx({
+      type: "income",
+      amount: "500.00",
+      transactionDate: "2027-02-01",
+      categoryId: ctx.incomeCategoryId,
+    });
+    await tx({
+      type: "expense",
+      amount: "9.00",
+      scope: "personal",
+      ownerId: ctx.anaId,
+      transactionDate: "2026-12-05",
+    });
+    const v = await tx({ type: "expense", amount: "8.00", transactionDate: "2026-11-06" });
+    await send(ctx.ana, "post", `/api/transactions/${v.body.id}/void`, { reason: "x" });
+    await prisma.transaction.create({
+      data: {
+        type: "expense",
+        status: "confirmed",
+        amount: "7.00",
+        description: "old",
+        transactionDate: new Date("2022-02-10T00:00:00Z"),
+        scope: "household",
+        categoryId: ctx.categoryId,
+        payerId: ctx.anaId,
+        createdById: ctx.anaId,
+        updatedById: ctx.anaId,
+      },
+    });
+    const res = await ctx.ana.get("/api/analytics/months");
+    expect(res.status).toBe(200);
+    expect(trendMonthsSchema.parse(res.body).months).toEqual(["2027-03", "2027-01"]);
+    expect((await request(makeApp(prisma)).get("/api/analytics/months")).status).toBe(401);
   });
 
   it("flags the current month as partial", async () => {

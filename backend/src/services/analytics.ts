@@ -1,7 +1,13 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import type { CategoryTrends, TrendSeries } from "@spendual/shared";
 import { centsToMoney, moneyToCents } from "../domain/accounting.js";
-import { currentPeriod, dateOnlyToDate, nextPeriod } from "../lib/period.js";
+import {
+  TREND_MONTHS_BACK,
+  addPeriods,
+  currentPeriod,
+  dateOnlyToDate,
+  nextPeriod,
+} from "../lib/period.js";
 import { budgetKey } from "./budget.js";
 
 type Db = PrismaClient | Prisma.TransactionClient;
@@ -117,4 +123,27 @@ export async function getCategoryTrends(
     overall: series(null, total, budgetKey(null).categoryKey),
     categories: listed,
   };
+}
+
+/**
+ * Months that have household spending (confirmed expenses), newest first, inside the range the
+ * trends accept. A refund counts in its expense's month, so it adds no month of its own.
+ */
+export async function getTrendMonths(db: Db, now: Date = new Date()): Promise<string[]> {
+  const current = currentPeriod(now);
+  const rows = await db.transaction.findMany({
+    where: {
+      status: "confirmed",
+      type: "expense",
+      scope: "household",
+      transactionDate: {
+        gte: dateOnlyToDate(`${addPeriods(current, -TREND_MONTHS_BACK)}-01`),
+        lt: dateOnlyToDate(`${nextPeriod(current)}-01`),
+      },
+    },
+    select: { transactionDate: true },
+    distinct: ["transactionDate"],
+  });
+  const months = new Set(rows.map((r) => r.transactionDate.toISOString().slice(0, 7)));
+  return [...months].sort().reverse();
 }

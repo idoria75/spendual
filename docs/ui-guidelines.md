@@ -227,9 +227,10 @@ and the plot scrolls sideways (swipe on a phone, mouse drag on desktop). It open
 month and shows `← Arraste o gráfico…` under it. A range that crosses a year shows the year
 under the first bar and under every January.
 
-`Mês a mês` adds a second line per closed month, `acumulado +R$ 70,00`: the running sum of
-budget minus spent, from the first month with spending (same months as the average). A month
-without a budget adds 0. The month in progress has none. A fourth tile shows the period total.
+`Mês a mês` shows `Acumulado +R$ 70,00` once, on the same line as its title: the sum of budget
+minus spent over the period, from the first month with spending (same months as the average,
+the month in progress left out). A month without a budget adds 0. The month pickers of
+`Personalizado` offer only months that have household spending (`GET /analytics/months`).
 
 ### 6.6 Chips and segmented control
 

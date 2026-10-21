@@ -295,6 +295,9 @@ export type SetupStatus = z.infer<typeof setupStatusSchema>;
 /**
  * Category trends (page "Análises"). Read only.
  *   GET /analytics/categories?from=&to=   -> 200 CategoryTrends
+ *   GET /analytics/months                 -> 200 TrendMonths
+ *        Months (newest first) with at least one confirmed household expense, from 60 months
+ *        back to the current month. The month pickers offer only these.
  *
  * Rules:
  *  - `from` and `to` are period keys, `from <= to`, at most 60 months, `to` not after the
@@ -366,3 +369,6 @@ export const installmentPlanSummarySchema = z.object({
 export type InstallmentPlanSummary = z.infer<typeof installmentPlanSummarySchema>;
 export const installmentPlanListSchema = z.object({ items: z.array(installmentPlanSummarySchema) });
 export type InstallmentPlanList = z.infer<typeof installmentPlanListSchema>;
+
+export const trendMonthsSchema = z.object({ months: z.array(periodKeySchema) });
+export type TrendMonths = z.infer<typeof trendMonthsSchema>;

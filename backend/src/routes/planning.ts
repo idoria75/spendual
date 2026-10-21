@@ -15,6 +15,7 @@ import {
   recurrenceRulePatchSchema,
   type InstallmentPlanList,
   type RecurrenceRuleList,
+  type TrendMonths,
 } from "@spendual/shared";
 import { AppError, asyncHandler } from "../auth/errors.js";
 import {
@@ -25,7 +26,12 @@ import {
   currentPeriod,
   isMonthInWindow,
 } from "../lib/period.js";
-import { MAX_TREND_MONTHS, getCategoryTrends, monthsBetween } from "../services/analytics.js";
+import {
+  MAX_TREND_MONTHS,
+  getCategoryTrends,
+  getTrendMonths,
+  monthsBetween,
+} from "../services/analytics.js";
 import * as bills from "../services/bills.js";
 import {
   AllocationExistsError,
@@ -80,6 +86,14 @@ export function planningRouter(prisma: PrismaClient, clock: () => Date = () => n
         throw new AppError(400, "validation_error", "Invalid request", problems);
       }
       res.json(await getCategoryTrends(prisma, from, to, now));
+    }),
+  );
+
+  r.get(
+    "/analytics/months",
+    asyncHandler(async (_req, res) => {
+      const body: TrendMonths = { months: await getTrendMonths(prisma, clock()) };
+      res.json(body);
     }),
   );
 
