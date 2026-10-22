@@ -193,6 +193,14 @@
       "theme": "Tema",
       "themes": { "system": "Sistema", "light": "Claro", "dark": "Escuro" }
     },
+    "export": {
+      "title": "Exportar",
+      "hint": "Todos os lançamentos em CSV, para planilha. Sem datas, baixa tudo.",
+      "from": "De",
+      "to": "Até",
+      "range": "A data inicial passa da final.",
+      "button": "Baixar CSV"
+    },
     "backup": {
       "title": "Backup",
       "loading": "Carregando...",

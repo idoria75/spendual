@@ -4,6 +4,7 @@ import { useAuth } from "../auth/AuthContext";
 import { Button } from "../components/ui/button";
 import { Segmented } from "../components/ui/segmented";
 import { BackupStatusRow } from "../features/settings/BackupStatusRow";
+import { ExportRow } from "../features/settings/ExportRow";
 import { ProfileSettings } from "../features/settings/ProfileSettings";
 import { CatalogManager, type CatalogKind } from "../features/settings/CatalogManager";
 
@@ -26,6 +27,7 @@ export function AjustesPage() {
         ]}
       />
       <CatalogManager key={kind} kind={kind} />
+      <ExportRow />
       <BackupStatusRow />
       <Button variant="ghost" className="self-start" onClick={() => void logout()}>
         {t("home.logout")}
