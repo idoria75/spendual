@@ -199,9 +199,14 @@ function move(kind: "ALLOCATION" | "WITHDRAWAL") {
   ): Promise<Goal> =>
     withRetry(() =>
       prisma.$transaction(async (tx) => {
-        const first = await tx.savingsGoal.findUnique({ where: { id }, select: { ownerId: true } });
+        // Locking reads only: a plain read first would fix the snapshot before the pool lock,
+        // and the free-savings check below would then miss an allocation that just committed.
+        const locked = await tx.$queryRaw<{ id: number; ownerId: number | null }[]>(
+          Prisma.sql`SELECT id, ownerId FROM SavingsGoal WHERE id = ${id} FOR UPDATE`,
+        );
         // Allocations of different goals share one pool of savings: serialize them on the
         // household row. A personal goal draws on its owner's balance: serialize on that user.
+        const first = locked[0];
         if (kind === "ALLOCATION" && first) {
           await tx.$queryRaw(
             first.ownerId === null
