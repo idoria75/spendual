@@ -17,6 +17,8 @@ import { withRetry } from "../lib/withRetry.js";
 type Db = Prisma.TransactionClient;
 
 const ENTITY = "Transaction";
+const CORRECTED = "Corrigido";
+const CORRECTS = "Corrige";
 
 export const invalid = (field: string, message: string) =>
   new AppError(400, "validation_error", "Invalid request", { [field]: message });
@@ -158,64 +160,71 @@ export async function listAudit(prisma: PrismaClient, id: number): Promise<Audit
   return rows.map(toAuditDto);
 }
 
+/** The create work, inside the caller's transaction (also used by correctTransaction). */
+async function createInTx(
+  tx: Prisma.TransactionClient,
+  actorId: number,
+  input: TransactionCreate,
+  auditReason: string | null = null,
+): Promise<Transaction> {
+  const amount = parseMoney(input.amount);
+  // The refund lock must come first. Any earlier plain read would fix the snapshot
+  // before the lock, and the refund sum would then miss a refund that just committed.
+  if (input.type === "refund") {
+    const relatedId = input.relatedTransactionId as number;
+    const related = await tx.$queryRaw<{ id: number }[]>`
+      SELECT id FROM \`Transaction\` WHERE id = ${relatedId} FOR UPDATE`;
+    const expense = related.length
+      ? await tx.transaction.findUnique({ where: { id: relatedId } })
+      : null;
+    if (!expense || expense.type !== "expense" || expense.status !== "confirmed") {
+      throw invalid("relatedTransactionId", "Must be a confirmed expense");
+    }
+    assertRefundFits(expense, await confirmedRefundsSum(tx, expense.id), amount);
+  }
+
+  const payerId = input.payerId ?? actorId;
+  await assertActiveUser(tx, payerId, "payerId");
+  if (input.ownerId != null) await assertActiveUser(tx, input.ownerId, "ownerId");
+  await assertCatalogActive(tx, input, kindFor(input.type));
+
+  const row = await tx.transaction.create({
+    data: {
+      type: input.type,
+      status: "confirmed",
+      amount,
+      description: input.description,
+      transactionDate: dateOnlyToDate(input.transactionDate),
+      scope: input.scope,
+      ownerId: input.ownerId ?? null,
+      payerId,
+      categoryId: input.categoryId ?? null,
+      accountId: input.accountId ?? null,
+      paymentMethodId: input.paymentMethodId ?? null,
+      relatedTransactionId: input.relatedTransactionId ?? null,
+      notes: input.notes ?? null,
+      createdById: actorId,
+      updatedById: actorId,
+    },
+  });
+  const after = toTransactionDto(row);
+  await writeAudit(tx, {
+    actorId,
+    entityType: ENTITY,
+    entityId: row.id,
+    action: "transaction.create",
+    after,
+    reason: auditReason,
+  });
+  return after;
+}
+
 export function createTransaction(
   prisma: PrismaClient,
   actorId: number,
   input: TransactionCreate,
 ): Promise<Transaction> {
-  const amount = parseMoney(input.amount);
-  return withRetry(() =>
-    prisma.$transaction(async (tx) => {
-      // The refund lock must come first. Any earlier plain read would fix the snapshot
-      // before the lock, and the refund sum would then miss a refund that just committed.
-      if (input.type === "refund") {
-        const relatedId = input.relatedTransactionId as number;
-        const related = await tx.$queryRaw<{ id: number }[]>`
-          SELECT id FROM \`Transaction\` WHERE id = ${relatedId} FOR UPDATE`;
-        const expense = related.length
-          ? await tx.transaction.findUnique({ where: { id: relatedId } })
-          : null;
-        if (!expense || expense.type !== "expense" || expense.status !== "confirmed") {
-          throw invalid("relatedTransactionId", "Must be a confirmed expense");
-        }
-        assertRefundFits(expense, await confirmedRefundsSum(tx, expense.id), amount);
-      }
-
-      const payerId = input.payerId ?? actorId;
-      await assertActiveUser(tx, payerId, "payerId");
-      if (input.ownerId != null) await assertActiveUser(tx, input.ownerId, "ownerId");
-      await assertCatalogActive(tx, input, kindFor(input.type));
-
-      const row = await tx.transaction.create({
-        data: {
-          type: input.type,
-          status: "confirmed",
-          amount,
-          description: input.description,
-          transactionDate: dateOnlyToDate(input.transactionDate),
-          scope: input.scope,
-          ownerId: input.ownerId ?? null,
-          payerId,
-          categoryId: input.categoryId ?? null,
-          accountId: input.accountId ?? null,
-          paymentMethodId: input.paymentMethodId ?? null,
-          relatedTransactionId: input.relatedTransactionId ?? null,
-          notes: input.notes ?? null,
-          createdById: actorId,
-          updatedById: actorId,
-        },
-      });
-      const after = toTransactionDto(row);
-      await writeAudit(tx, {
-        actorId,
-        entityType: ENTITY,
-        entityId: row.id,
-        action: "transaction.create",
-        after,
-      });
-      return after;
-    }),
-  );
+  return withRetry(() => prisma.$transaction((tx) => createInTx(tx, actorId, input)));
 }
 
 function requireStatus(row: TxRow, status: TxRow["status"]): void {
@@ -312,7 +321,44 @@ export function patchTransaction(
   );
 }
 
-/** Shared by void and cancel: lock, check status, close the row, write the audit row. */
+/** Void or cancel inside the caller's transaction: lock, check status, close, audit. */
+async function closeInTx(
+  tx: Prisma.TransactionClient,
+  actorId: number,
+  id: number,
+  reason: string,
+  from: "confirmed" | "planned",
+  action?: string,
+): Promise<Transaction> {
+  const to = from === "confirmed" ? "voided" : "cancelled";
+  const cur = await lockTransaction(tx, id);
+  requireStatus(cur, from);
+  if (cur.type === "expense" && from === "confirmed") {
+    const refunds = await tx.transaction.count({
+      where: { relatedTransactionId: id, type: "refund", status: "confirmed" },
+    });
+    if (refunds > 0) {
+      throw new AppError(409, "has_refunds", "Void the confirmed refunds first");
+    }
+  }
+  const row = await tx.transaction.update({
+    where: { id },
+    data: { status: to, voidReason: reason, updatedById: actorId },
+  });
+  const after = toTransactionDto(row);
+  await writeAudit(tx, {
+    actorId,
+    entityType: ENTITY,
+    entityId: id,
+    action: action ?? `transaction.${to === "voided" ? "void" : "cancel"}`,
+    before: toTransactionDto(cur),
+    after,
+    reason,
+  });
+  return after;
+}
+
+/** Shared by void and cancel. */
 function closeTransaction(
   prisma: PrismaClient,
   actorId: number,
@@ -320,34 +366,29 @@ function closeTransaction(
   reason: string,
   from: "confirmed" | "planned",
 ): Promise<Transaction> {
-  const to = from === "confirmed" ? "voided" : "cancelled";
+  return withRetry(() => prisma.$transaction((tx) => closeInTx(tx, actorId, id, reason, from)));
+}
+
+/**
+ * Correct a confirmed record: void it and enter the right one, in one transaction. The old
+ * row is voided first so a corrected refund is not counted twice. Its void reason points to
+ * the new record; the new record's create event says which one it corrects.
+ */
+export function correctTransaction(
+  prisma: PrismaClient,
+  actorId: number,
+  id: number,
+  input: TransactionCreate,
+): Promise<Transaction> {
   return withRetry(() =>
     prisma.$transaction(async (tx) => {
-      const cur = await lockTransaction(tx, id);
-      requireStatus(cur, from);
-      if (cur.type === "expense" && from === "confirmed") {
-        const refunds = await tx.transaction.count({
-          where: { relatedTransactionId: id, type: "refund", status: "confirmed" },
-        });
-        if (refunds > 0) {
-          throw new AppError(409, "has_refunds", "Void the confirmed refunds first");
-        }
-      }
-      const row = await tx.transaction.update({
+      await closeInTx(tx, actorId, id, CORRECTED, "confirmed", "transaction.correct");
+      const created = await createInTx(tx, actorId, input, `${CORRECTS} #${id}`);
+      await tx.transaction.update({
         where: { id },
-        data: { status: to, voidReason: reason, updatedById: actorId },
+        data: { voidReason: `${CORRECTED} (#${created.id})` },
       });
-      const after = toTransactionDto(row);
-      await writeAudit(tx, {
-        actorId,
-        entityType: ENTITY,
-        entityId: id,
-        action: `transaction.${to === "voided" ? "void" : "cancel"}`,
-        before: toTransactionDto(cur),
-        after,
-        reason,
-      });
-      return after;
+      return created;
     }),
   );
 }

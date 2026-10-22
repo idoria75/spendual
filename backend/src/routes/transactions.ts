@@ -1,7 +1,9 @@
 import { Router } from "express";
 import type { PrismaClient } from "@prisma/client";
 import {
+  dashboardQuerySchema,
   reasonRequestSchema,
+  similarQuerySchema,
   transactionCreateSchema,
   transactionListQuerySchema,
   transactionPatchSchema,
@@ -9,6 +11,7 @@ import {
   type TransactionList,
 } from "@spendual/shared";
 import { asyncHandler } from "../auth/errors.js";
+import { findSimilar, listDuplicateGroups } from "../services/duplicates.js";
 import * as svc from "../services/transactions.js";
 import { actorId, idParam } from "./params.js";
 
@@ -34,6 +37,24 @@ export function transactionsRouter(prisma: PrismaClient): Router {
   );
 
   r.get(
+    "/similar",
+    asyncHandler(async (req, res) => {
+      const body: TransactionList = {
+        items: await findSimilar(prisma, similarQuerySchema.parse(req.query)),
+      };
+      res.json(body);
+    }),
+  );
+
+  r.get(
+    "/duplicates",
+    asyncHandler(async (req, res) => {
+      const { month } = dashboardQuerySchema.parse(req.query);
+      res.json(await listDuplicateGroups(prisma, month));
+    }),
+  );
+
+  r.get(
     "/:id",
     asyncHandler(async (req, res) => {
       res.json(await svc.getTransaction(prisma, idParam(req)));
@@ -55,6 +76,15 @@ export function transactionsRouter(prisma: PrismaClient): Router {
       const id = idParam(req);
       const { reason } = reasonRequestSchema.parse(req.body);
       res.json(await svc.voidTransaction(prisma, actorId(req), id, reason));
+    }),
+  );
+
+  r.post(
+    "/:id/correct",
+    asyncHandler(async (req, res) => {
+      const id = idParam(req);
+      const input = transactionCreateSchema.parse(req.body);
+      res.status(201).json(await svc.correctTransaction(prisma, actorId(req), id, input));
     }),
   );
 

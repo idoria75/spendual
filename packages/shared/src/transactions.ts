@@ -21,6 +21,7 @@ import { Scope, TransactionStatus, TransactionType, dateOnlySchema, moneySchema 
  *   POST  /transactions            -> 201 Transaction       body TransactionCreate
  *   PATCH /transactions/:id        -> 200 Transaction       body TransactionPatch (status confirmed)
  *   POST  /transactions/:id/void   -> 200 Transaction       body ReasonRequest (confirmed -> voided)
+ *   POST  /transactions/:id/correct -> 201 Transaction      body TransactionCreate (the right record)
  *   POST  /transactions/:id/cancel -> 200 Transaction       body ReasonRequest (planned -> cancelled)
  *   GET   /transactions/:id/audit  -> 200 AuditEventList
  *
@@ -41,6 +42,9 @@ import { Scope, TransactionStatus, TransactionType, dateOnlySchema, moneySchema 
  *  - PATCH changes only: amount, description, transactionDate, categoryId, accountId,
  *    paymentMethodId, payerId, notes. Type, scope, owner and link never change; void and
  *    re-enter instead. Every PATCH, void and cancel writes one AuditEvent (before, after, reason).
+ *  - correct: one transaction. The confirmed record `:id` is voided (reason "Corrigido (#new)")
+ *    and the body is created as a new record (its create event says "Corrige #id"). Anything
+ *    that fails (has_refunds, validation, wrong status 409) leaves both records unchanged.
  *  - void and cancel need a non-empty `reason` (400 if missing). No hard delete.
  *  - A void or cancel on the wrong status -> 409 invalid_state.
  *  - Voiding an expense that has confirmed refunds -> 409 has_refunds.
@@ -221,6 +225,28 @@ export const transactionListQuerySchema = z.object({
 });
 export type TransactionListQuery = z.infer<typeof transactionListQuerySchema>;
 
+/**
+ * Duplicate checks (read only).
+ *   GET /transactions/similar?type=&amount=&transactionDate=&scope=&ownerId=&description=
+ *       -> 200 TransactionList   confirmed records that look like the one being entered:
+ *       same type, amount, scope (and owner for personal), a date within 3 days, and the same
+ *       description (ignoring case, accents and extra spaces). At most 5, newest first.
+ *   GET /transactions/duplicates?month=
+ *       -> 200 DuplicateGroups   the same match rule applied to the confirmed records of the
+ *       month: each group has 2 or more records. Newest group first.
+ */
+export const DUPLICATE_DAYS = 3;
+
+export const similarQuerySchema = z.object({
+  type: TransactionType,
+  amount: moneySchema,
+  transactionDate: dateOnlySchema,
+  scope: Scope,
+  ownerId: z.coerce.number().int().positive().optional(),
+  description: z.string().trim().min(1).max(200),
+});
+export type SimilarQuery = z.infer<typeof similarQuerySchema>;
+
 export const transactionSchema = z.object({
   id: z.number().int(),
   type: TransactionType,
@@ -260,3 +286,8 @@ export const auditEventSchema = z.object({
 export type AuditEventDto = z.infer<typeof auditEventSchema>;
 export const auditEventListSchema = z.object({ items: z.array(auditEventSchema) });
 export type AuditEventList = z.infer<typeof auditEventListSchema>;
+
+export const duplicateGroupsSchema = z.object({
+  groups: z.array(z.object({ items: z.array(transactionSchema) })),
+});
+export type DuplicateGroups = z.infer<typeof duplicateGroupsSchema>;
