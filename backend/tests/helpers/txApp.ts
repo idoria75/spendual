@@ -42,7 +42,7 @@ export async function setup(prisma: PrismaClient, opts: Partial<AppOptions> = {}
 /** Send a state-changing request with the CSRF token. */
 export async function send(
   agent: Agent,
-  method: "post" | "patch",
+  method: "post" | "patch" | "put",
   url: string,
   body: unknown = {},
 ) {

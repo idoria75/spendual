@@ -315,6 +315,8 @@ model PersonalAllowanceEntry {
 enum BudgetScope {
   OVERALL
   CATEGORY
+  // Monthly savings target (a row with categoryKey "savings")
+  SAVINGS
 }
 
 model MonthlyBudget {

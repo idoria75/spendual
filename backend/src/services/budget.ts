@@ -6,15 +6,23 @@ import { withRetry } from "../lib/withRetry.js";
 export type BudgetEditMode = "going_forward" | "this_period_only";
 
 export interface EditBudgetInput {
-  /** null for the overall household budget */
+  /** null for the overall household budget (or the savings target, see `savings`) */
   categoryId: number | null;
+  /** true: edit the monthly savings target instead of a spending budget */
+  savings?: boolean;
   period: string;
   amount: string;
   mode: BudgetEditMode;
   actorId?: number;
 }
 
-export function budgetKey(categoryId: number | null): { scope: BudgetScope; categoryKey: string } {
+export const SAVINGS_KEY = "savings";
+
+export function budgetKey(
+  categoryId: number | null,
+  savings = false,
+): { scope: BudgetScope; categoryKey: string } {
+  if (savings) return { scope: "SAVINGS", categoryKey: SAVINGS_KEY };
   return categoryId === null
     ? { scope: "OVERALL", categoryKey: "overall" }
     : { scope: "CATEGORY", categoryKey: String(categoryId) };
@@ -25,9 +33,13 @@ export async function budgetFor(
   db: PrismaClient | Prisma.TransactionClient,
   categoryId: number | null,
   period: string,
+  savings = false,
 ) {
   return db.monthlyBudget.findFirst({
-    where: { categoryKey: budgetKey(categoryId).categoryKey, effectiveFrom: { lte: period } },
+    where: {
+      categoryKey: budgetKey(categoryId, savings).categoryKey,
+      effectiveFrom: { lte: period },
+    },
     orderBy: { effectiveFrom: "desc" },
   });
 }
@@ -40,7 +52,7 @@ export async function budgetFor(
  *   insert one at P+1 with the amount that was in force before the edit.
  */
 export function editBudget(prisma: PrismaClient, input: EditBudgetInput): Promise<void> {
-  const { scope, categoryKey } = budgetKey(input.categoryId);
+  const { scope, categoryKey } = budgetKey(input.categoryId, input.savings);
   return withRetry(() =>
     prisma.$transaction(async (tx) => {
       // Edits are rare, so serialize them all on the Household row. This makes
@@ -49,7 +61,7 @@ export function editBudget(prisma: PrismaClient, input: EditBudgetInput): Promis
         Prisma.sql`SELECT id FROM Household WHERE id = ${HOUSEHOLD_ID} FOR UPDATE`,
       );
       if (lock.length === 0) throw new Error("Household row missing. Run the seed.");
-      const before = await budgetFor(tx, input.categoryId, input.period);
+      const before = await budgetFor(tx, input.categoryId, input.period, input.savings);
       await tx.monthlyBudget.upsert({
         where: { categoryKey_effectiveFrom: { categoryKey, effectiveFrom: input.period } },
         update: { amount: input.amount, updatedById: input.actorId },

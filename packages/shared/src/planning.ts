@@ -83,18 +83,27 @@ export const budgetOverviewSchema = z.object({
   month: periodKeySchema,
   overall: budgetLineSchema,
   categories: z.array(budgetLineSchema),
+  /** Monthly savings target: `amount` in force (null = none), `spent` = Sobra do mês so far. */
+  savings: budgetLineSchema,
 });
 export type BudgetOverview = z.infer<typeof budgetOverviewSchema>;
 
 export const BudgetEditMode = z.enum(["going_forward", "this_period_only"]);
 export type BudgetEditMode = z.infer<typeof BudgetEditMode>;
 
-export const budgetEditSchema = z.object({
-  categoryId: z.number().int().positive().nullable(),
-  period: periodKeySchema,
-  amount: moneySchema.refine((s) => Number(s) >= 0, "Must not be negative"),
-  mode: BudgetEditMode,
-});
+export const budgetEditSchema = z
+  .object({
+    categoryId: z.number().int().positive().nullable(),
+    /** true: edit the monthly savings target. Then `categoryId` must be null. */
+    savings: z.boolean().optional(),
+    period: periodKeySchema,
+    amount: moneySchema.refine((s) => Number(s) >= 0, "Must not be negative"),
+    mode: BudgetEditMode,
+  })
+  .refine((b) => !b.savings || b.categoryId === null, {
+    path: ["categoryId"],
+    message: "Must be null for the savings target",
+  });
 export type BudgetEdit = z.infer<typeof budgetEditSchema>;
 
 export const allowanceKindSchema = z.enum(["ALLOCATION", "ADJUSTMENT", "CORRECTION"]);
@@ -161,6 +170,8 @@ export const dashboardSchema = z.object({
   plannedBillsTotal: moneySchema,
   plannedBillsUnknownCount: z.number().int(),
   overallBudget: z.object({ budget: moneySchema.nullable(), spent: moneySchema }),
+  /** Monthly savings target in force; null = none. Compared with `savingsBeforeGoals`. */
+  savingsTarget: moneySchema.nullable(),
   /** Household expenses net of refunds by category, biggest first. Feeds the stacked bar. */
   categorySpending: z.array(
     z.object({ categoryId: z.number().int().nullable(), amount: moneySchema }),
