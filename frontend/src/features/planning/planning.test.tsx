@@ -34,6 +34,7 @@ const dashboard = {
   plannedBillsTotal: "190.00",
   plannedBillsUnknownCount: 2,
   overallBudget: { budget: "4000.00", spent: "5000.00" },
+  savingsTarget: null,
   categorySpending: [
     { categoryId: 2, amount: "3400.00" },
     { categoryId: 1, amount: "1600.00" },
@@ -109,6 +110,7 @@ function base(extra?: Extra): Handler {
       return json(200, {
         month,
         overall: { categoryId: null, amount: "4000.00", spent: "1000.00" },
+        savings: { categoryId: null, amount: null, spent: "0.00" },
         categories: [
           { categoryId: 1, amount: "800.00", spent: "872.00" },
           { categoryId: 2, amount: null, spent: "50.00" },
@@ -437,6 +439,7 @@ describe("Orçamentos", () => {
           ? json(200, {
               month,
               overall: { categoryId: null, amount: null, spent: "0.00" },
+              savings: { categoryId: null, amount: null, spent: "0.00" },
               categories: [],
             })
           : undefined,
@@ -468,6 +471,7 @@ describe("Orçamentos", () => {
           ? json(200, {
               month,
               overall: { categoryId: null, amount: null, spent: "0.00" },
+              savings: { categoryId: null, amount: null, spent: "0.00" },
               categories: [],
             })
           : undefined,
@@ -483,6 +487,34 @@ describe("Orçamentos", () => {
       period: month,
       amount: "4000.00",
       mode: "this_period_only",
+    });
+  });
+
+  it("edits the monthly savings target and shows how far it is", async () => {
+    const mock = mockFetch(
+      base((req) =>
+        req.method === "PUT"
+          ? json(200, {
+              month,
+              overall: { categoryId: null, amount: null, spent: "0.00" },
+              savings: { categoryId: null, amount: "3000.00", spent: "1000.00" },
+              categories: [],
+            })
+          : undefined,
+      ),
+    );
+    renderAt("/orcamentos");
+    const dialog = await openEdit("Meta de poupança");
+    const field = within(dialog).getByLabelText("Valor do orçamento");
+    await userEvent.type(field, "300000");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(callsTo(mock, "/api/budgets", "PUT")).toHaveLength(1));
+    expect(JSON.parse(callsTo(mock, "/api/budgets", "PUT")[0]![1]!.body as string)).toEqual({
+      categoryId: null,
+      savings: true,
+      period: month,
+      amount: "3000.00",
+      mode: "going_forward",
     });
   });
 

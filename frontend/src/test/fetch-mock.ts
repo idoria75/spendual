@@ -62,6 +62,7 @@ export function shellStubs(url: string): Response | null {
       plannedBillsTotal: zero,
       plannedBillsUnknownCount: 0,
       overallBudget: { budget: null, spent: zero },
+      savingsTarget: null,
       categorySpending: [],
       upcoming: [],
       people: [],

@@ -276,6 +276,9 @@
     "savings": "Sobra do mês",
     "unallocated": "Poupança sem destino",
     "inGoals": "Em metas",
+    "target": "Meta de poupança",
+    "targetMet": "Meta atingida",
+    "targetLeft": "Faltam {{amount}} para a meta",
     "unknownCount_one": "mais {{count}} conta sem valor (valor ?)",
     "unknownCount_other": "mais {{count}} contas sem valor (valor ?)",
     "seeBills": "Ver contas a pagar",
@@ -429,6 +432,8 @@
   },
   "budgets": {
     "overall": "Orçamento geral",
+    "savings": "Meta de poupança",
+    "savingsNone": "sem meta de poupança",
     "none": "sem orçamento",
     "of": "de {{amount}}",
     "over": "▲ {{amount}} acima",

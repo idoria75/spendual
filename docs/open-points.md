@@ -77,7 +77,7 @@ Início merge and P1 next steps (2026-10-21):
      - reconciliation tests (the guide requires them)
      - `/metas` page (`Alocar` / `Retirar`) and a goals line on Início
   2. DONE (2026-10-22): audit history. Create events for transactions, rules and plans; `GET /audit`; page `/historico` (Mais menu and sidebar). Not checked on a phone. Gaps: ids (category, payer) show as numbers in the detail sheet; bill rows have no filter chip; no search or date filter.
-  3. Monthly savings target (not started).
+  3. DONE (2026-10-22): monthly savings target. One amount for the household, set on `Orçamentos` (`Meta de poupança`, from this month on or this month only, like a budget). Compared with `Sobra do mês`; Início shows a bar and `Faltam ...` or `Meta atingida`. Stored as a `MonthlyBudget` row with scope `SAVINGS`. 0 means no target. Not checked on a phone. Not done: no alert when missed; no history of past targets in Análises.
   4. CSV export (not started); CSV import with preview and duplicate detection is Phase 7.
   5. Later: fuller personal budget screens, spending pace (this month vs same elapsed part of last month), duplicate and correction workflows.
 - Questions to answer before planning Metas: target amount and date from the start? Who may close a goal? Can a goal be reopened?

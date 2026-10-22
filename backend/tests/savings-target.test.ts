@@ -49,7 +49,6 @@ describe("monthly savings target", () => {
     expect(none.savings).toEqual({ categoryId: null, amount: null, spent: "4000.00" });
     expect(await target("2027-03")).toBeNull();
 
-    const first = await put("2027-03", "3000.00", "going_forward");
     expect((await put("2027-03", "3000.00", "going_forward")).status).toBe(200);
     const set = await overview("2027-03");
     expect(set.savings.amount).toBe("3000.00");

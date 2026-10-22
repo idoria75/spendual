@@ -12,7 +12,7 @@ import { useEntry } from "../transactions/entry";
 import { useLookups } from "../transactions/lookups";
 import { useMonth } from "../transactions/month";
 import { fetchBills, fetchDashboard } from "./api";
-import { percentOf } from "./display";
+import { Bar, percentOf } from "./display";
 import { BillRow } from "./BillsView";
 import { useLoad } from "./use-load";
 
@@ -187,42 +187,75 @@ function MonthResult({ d }: { d: Dashboard }) {
   // With no goal money in the month the two savings numbers match; show the split only then.
   const goalNet = toCents(d.goalAllocationsNet);
   const showUnallocated = goalNet !== 0n;
+  const target = d.savingsTarget === null ? null : toCents(d.savingsTarget);
   return (
-    <details className="group border-t border-line pt-1">
-      <summary className="flex min-h-[44px] cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
-        <span className="flex items-baseline gap-2">
-          <span className="text-[0.85rem] text-muted">{t("dashboard.savings")}</span>
-          <span
+    <>
+      {target !== null && target > 0n ? (
+        <div className="flex flex-col gap-1 border-t border-line pt-2">
+          <div className="flex items-baseline justify-between gap-3 text-[0.85rem]">
+            <span className="text-muted">{t("dashboard.target")}</span>
+            <span className="tabular-nums">{formatMoney(d.savingsTarget ?? "0.00")}</span>
+          </div>
+          <Bar
+            label={t("dashboard.target")}
+            percent={percentOf(savings, target)}
+            over={false}
+            color="var(--pos)"
+          />
+          <p
             className={cn(
-              "font-bold tabular-nums",
-              savings > 0n && "text-pos",
-              savings < 0n && "text-warn",
+              "text-[0.8rem]",
+              savings >= target ? "font-semibold text-pos" : "text-muted",
             )}
           >
-            {formatMoney(d.savingsBeforeGoals)}
+            {savings >= target
+              ? t("dashboard.targetMet")
+              : t("dashboard.targetLeft", { amount: formatMoney(fromCents(target - savings)) })}
+          </p>
+        </div>
+      ) : null}
+      <details className="group border-t border-line pt-1">
+        <summary className="flex min-h-[44px] cursor-pointer list-none items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
+          <span className="flex items-baseline gap-2">
+            <span className="text-[0.85rem] text-muted">{t("dashboard.savings")}</span>
+            <span
+              className={cn(
+                "font-bold tabular-nums",
+                savings > 0n && "text-pos",
+                savings < 0n && "text-warn",
+              )}
+            >
+              {formatMoney(d.savingsBeforeGoals)}
+            </span>
           </span>
-        </span>
-        <span className="flex items-center gap-1 text-[0.85rem] font-semibold text-accent">
-          {t("dashboard.details")}
-          <ChevronDown size={16} aria-hidden className="transition-none group-open:rotate-180" />
-        </span>
-      </summary>
-      <dl className="flex flex-col gap-2 pb-1 pt-1">
-        <ResultRow label={t("dashboard.income")} value={formatMoney(d.householdIncome)} />
-        <ResultRow label={t("dashboard.sharedExpenses")} value={formatMoney(d.sharedExpensesNet)} />
-        <ResultRow label={t("dashboard.allowances")} value={formatMoney(d.allowanceAllocations)} />
-        {showUnallocated ? (
-          <>
-            <ResultRow label={t("dashboard.inGoals")} value={formatMoney(d.goalAllocationsNet)} />
-            <ResultRow
-              label={t("dashboard.unallocated")}
-              value={formatMoney(d.unallocatedSavings)}
-            />
-          </>
-        ) : null}
-      </dl>
-      <p className="pb-1 text-[0.78rem] text-muted">{t("dashboard.savingsHint")}</p>
-    </details>
+          <span className="flex items-center gap-1 text-[0.85rem] font-semibold text-accent">
+            {t("dashboard.details")}
+            <ChevronDown size={16} aria-hidden className="transition-none group-open:rotate-180" />
+          </span>
+        </summary>
+        <dl className="flex flex-col gap-2 pb-1 pt-1">
+          <ResultRow label={t("dashboard.income")} value={formatMoney(d.householdIncome)} />
+          <ResultRow
+            label={t("dashboard.sharedExpenses")}
+            value={formatMoney(d.sharedExpensesNet)}
+          />
+          <ResultRow
+            label={t("dashboard.allowances")}
+            value={formatMoney(d.allowanceAllocations)}
+          />
+          {showUnallocated ? (
+            <>
+              <ResultRow label={t("dashboard.inGoals")} value={formatMoney(d.goalAllocationsNet)} />
+              <ResultRow
+                label={t("dashboard.unallocated")}
+                value={formatMoney(d.unallocatedSavings)}
+              />
+            </>
+          ) : null}
+        </dl>
+        <p className="pb-1 text-[0.78rem] text-muted">{t("dashboard.savingsHint")}</p>
+      </details>
+    </>
   );
 }
 

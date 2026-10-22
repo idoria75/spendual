@@ -36,6 +36,7 @@ function handler(extra?: (req: Parameters<Handler>[0]) => Response | undefined):
       return json(200, {
         month: currentMonth(),
         overall: { categoryId: null, amount: "0.00", spent: "0.00" },
+        savings: { categoryId: null, amount: null, spent: "0.00" },
         categories: [],
       });
     if (path === "/api/allowances") return json(200, { month: currentMonth(), people: [] });

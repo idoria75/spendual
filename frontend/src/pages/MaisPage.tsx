@@ -1,4 +1,12 @@
-import { ChartColumn, ChevronRight, History, PiggyBank, Settings, User, Wallet } from "lucide-react";
+import {
+  ChartColumn,
+  ChevronRight,
+  History,
+  PiggyBank,
+  Settings,
+  User,
+  Wallet,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 

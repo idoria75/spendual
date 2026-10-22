@@ -14,6 +14,8 @@ import { putBudget } from "./api";
 export interface BudgetTarget {
   line: BudgetLine;
   name: string;
+  /** true: the monthly savings target, not a spending budget. */
+  savings?: boolean;
 }
 
 interface Props {
@@ -62,6 +64,7 @@ function BudgetForm({
     setFormError(null);
     const parsed = budgetEditSchema.safeParse({
       categoryId: target.line.categoryId,
+      ...(target.savings ? { savings: true } : {}),
       period: month,
       amount: parseAmountInput(amount) ?? "",
       mode,
