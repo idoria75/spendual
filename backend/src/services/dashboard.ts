@@ -17,7 +17,15 @@ import {
   unallocatedSavings,
 } from "../domain/accounting.js";
 import { AppError } from "../auth/errors.js";
-import { currentDate, currentPeriod, dateOnlyToDate, nextPeriod } from "../lib/period.js";
+import {
+  addPeriods,
+  currentDate,
+  currentPeriod,
+  dateOnlyToDate,
+  daysInMonth,
+  nextPeriod,
+  parsePeriod,
+} from "../lib/period.js";
 import { withRetry } from "../lib/withRetry.js";
 import { SAVINGS_KEY, budgetFor, budgetKey } from "./budget.js";
 import { installmentBill, recurrenceBill } from "./bills.js";
@@ -262,9 +270,41 @@ export async function getDashboard(
       spent: centsToMoney(sharedNet),
     },
     savingsTarget: target ? target.amount.toFixed(2) : null,
+    pace: await spendingPace(prisma, month, now),
     categorySpending: spending,
     upcoming,
     people,
+  };
+}
+
+/**
+ * Household spending of the current month up to today, against the same days of last month.
+ * null for any other month. A short last month is clamped (day 31 on a 30 day month).
+ */
+async function spendingPace(db: Db, month: string, now: Date): Promise<Dashboard["pace"]> {
+  if (month !== currentPeriod(now)) return null;
+  const day = Number(currentDate(now).slice(8, 10));
+  const last = addPeriods(month, -1);
+  const { year, month: m } = parsePeriod(last);
+  const lastDay = Math.min(day, daysInMonth(year, m));
+  const upTo = (period: string, days: number): Range => {
+    const start = monthRange(period);
+    return {
+      gte: start.gte as Date,
+      lt: new Date((start.gte as Date).getTime() + days * 86_400_000),
+    };
+  };
+  const household = { scope: "household" as const };
+  const [spent, lastSame, lastTotal] = await Promise.all([
+    netSpent(db, household, upTo(month, day)),
+    netSpent(db, household, upTo(last, lastDay)),
+    netSpent(db, household, monthRange(last)),
+  ]);
+  return {
+    day,
+    spent: centsToMoney(spent),
+    lastMonthSameDays: centsToMoney(lastSame),
+    lastMonthTotal: centsToMoney(lastTotal),
   };
 }
 

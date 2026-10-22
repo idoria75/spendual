@@ -170,6 +170,19 @@ export const dashboardSchema = z.object({
   plannedBillsTotal: moneySchema,
   plannedBillsUnknownCount: z.number().int(),
   overallBudget: z.object({ budget: moneySchema.nullable(), spent: moneySchema }),
+  /**
+   * Spending pace, only when `month` is the current month: household expenses net of refunds
+   * from day 1 to `day`, against the same days of the previous month. Not a forecast.
+   */
+  pace: z
+    .object({
+      day: z.number().int(),
+      spent: moneySchema,
+      lastMonthSameDays: moneySchema,
+      lastMonthTotal: moneySchema,
+    })
+    .nullable()
+    .default(null),
   /** Monthly savings target in force; null = none. Compared with `savingsBeforeGoals`. */
   savingsTarget: moneySchema.nullable(),
   /** Household expenses net of refunds by category, biggest first. Feeds the stacked bar. */
