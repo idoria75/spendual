@@ -271,7 +271,7 @@
     "income": "Receitas da casa",
     "sharedExpenses": "Despesas da casa",
     "allowances": "Mesadas",
-    "savings": "Poupança do mês",
+    "savings": "Sobra do mês",
     "unallocated": "Poupança sem destino",
     "inGoals": "Em metas",
     "unknownCount_one": "mais {{count}} conta sem valor (valor ?)",
