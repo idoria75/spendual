@@ -1061,10 +1061,14 @@ describe("Início chart and upcoming bills", () => {
     expect(within(block).getByText("Meta de poupança")).toBeInTheDocument();
     expect(within(block).getByText("Faltam R$ 1.000,00")).toBeInTheDocument();
     expect(within(block).getByText("50% a mais")).toHaveClass("text-warn");
+    const prevMonth = shiftMonth(month, -1).slice(5);
+    expect(block).toHaveTextContent(`Até 12/${month.slice(5)}: R$ 1.500,00`);
+    expect(block).toHaveTextContent(`Até 12/${prevMonth}: R$ 1.000,00`);
     expect(block).toHaveTextContent(
-      `Até 12/${month.slice(5)}: R$ 1.500,00 · mês passado: R$ 1.000,00`,
+      `Total de ${new Intl.DateTimeFormat("pt-BR", { month: "long", timeZone: "UTC" }).format(
+        new Date(`${shiftMonth(month, -1)}-01T00:00:00Z`),
+      )}: R$ 3.000,00`,
     );
-    expect(block).toHaveTextContent("Mês passado fechou em R$ 3.000,00");
   });
 
   it("sizes the bar against the budget: two halves of 50 % take 25 % each and the rest stays empty", async () => {

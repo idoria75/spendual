@@ -362,6 +362,8 @@ model SavingsGoal {
   targetDate   DateTime?  @db.Date
   currency     String     @default("BRL") @db.VarChar(3)
   status       GoalStatus @default(active)
+  // Amount reached when the goal was completed (before the money went back). null otherwise.
+  finalAmount  Decimal?   @db.Decimal(12, 2)
   // null = shared by the household; set = personal goal of that user (money from their own balance)
   ownerId      Int?
   createdById  Int

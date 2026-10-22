@@ -164,7 +164,27 @@ describe("goals", () => {
     });
     expect(patched.body.name).toBe("Casa nova");
 
+    // Completed by hand with nothing left: the amount it reached (50,00) is kept.
+    expect(done.body.finalAmount).toBe("50.00");
     expect((await act(g.id, "reopen")).body.status).toBe("active");
+    expect((await ctx.ana.get(`/api/goals/${g.id}/entries`)).body.items).toHaveLength(2);
+    expect(
+      goalListSchema.parse((await ctx.ana.get("/api/goals")).body).items[0]?.finalAmount,
+    ).toBeNull();
+
+    // Complete with withdrawAll: the money goes back in the same step and the amount is kept.
+    expect((await move(g.id, "allocations", "30.00")).status).toBe(201);
+    const closed = await send(ctx.ana, "post", `/api/goals/${g.id}/complete`, {
+      withdrawAll: true,
+    });
+    expect(closed.status).toBe(200);
+    expect(closed.body).toMatchObject({
+      status: "completed",
+      balance: "0.00",
+      finalAmount: "30.00",
+    });
+    expect((await dash()).unallocatedSavings).toBe("100.00");
+    expect((await act(g.id, "reopen")).body.finalAmount).toBeNull();
     expect((await move(g.id, "allocations", "5.00")).status).toBe(201);
     await move(g.id, "withdrawals", "5.00");
     expect((await act(g.id, "archive")).body.status).toBe("archived");
@@ -181,7 +201,7 @@ describe("goals", () => {
       expect(r.body.error.code).toBe("invalid_state");
     }
     // History stays readable.
-    expect((await ctx.ana.get(`/api/goals/${g.id}/entries`)).body.items).toHaveLength(4);
+    expect((await ctx.ana.get(`/api/goals/${g.id}/entries`)).body.items).toHaveLength(6);
     expect((await ctx.ana.get("/api/goals/9999/entries")).status).toBe(404);
   });
 

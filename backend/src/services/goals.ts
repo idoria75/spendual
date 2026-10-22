@@ -33,7 +33,11 @@ export async function goalBalance(db: Db | PrismaClient, goalId: number): Promis
   return rows.reduce((acc, r) => acc.add(signed(r.kind, r._sum.amount ?? ZERO)), ZERO);
 }
 
-function toGoalDto(g: SavingsGoal, balance: Prisma.Decimal): Goal {
+function toGoalDto(
+  g: SavingsGoal,
+  balance: Prisma.Decimal,
+  final: Prisma.Decimal | null = null,
+): Goal {
   return {
     id: g.id,
     name: g.name,
@@ -42,6 +46,7 @@ function toGoalDto(g: SavingsGoal, balance: Prisma.Decimal): Goal {
     targetDate: g.targetDate ? dateToDateOnly(g.targetDate) : null,
     currency: g.currency,
     status: g.status,
+    finalAmount: g.status === "completed" ? moneyToString(g.finalAmount ?? final ?? ZERO) : null,
     ownerId: g.ownerId,
     balance: moneyToString(balance),
     createdById: g.createdById,
@@ -64,6 +69,30 @@ export function toGoalEntryDto(e: GoalEntry): GoalEntryDto {
     createdAt: e.createdAt.toISOString(),
   };
 }
+
+/**
+ * Highest balance a goal ever had, by entry date. Stands in for `finalAmount` on goals that were
+ * completed before that column existed.
+ */
+async function peakBalance(db: Db | PrismaClient, goalId: number): Promise<Prisma.Decimal> {
+  const rows = await db.goalEntry.findMany({
+    where: { goalId },
+    orderBy: [{ effectiveDate: "asc" }, { id: "asc" }],
+  });
+  let running = ZERO;
+  let peak = ZERO;
+  for (const e of rows) {
+    running = running.add(signed(e.kind, e.amount));
+    if (running.gt(peak)) peak = running;
+  }
+  return peak;
+}
+
+/** Amount for the DTO of a completed goal that has no `finalAmount` stored. */
+const finalFor = (db: Db | PrismaClient, g: SavingsGoal) =>
+  g.status === "completed" && g.finalAmount === null
+    ? peakBalance(db, g.id)
+    : Promise.resolve(null);
 
 /** Lock the goal row until the DB transaction ends. Returns it fresh, or throws 404. */
 async function lockGoal(tx: Db, id: number): Promise<SavingsGoal> {
@@ -102,13 +131,15 @@ export async function listGoals(prisma: PrismaClient): Promise<Goal[]> {
     const cur = balances.get(s.goalId) ?? ZERO;
     balances.set(s.goalId, cur.add(signed(s.kind, s._sum.amount ?? ZERO)));
   }
-  return goals.map((g) => toGoalDto(g, balances.get(g.id) ?? ZERO));
+  return Promise.all(
+    goals.map(async (g) => toGoalDto(g, balances.get(g.id) ?? ZERO, await finalFor(prisma, g))),
+  );
 }
 
 export async function getGoal(prisma: PrismaClient, id: number): Promise<Goal> {
   const g = await prisma.savingsGoal.findUnique({ where: { id } });
   if (!g) throw new AppError(404, "not_found", "Goal not found");
-  return toGoalDto(g, await goalBalance(prisma, id));
+  return toGoalDto(g, await goalBalance(prisma, id), await finalFor(prisma, g));
 }
 
 export async function listEntries(prisma: PrismaClient, id: number): Promise<GoalEntryDto[]> {
@@ -183,7 +214,7 @@ export function patchGoal(
         before: snapshot(cur, balance),
         after: snapshot(row, balance),
       });
-      return toGoalDto(row, balance);
+      return toGoalDto(row, balance, await finalFor(tx, row));
     }),
   );
 }
@@ -292,6 +323,7 @@ export function transition(
   actorId: number,
   id: number,
   name: Transition,
+  opts: { withdrawAll?: boolean; now?: Date } = {},
 ): Promise<Goal> {
   const t = TRANSITIONS[name];
   return withRetry(() =>
@@ -299,15 +331,42 @@ export function transition(
       const cur = await lockGoal(tx, id);
       requireOwner(cur, actorId);
       requireStatus(cur, ...t.from);
-      const balance = await goalBalance(tx, id);
+      let balance = await goalBalance(tx, id);
+      // Completing can return the money in the same step. The amount reached is kept apart.
+      let reached: Prisma.Decimal | null = null;
+      if (name === "complete" && opts.withdrawAll && balance.gt(ZERO)) {
+        reached = balance;
+        await tx.goalEntry.create({
+          data: {
+            goalId: id,
+            kind: "WITHDRAWAL",
+            amount: balance,
+            currency: cur.currency,
+            effectiveDate: dateOnlyToDate(currentDate(opts.now)),
+            actorId,
+            notes: "Meta concluída",
+          },
+        });
+        balance = ZERO;
+      }
       if (t.needsZero && !balance.isZero()) {
         throw new AppError(409, "goal_has_balance", "Goal still has money", {
           balance: moneyToString(balance),
         });
       }
+      const finalAmount =
+        name === "complete"
+          ? (reached ?? (await peakBalance(tx, id)))
+          : name === "reopen"
+            ? null
+            : undefined;
       const row = await tx.savingsGoal.update({
         where: { id },
-        data: { status: t.to, updatedById: actorId },
+        data: {
+          status: t.to,
+          updatedById: actorId,
+          ...(finalAmount !== undefined ? { finalAmount } : {}),
+        },
       });
       await writeAudit(tx, {
         actorId,

@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { cn } from "../../lib/cn";
 import { formatMoney, fromCents, toCents } from "../../lib/currency";
-import { currentMonth, formatDayMonth } from "../../lib/date";
+import { currentMonth, formatDayMonth, shiftMonth } from "../../lib/date";
 import { CategoryTile, categoryColor } from "../transactions/CategoryTile";
 import { spendingLink } from "../transactions/drilldown";
 import { useEntry } from "../transactions/entry";
@@ -119,6 +119,7 @@ function BalanceCard({ d }: { d: Dashboard }) {
             {formatMoney(fromCents(balance))}
           </p>
         )}
+        <p className="mt-1 text-[0.78rem] text-muted">{t("dashboard.balanceHint")}</p>
         <Pending d={d} balance={balance} />
       </div>
 
@@ -221,6 +222,14 @@ function BalanceCard({ d }: { d: Dashboard }) {
   );
 }
 
+const monthNameFmt = new Intl.DateTimeFormat("pt-BR", { month: "long", timeZone: "UTC" });
+
+/** "2026-09" -> "setembro" */
+function monthName(month: string): string {
+  const [y = 0, m = 1] = month.split("-").map(Number);
+  return monthNameFmt.format(new Date(Date.UTC(y, m - 1, 1)));
+}
+
 /**
  * Spending so far against the same days of last month. Only for the current month, and only when
  * last month had spending by that day. A comparison, not a forecast (guide section 9).
@@ -236,18 +245,34 @@ function Pace({ d }: { d: Dashboard }) {
     diff === 0n
       ? t("dashboard.paceSame")
       : t(diff > 0n ? "dashboard.paceMore" : "dashboard.paceLess", { percent });
+  // Same day last month; a short month is clamped (the 31st becomes the 30th).
+  const prev = shiftMonth(d.month, -1);
+  const [py = 0, pm = 1] = prev.split("-").map(Number);
+  const lastDayNumber = Math.min(pace.day, new Date(Date.UTC(py, pm, 0)).getUTCDate());
+  const thisDay = `${d.month}-${String(pace.day).padStart(2, "0")}`;
+  const lastDay = `${prev}-${String(lastDayNumber).padStart(2, "0")}`;
   return (
     <div className="flex flex-col gap-1 border-t border-line pt-2 text-[0.85rem]">
-      <p className="text-muted">
-        {t("dashboard.paceLine", {
-          date: formatDayMonth(`${d.month}-${String(pace.day).padStart(2, "0")}`),
-          spent: formatMoney(pace.spent),
-          last: formatMoney(pace.lastMonthSameDays),
-        })}
-      </p>
+      <div className="flex flex-col text-muted">
+        <p>
+          {t("dashboard.paceNow", {
+            date: formatDayMonth(thisDay),
+            spent: formatMoney(pace.spent),
+          })}
+        </p>
+        <p>
+          {t("dashboard.paceBefore", {
+            date: formatDayMonth(lastDay),
+            last: formatMoney(pace.lastMonthSameDays),
+          })}
+        </p>
+      </div>
       <p className={cn("font-semibold", diff > 0n ? "text-warn" : "text-pos")}>{verdict}</p>
       <p className="text-[0.78rem] text-muted">
-        {t("dashboard.paceHint", { total: formatMoney(pace.lastMonthTotal) })}
+        {t("dashboard.paceHint", {
+          month: monthName(prev),
+          total: formatMoney(pace.lastMonthTotal),
+        })}
       </p>
     </div>
   );

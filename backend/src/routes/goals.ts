@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { PrismaClient } from "@prisma/client";
 import {
   goalCreateSchema,
+  goalCompleteSchema,
   goalMoveSchema,
   goalPatchSchema,
   type GoalEntryList,
@@ -75,7 +76,13 @@ export function goalsRouter(prisma: PrismaClient, clock: () => Date = () => new 
     r.post(
       `/goals/:id/${name}`,
       asyncHandler(async (req, res) => {
-        res.json(await goals.transition(prisma, actorId(req), idParam(req), name));
+        const opts = name === "complete" ? goalCompleteSchema.parse(req.body ?? {}) : {};
+        res.json(
+          await goals.transition(prisma, actorId(req), idParam(req), name, {
+            ...opts,
+            now: clock(),
+          }),
+        );
       }),
     );
   }

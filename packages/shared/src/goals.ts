@@ -12,7 +12,7 @@ import { positiveMoneySchema } from "./transactions.js";
  *   PATCH /goals/:id               -> 200 Goal             body GoalPatch (active or completed)
  *   POST  /goals/:id/allocations   -> 201 Goal             body GoalMove (active only)
  *   POST  /goals/:id/withdrawals   -> 201 Goal             body GoalMove (active only)
- *   POST  /goals/:id/complete      -> 200 Goal             (active -> completed)
+ *   POST  /goals/:id/complete      -> 200 Goal             body GoalComplete, optional (active -> completed)
  *   POST  /goals/:id/reopen        -> 200 Goal             (completed -> active)
  *   POST  /goals/:id/archive       -> 200 Goal             (active or completed -> archived)
  *   GET   /goals/:id/entries       -> 200 GoalEntryList    (newest first)
@@ -23,7 +23,9 @@ import { positiveMoneySchema } from "./transactions.js";
  *  - A withdrawal goes back to unallocated savings only. Over the balance -> 409 insufficient_balance.
  *  - An allocation above the unallocated savings of the entry month -> 409 insufficient_savings.
  *  - A write on a goal in the wrong status -> 409 invalid_state. `archived` is final and read only.
- *  - complete and archive need a zero balance, else 409 goal_has_balance.
+ *  - complete and archive need a zero balance, else 409 goal_has_balance. `complete` with
+ *    `withdrawAll: true` first returns the balance to the savings (one entry, one step) and keeps
+ *    the amount as `finalAmount`; `reopen` clears it.
  *  - Personal goals (`ownerId` set, created with `personal: true`): both people can read them,
  *    only the owner can change them (else 403 forbidden). A deposit comes from the owner's own
  *    personal balance and is refused above it (409 insufficient_personal); a withdrawal goes
@@ -46,6 +48,11 @@ export const goalSchema = z.object({
   targetDate: dateOnlySchema.nullable(),
   currency: z.string(),
   status: GoalStatus,
+  /**
+   * Completed goals: the amount reached when it was completed (the balance is 0 once the money
+   * is back). null for goals that are not completed.
+   */
+  finalAmount: moneySchema.nullable().default(null),
   /** null = shared by the household; a user id = personal goal of that user. */
   ownerId: z.number().int().nullable().default(null),
   balance: moneySchema,
@@ -98,6 +105,10 @@ export const goalPatchSchema = z
   .partial()
   .refine((v) => Object.keys(v).length > 0, "Empty patch");
 export type GoalPatch = z.infer<typeof goalPatchSchema>;
+
+/** Body of POST /goals/:id/complete. `withdrawAll` returns the balance in the same step. */
+export const goalCompleteSchema = z.object({ withdrawAll: z.boolean().optional() });
+export type GoalComplete = z.infer<typeof goalCompleteSchema>;
 
 /** Body of an allocation or a withdrawal. */
 export const goalMoveSchema = z.object({
