@@ -24,6 +24,10 @@ import { positiveMoneySchema } from "./transactions.js";
  *  - An allocation above the unallocated savings of the entry month -> 409 insufficient_savings.
  *  - A write on a goal in the wrong status -> 409 invalid_state. `archived` is final and read only.
  *  - complete and archive need a zero balance, else 409 goal_has_balance.
+ *  - Personal goals (`ownerId` set, created with `personal: true`): both people can read them,
+ *    only the owner can change them (else 403 forbidden). A deposit comes from the owner's own
+ *    personal balance and is refused above it (409 insufficient_personal); a withdrawal goes
+ *    back to that balance. They never touch the household's unallocated savings.
  *  - `effectiveDate` decides the month an entry counts in on Inicio. Its month must be inside
  *    the usual month window. Default: today.
  */
@@ -42,6 +46,8 @@ export const goalSchema = z.object({
   targetDate: dateOnlySchema.nullable(),
   currency: z.string(),
   status: GoalStatus,
+  /** null = shared by the household; a user id = personal goal of that user. */
+  ownerId: z.number().int().nullable().default(null),
   balance: moneySchema,
   createdById: z.number().int(),
   updatedById: z.number().int(),
@@ -77,6 +83,8 @@ export const goalCreateSchema = z.object({
   description: descriptionSchema.nullable().optional(),
   targetAmount: positiveMoneySchema.nullable().optional(),
   targetDate: dateOnlySchema.nullable().optional(),
+  /** true: a personal goal of the signed-in user (deposits come from their own balance). */
+  personal: z.boolean().optional(),
 });
 export type GoalCreate = z.infer<typeof goalCreateSchema>;
 

@@ -13,7 +13,7 @@ import { HOUSEHOLD_ID } from "../lib/household.js";
 import { currentDate, dateOnlyToDate, dateToDateOnly } from "../lib/period.js";
 import { moneyToString } from "../lib/serialize.js";
 import { withRetry } from "../lib/withRetry.js";
-import { unallocatedForMonth } from "./dashboard.js";
+import { personalClosing, unallocatedForMonth } from "./dashboard.js";
 
 type Db = Prisma.TransactionClient;
 
@@ -42,6 +42,7 @@ function toGoalDto(g: SavingsGoal, balance: Prisma.Decimal): Goal {
     targetDate: g.targetDate ? dateToDateOnly(g.targetDate) : null,
     currency: g.currency,
     status: g.status,
+    ownerId: g.ownerId,
     balance: moneyToString(balance),
     createdById: g.createdById,
     updatedById: g.updatedById,
@@ -72,6 +73,13 @@ async function lockGoal(tx: Db, id: number): Promise<SavingsGoal> {
   const row = rows.length > 0 ? await tx.savingsGoal.findUnique({ where: { id } }) : null;
   if (!row) throw new AppError(404, "not_found", "Goal not found");
   return row;
+}
+
+/** A personal goal can be read by both people but changed only by its owner. */
+function requireOwner(g: SavingsGoal, actorId: number): void {
+  if (g.ownerId !== null && g.ownerId !== actorId) {
+    throw new AppError(403, "forbidden", "Only the owner can change a personal goal");
+  }
 }
 
 function requireStatus(g: SavingsGoal, ...allowed: SavingsGoal["status"][]): void {
@@ -126,6 +134,7 @@ export function createGoal(
           description: input.description ?? null,
           targetAmount: input.targetAmount ?? null,
           targetDate: input.targetDate ? dateOnlyToDate(input.targetDate) : null,
+          ownerId: input.personal ? actorId : null,
           createdById: actorId,
           updatedById: actorId,
         },
@@ -151,6 +160,7 @@ export function patchGoal(
   return withRetry(() =>
     prisma.$transaction(async (tx) => {
       const cur = await lockGoal(tx, id);
+      requireOwner(cur, actorId);
       requireStatus(cur, "active", "completed");
       const balance = await goalBalance(tx, id);
       const row = await tx.savingsGoal.update({
@@ -189,17 +199,32 @@ function move(kind: "ALLOCATION" | "WITHDRAWAL") {
   ): Promise<Goal> =>
     withRetry(() =>
       prisma.$transaction(async (tx) => {
-        // Allocations of different goals share one pool of savings: serialize them on the household row.
-        if (kind === "ALLOCATION") {
+        const first = await tx.savingsGoal.findUnique({ where: { id }, select: { ownerId: true } });
+        // Allocations of different goals share one pool of savings: serialize them on the
+        // household row. A personal goal draws on its owner's balance: serialize on that user.
+        if (kind === "ALLOCATION" && first) {
           await tx.$queryRaw(
-            Prisma.sql`SELECT id FROM Household WHERE id = ${HOUSEHOLD_ID} FOR UPDATE`,
+            first.ownerId === null
+              ? Prisma.sql`SELECT id FROM Household WHERE id = ${HOUSEHOLD_ID} FOR UPDATE`
+              : Prisma.sql`SELECT id FROM User WHERE id = ${first.ownerId} FOR UPDATE`,
           );
         }
         const cur = await lockGoal(tx, id);
+        requireOwner(cur, actorId);
         requireStatus(cur, "active");
         const amount = new Prisma.Decimal(input.amount);
         const effectiveDate = input.effectiveDate ?? currentDate(now);
-        if (kind === "ALLOCATION") {
+        if (kind === "ALLOCATION" && cur.ownerId !== null) {
+          const free = await personalClosing(tx, cur.ownerId, effectiveDate.slice(0, 7));
+          if (moneyToCents(amount.toFixed(2)) > free) {
+            throw new AppError(
+              409,
+              "insufficient_personal",
+              "Deposit is above the personal balance",
+              { amount: "Above the personal balance" },
+            );
+          }
+        } else if (kind === "ALLOCATION") {
           const free = await unallocatedForMonth(tx, effectiveDate.slice(0, 7));
           if (moneyToCents(amount.toFixed(2)) > free) {
             throw new AppError(
@@ -267,6 +292,7 @@ export function transition(
   return withRetry(() =>
     prisma.$transaction(async (tx) => {
       const cur = await lockGoal(tx, id);
+      requireOwner(cur, actorId);
       requireStatus(cur, ...t.from);
       const balance = await goalBalance(tx, id);
       if (t.needsZero && !balance.isZero()) {

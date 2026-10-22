@@ -44,6 +44,7 @@ model User {
   goalsUpdated   SavingsGoal[]            @relation("GoalUpdatedBy")
   goalEntries    GoalEntry[]              @relation("GoalEntryActor")
   auditEvents    AuditEvent[]             @relation("AuditActor")
+  ownedGoals     SavingsGoal[]            @relation("GoalOwner")
 }
 
 enum CategoryKind {
@@ -361,6 +362,8 @@ model SavingsGoal {
   targetDate   DateTime?  @db.Date
   currency     String     @default("BRL") @db.VarChar(3)
   status       GoalStatus @default(active)
+  // null = shared by the household; set = personal goal of that user (money from their own balance)
+  ownerId      Int?
   createdById  Int
   updatedById  Int
   createdAt    DateTime   @default(now())
@@ -368,10 +371,12 @@ model SavingsGoal {
 
   createdBy User        @relation("GoalCreatedBy", fields: [createdById], references: [id])
   updatedBy User        @relation("GoalUpdatedBy", fields: [updatedById], references: [id])
+  owner     User?       @relation("GoalOwner", fields: [ownerId], references: [id])
   entries   GoalEntry[]
 
   @@index([createdById])
   @@index([updatedById])
+  @@index([ownerId])
 }
 
 // Append-only. Correct mistakes by adding entries, never by editing rows.

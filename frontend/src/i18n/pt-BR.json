@@ -49,6 +49,8 @@
     "goal_has_balance": "A meta ainda tem saldo. Retire o valor antes de encerrar.",
     "insufficient_balance": "O valor é maior que o saldo da meta.",
     "insufficient_savings": "O valor é maior que a poupança sem destino.",
+    "insufficient_personal": "O valor é maior que o seu saldo pessoal.",
+    "forbidden": "Só quem criou esta meta pode mudá-la.",
     "tone_taken": "Esse tom já é da outra pessoa.",
     "internal_error": "Algo deu errado. Tente de novo em instantes.",
     "network": "Sem conexão com o servidor. Tente de novo."

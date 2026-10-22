@@ -67,6 +67,8 @@ export const personSummarySchema = z.object({
   personalCredits: moneySchema, // confirmed personal income and other_receipt
   /** Opening balance + month movements. Unused allowance is never reset. */
   closingBalance: moneySchema,
+  /** Net put into the person's personal goals this month (deposits - withdrawals); already left out of `closingBalance`. */
+  goalNet: moneySchema.default("0.00"),
 });
 export type PersonSummary = z.infer<typeof personSummarySchema>;
 
@@ -397,6 +399,8 @@ export const personalPointSchema = z.object({
   allowance: moneySchema,
   credits: moneySchema,
   spent: moneySchema,
+  /** Net put into personal goals this month. */
+  goals: moneySchema.default("0.00"),
   closing: moneySchema,
   partial: z.boolean(),
 });

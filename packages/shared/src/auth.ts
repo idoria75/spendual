@@ -61,6 +61,8 @@ export const ApiErrorCode = z.enum([
   "goal_has_balance",
   "insufficient_balance",
   "insufficient_savings",
+  "insufficient_personal",
+  "forbidden",
   "tone_taken",
   "internal_error",
 ]);

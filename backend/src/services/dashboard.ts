@@ -121,14 +121,17 @@ export async function personalHistory(
     const allowance = moneyToCents(s.allowanceAllocated);
     const credits = moneyToCents(s.personalCredits);
     const spent = moneyToCents(s.personalSpent);
-    const idle = closing === 0n && allowance === 0n && credits === 0n && spent === 0n;
+    const goals = moneyToCents(s.goalNet);
+    const idle =
+      closing === 0n && allowance === 0n && credits === 0n && spent === 0n && goals === 0n;
     if (points.length === 0 && idle) continue;
     points.push({
       month,
-      opening: centsToMoney(closing - allowance - credits + spent),
+      opening: centsToMoney(closing - allowance - credits + spent + goals),
       allowance: s.allowanceAllocated,
       credits: s.personalCredits,
       spent: s.personalSpent,
+      goals: s.goalNet,
       closing: s.closingBalance,
       partial: month === current,
     });
@@ -152,20 +155,32 @@ async function personSummary(
     });
     return cents(agg._sum.amount);
   };
-  const [openAllow, openCredits, openSpent, allowance, personalCredits, personalSpent] =
-    await Promise.all([
-      allowances({ periodKey: { lt: month } }),
-      credits(before(month)),
-      netSpent(db, own, before(month)),
-      allowances({ periodKey: month }),
-      credits(range),
-      netSpent(db, own, range),
-    ]);
+  const [
+    openAllow,
+    openCredits,
+    openSpent,
+    openGoals,
+    allowance,
+    personalCredits,
+    personalSpent,
+    goalNet,
+  ] = await Promise.all([
+    allowances({ periodKey: { lt: month } }),
+    credits(before(month)),
+    netSpent(db, own, before(month)),
+    personalGoalNet(db, userId, before(month)),
+    allowances({ periodKey: month }),
+    credits(range),
+    netSpent(db, own, range),
+    personalGoalNet(db, userId, range),
+  ]);
+  // Money put into a personal goal leaves the free balance, like a transfer out.
   const closing = personalClosingBalance({
-    opening: openAllow + openCredits - openSpent,
+    opening: openAllow + openCredits - openSpent - openGoals,
     allowanceAllocations: allowance,
     personalCredits,
     personalExpensesNet: personalSpent,
+    transfersOut: goalNet,
   });
   return {
     userId,
@@ -173,6 +188,7 @@ async function personSummary(
     personalSpent: centsToMoney(personalSpent),
     personalCredits: centsToMoney(personalCredits),
     closingBalance: centsToMoney(closing),
+    goalNet: centsToMoney(goalNet),
   };
 }
 
@@ -368,11 +384,37 @@ async function overdueBills(db: Db, month: string, now: Date) {
   return { total: cents(rec._sum.expectedAmount) + cents(ins._sum.expectedAmount), unknown };
 }
 
+/** Deposits minus withdrawals of the person's personal goals in the range. */
+async function personalGoalNet(db: Db, ownerId: number, range: Range): Promise<bigint> {
+  const rows = await db.goalEntry.groupBy({
+    by: ["kind"],
+    where: {
+      kind: { in: ["ALLOCATION", "WITHDRAWAL"] },
+      effectiveDate: range,
+      goal: { ownerId },
+    },
+    _sum: { amount: true },
+  });
+  const sum = (kind: string) => cents(rows.find((r) => r.kind === kind)?._sum.amount);
+  return sum("ALLOCATION") - sum("WITHDRAWAL");
+}
+
+/** Free personal balance at the end of the month (after goals). Used to limit a deposit. */
+export async function personalClosing(db: Db, userId: number, month: string): Promise<bigint> {
+  const s = await personSummary(db, userId, month, monthRange(month));
+  return moneyToCents(s.closingBalance);
+}
+
 /** Goal ALLOCATION and WITHDRAWAL totals by effectiveDate. Not income, not expense. */
 async function goalEntrySums(db: Db, range: Range) {
   const rows = await db.goalEntry.groupBy({
     by: ["kind"],
-    where: { kind: { in: ["ALLOCATION", "WITHDRAWAL"] }, effectiveDate: range },
+    // Personal goals are paid from personal balances, not from the household's savings.
+    where: {
+      kind: { in: ["ALLOCATION", "WITHDRAWAL"] },
+      effectiveDate: range,
+      goal: { ownerId: null },
+    },
     _sum: { amount: true },
   });
   const sum = (kind: string) => cents(rows.find((r) => r.kind === kind)?._sum.amount);
