@@ -104,6 +104,7 @@ describe("installment plans: edit and cancel", () => {
     const audits = await prisma.auditEvent.findMany({ where: { entityType: "InstallmentPlan" } });
     expect(audits.map((a) => a.action).sort()).toEqual([
       "plan.cancel",
+      "plan.create",
       "plan.update",
       "plan.update",
     ]);
@@ -128,7 +129,7 @@ describe("installment plans: edit and cancel", () => {
     const planned = await prisma.recurrenceOccurrence.findMany({ where: { ruleId } });
     expect(planned.every((o) => o.expectedAmount?.toFixed(2) === "400.00")).toBe(true);
     const audit = await prisma.auditEvent.findFirstOrThrow({
-      where: { entityType: "RecurrenceRule" },
+      where: { entityType: "RecurrenceRule", action: "rule.update" },
     });
     expect(audit).toMatchObject({ action: "rule.update", actorId: ctx.betoId });
   });

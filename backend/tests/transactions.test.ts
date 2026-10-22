@@ -6,6 +6,9 @@ import { makeApp } from "./helpers/authApp.js";
 import { resetDb, testPrisma } from "./helpers/testDb.js";
 import { send, setup, type Ctx } from "./helpers/txApp.js";
 
+/** Create events are covered in audit.test.ts; these tests look at the change events only. */
+const NOT_CREATE = { action: { not: "transaction.create" } };
+
 let prisma: PrismaClient;
 let ctx: Ctx;
 beforeAll(() => {
@@ -307,7 +310,7 @@ describe("patch", () => {
       updatedById: ctx.betoId,
       createdById: ctx.anaId,
     });
-    const rows = await prisma.auditEvent.findMany();
+    const rows = await prisma.auditEvent.findMany({ where: NOT_CREATE });
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       actorId: ctx.betoId,
@@ -386,7 +389,7 @@ describe("void and cancel", () => {
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe("validation_error");
     }
-    expect(await prisma.auditEvent.count()).toBe(0);
+    expect(await prisma.auditEvent.count({ where: NOT_CREATE })).toBe(0);
   });
 
   it("void sets status and reason and writes an audit row", async () => {
@@ -398,7 +401,7 @@ describe("void and cancel", () => {
       voidReason: "erro",
       updatedById: ctx.betoId,
     });
-    const rows = await prisma.auditEvent.findMany();
+    const rows = await prisma.auditEvent.findMany({ where: NOT_CREATE });
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       action: "transaction.void",
@@ -448,7 +451,7 @@ describe("void and cancel", () => {
     const res = await send(ctx.ana, "post", url, { reason: "pago em dinheiro" });
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ status: "cancelled", voidReason: "pago em dinheiro" });
-    const rows = await prisma.auditEvent.findMany();
+    const rows = await prisma.auditEvent.findMany({ where: NOT_CREATE });
     expect(rows).toHaveLength(1);
     expect(rows[0]?.action).toBe("transaction.cancel");
     expect((await send(ctx.ana, "post", url, { reason: "x" })).status).toBe(409);
@@ -470,7 +473,7 @@ describe("void and cancel", () => {
     expect(results.filter((r) => r.status === 200)).toHaveLength(1);
     expect(results.filter((r) => r.status === 409)).toHaveLength(4);
     expect(results.filter((r) => r.status === 500)).toHaveLength(0);
-    expect(await prisma.auditEvent.count()).toBe(1);
+    expect(await prisma.auditEvent.count({ where: NOT_CREATE })).toBe(1);
   });
 });
 
@@ -490,7 +493,11 @@ describe("get, list and audit", () => {
     const res = await ctx.ana.get(`/api/transactions/${id}/audit`);
     expect(res.status).toBe(200);
     const list = auditEventListSchema.parse(res.body);
-    expect(list.items.map((e) => e.action)).toEqual(["transaction.void", "transaction.update"]);
+    expect(list.items.map((e) => e.action)).toEqual([
+      "transaction.void",
+      "transaction.update",
+      "transaction.create",
+    ]);
     expect(list.items[0]?.reason).toBe("erro");
   });
 
