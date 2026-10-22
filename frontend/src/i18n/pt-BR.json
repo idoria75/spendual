@@ -436,6 +436,7 @@
   "goals": {
     "new": "Nova meta",
     "newPersonal": "Nova meta pessoal",
+    "reached": "Alcançado:",
     "emptyPersonal": "Nenhuma meta pessoal ainda. Crie uma, por exemplo, para comprar um celular.",
     "availablePersonal": "Seu saldo pessoal: {{amount}}",
     "edit": "Editar",

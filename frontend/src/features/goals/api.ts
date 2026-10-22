@@ -23,3 +23,7 @@ export const withdrawGoal = (id: number, body: GoalMove): Promise<Goal> =>
   api.post(`/goals/${id}/withdrawals`, body, goalSchema);
 export const goalAction = (id: number, name: "complete" | "reopen" | "archive"): Promise<Goal> =>
   api.post(`/goals/${id}/${name}`, {}, goalSchema);
+
+/** Complete a goal. `withdrawAll` returns the balance to the savings in the same step. */
+export const completeGoal = (id: number, withdrawAll: boolean): Promise<Goal> =>
+  api.post(`/goals/${id}/complete`, withdrawAll ? { withdrawAll: true } : {}, goalSchema);

@@ -14,7 +14,7 @@ import { Bar, percentOf } from "../planning/display";
 import { useLoad } from "../planning/use-load";
 import { useEntry } from "../transactions/entry";
 import { useLookups } from "../transactions/lookups";
-import { fetchGoalEntries, fetchGoals, goalAction, withdrawGoal } from "./api";
+import { completeGoal, fetchGoalEntries, fetchGoals, goalAction, withdrawGoal } from "./api";
 import { GoalFormSheet, MoveSheet } from "./GoalSheets";
 
 type Closing = { goal: Goal; name: "complete" | "archive" };
@@ -92,6 +92,11 @@ function GoalCard({
   const target = goal.targetAmount === null ? null : toCents(goal.targetAmount);
   const active = goal.status === "active";
   const archived = goal.status === "archived";
+  const completed = goal.status === "completed";
+  // A completed goal shows what it reached, struck through: green when it met the target,
+  // faded yellow when it fell short. The balance is 0 once the money went back.
+  const reached = toCents(goal.finalAmount ?? "0.00");
+  const met = target === null || reached >= target;
   return (
     <li className="flex flex-col gap-2 rounded-card bg-surface p-4">
       <div className="flex items-baseline justify-between gap-3">
@@ -103,8 +108,20 @@ function GoalCard({
         ) : null}
       </div>
       {goal.description ? <p className="text-[0.85rem] text-muted">{goal.description}</p> : null}
-      <p className="text-[1.7rem] font-bold tabular-nums">{formatMoney(goal.balance)}</p>
-      {target !== null ? (
+      {completed ? (
+        <p
+          className="text-[1.7rem] font-bold tabular-nums line-through"
+          style={{
+            color: met ? "var(--pos)" : "color-mix(in srgb, var(--warn) 60%, transparent)",
+          }}
+        >
+          <span className="sr-only">{t("goals.reached")} </span>
+          {formatMoney(goal.finalAmount ?? "0.00")}
+        </p>
+      ) : (
+        <p className="text-[1.7rem] font-bold tabular-nums">{formatMoney(goal.balance)}</p>
+      )}
+      {completed ? null : target !== null ? (
         <>
           <Bar label={goal.name} percent={percentOf(balance, target)} over={false} />
           <p className="text-[0.8rem] text-muted tabular-nums">
@@ -199,7 +216,7 @@ export function GoalsPanel({ ownerId, free, canAct, heading, intro, onChanged }:
   const close = (goal: Goal, name: Closing["name"]) => {
     // Complete with nothing left needs no question. Archive is final, so it always asks.
     if (name === "complete" && toCents(goal.balance) === 0n) {
-      void run(() => goalAction(goal.id, "complete"), t("goals.completed"));
+      void run(() => completeGoal(goal.id, false), t("goals.completed"));
     } else setClosing({ goal, name });
   };
 
@@ -325,10 +342,15 @@ export function GoalsPanel({ ownerId, free, canAct, heading, intro, onChanged }:
         onConfirm={async () => {
           if (!closing) return;
           const { goal, name } = closing;
-          if (toCents(goal.balance) > 0n) {
-            await withdrawGoal(goal.id, { amount: goal.balance, effectiveDate: today() });
+          if (name === "complete") {
+            // One step on the server: the money goes back and the amount reached is kept.
+            await completeGoal(goal.id, true);
+          } else {
+            if (toCents(goal.balance) > 0n) {
+              await withdrawGoal(goal.id, { amount: goal.balance, effectiveDate: today() });
+            }
+            await goalAction(goal.id, name);
           }
-          await goalAction(goal.id, name);
           setClosing(null);
           saved(t(name === "archive" ? "goals.archived" : "goals.completed"));
         }}

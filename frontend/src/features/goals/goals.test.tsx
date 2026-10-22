@@ -23,13 +23,20 @@ const goal = (over: Record<string, unknown> = {}) => ({
 
 let calls: { method: string; url: string; body: unknown }[] = [];
 let failWithdraw = false;
+let withCompleted = false;
 const handler: Handler = (req) => {
   const path = req.url.split("?")[0];
   if (path === "/api/auth/me") return json(200, user);
   if (path === "/api/auth/csrf") return json(200, { csrfToken: "tok" });
   if (path === "/api/goals" && req.method === "GET") {
+    const done = (id: number, name: string, finalAmount: string) =>
+      goal({ id, name, status: "completed", balance: "0.00", finalAmount });
     return json(200, {
-      items: [goal(), goal({ id: 2, name: "Casa", targetAmount: null, balance: "0.00" })],
+      items: [
+        goal(),
+        goal({ id: 2, name: "Casa", targetAmount: null, balance: "0.00" }),
+        ...(withCompleted ? [done(3, "Japão", "5000.00"), done(4, "Carro", "2000.00")] : []),
+      ],
     });
   }
   if (req.method !== "GET") {
@@ -67,6 +74,7 @@ beforeEach(() => {
   localStorage.clear();
   calls = [];
   failWithdraw = false;
+  withCompleted = false;
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -125,15 +133,31 @@ describe("Metas", () => {
     expect(calls.at(-1)!.url).toBe("/api/goals/1/withdrawals");
   });
 
-  it("closing with money left withdraws everything first", async () => {
+  it("closing with money left returns it and completes in one request", async () => {
     mockFetch(handler);
     renderMetas();
     const card = (await screen.findByRole("heading", { name: "Viagem" })).closest("li")!;
     await userEvent.click(within(card).getByRole("button", { name: "Concluir" }));
     const dialog = await screen.findByRole("dialog", { name: "Concluir meta?" });
     await userEvent.click(within(dialog).getByRole("button", { name: "Retirar tudo e concluir" }));
-    await vi.waitFor(() => expect(calls).toHaveLength(2));
-    expect(calls.map((c) => c.url)).toEqual(["/api/goals/1/withdrawals", "/api/goals/1/complete"]);
-    expect(calls[0]!.body).toMatchObject({ amount: "1000.00" });
+    await vi.waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]).toMatchObject({ url: "/api/goals/1/complete", body: { withdrawAll: true } });
+  });
+
+  it("shows a completed goal by the amount it reached, struck through, green or faded", async () => {
+    withCompleted = true;
+    mockFetch(handler);
+    renderMetas();
+    const met = (await screen.findByRole("heading", { name: "Japão" })).closest("li")!;
+    const short = (await screen.findByRole("heading", { name: "Carro" })).closest("li")!;
+    const amountOf = (card: HTMLElement, text: string) =>
+      within(card).getByText(text).closest("p")!;
+    expect(amountOf(met, "R$ 5.000,00")).toHaveClass("line-through");
+    expect(amountOf(met, "R$ 5.000,00").getAttribute("style")).toContain("var(--pos)");
+    expect(amountOf(short, "R$ 2.000,00")).toHaveClass("line-through");
+    expect(amountOf(short, "R$ 2.000,00").getAttribute("style")).toContain("var(--warn)");
+    // No "0 de 5.000" line and no bar for a completed goal.
+    expect(within(met).queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(within(met).queryByText(/de R\$/)).not.toBeInTheDocument();
   });
 });
