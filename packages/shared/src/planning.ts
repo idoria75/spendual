@@ -365,6 +365,43 @@ export const categoryTrendsSchema = z.object({
 });
 export type CategoryTrends = z.infer<typeof categoryTrendsSchema>;
 
+/**
+ * Personal balance history (page "Pessoal"). Read only.
+ *
+ *   GET /personal/history?userId=&from=&to=  -> 200 PersonalHistory
+ *
+ *  - One point per month, oldest first. `closing` = opening + allowance + credits - spent, and the
+ *    next month's `opening` is this `closing` (unused allowance is never reset).
+ *  - `credits` are personal income and other receipts; `spent` is personal expenses net of refunds.
+ *  - Months before the person's first activity are left out, so the list can be shorter than the range.
+ *  - `partial` is true for the current month.
+ *  - 400 when `from` is after `to`, `to` is after the current month, `from` is older than 60 months
+ *    back, the range is over 24 months, or `userId` is not an active user.
+ */
+export const personalHistoryQuerySchema = z.object({
+  userId: z.coerce.number().int().positive(),
+  from: periodKeySchema,
+  to: periodKeySchema,
+});
+export type PersonalHistoryQuery = z.infer<typeof personalHistoryQuerySchema>;
+
+export const personalPointSchema = z.object({
+  month: periodKeySchema,
+  opening: moneySchema,
+  allowance: moneySchema,
+  credits: moneySchema,
+  spent: moneySchema,
+  closing: moneySchema,
+  partial: z.boolean(),
+});
+export type PersonalPoint = z.infer<typeof personalPointSchema>;
+
+export const personalHistorySchema = z.object({
+  userId: z.number().int(),
+  points: z.array(personalPointSchema),
+});
+export type PersonalHistory = z.infer<typeof personalHistorySchema>;
+
 export const installmentPlanPatchSchema = z
   .object({ description: descriptionSchema, installmentAmount: positiveMoneySchema })
   .partial()

@@ -7,6 +7,7 @@ import {
   billConfirmSchema,
   budgetEditSchema,
   categoryTrendsQuerySchema,
+  personalHistoryQuerySchema,
   dashboardQuerySchema,
   installmentPlanCreateSchema,
   installmentPlanPatchSchema,
@@ -86,6 +87,31 @@ export function planningRouter(prisma: PrismaClient, clock: () => Date = () => n
         throw new AppError(400, "validation_error", "Invalid request", problems);
       }
       res.json(await getCategoryTrends(prisma, from, to, now));
+    }),
+  );
+
+  r.get(
+    "/personal/history",
+    asyncHandler(async (req, res) => {
+      const { userId, from, to } = personalHistoryQuerySchema.parse(req.query);
+      const now = clock();
+      const problems: Record<string, string> = {};
+      if (from < addPeriods(currentPeriod(now), -TREND_MONTHS_BACK)) {
+        problems.from = `Must be within ${TREND_MONTHS_BACK} months back`;
+      }
+      if (to > currentPeriod(now)) problems.to = "Must not be after the current month";
+      if (from > to) problems.to = "Must not be before from";
+      else if (monthsBetween(from, to).length > dash.MAX_PERSONAL_MONTHS) {
+        problems.to = `At most ${dash.MAX_PERSONAL_MONTHS} months`;
+      }
+      if (Object.keys(problems).length > 0) {
+        throw new AppError(400, "validation_error", "Invalid request", problems);
+      }
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (!user?.active) {
+        throw new AppError(400, "validation_error", "Invalid request", { userId: "Unknown user" });
+      }
+      res.json(await dash.personalHistory(prisma, userId, monthsBetween(from, to), now));
     }),
   );
 

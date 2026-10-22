@@ -6,6 +6,8 @@ import type {
   BudgetOverview,
   Dashboard,
   PersonSummary,
+  PersonalHistory,
+  PersonalPoint,
 } from "@spendual/shared";
 import {
   centsToMoney,
@@ -97,6 +99,41 @@ export async function personSummaries(db: Db, month: string): Promise<PersonSumm
   const users = await db.user.findMany({ where: { active: true }, orderBy: { id: "asc" } });
   const range = monthRange(month);
   return Promise.all(users.map((u) => personSummary(db, u.id, month, range)));
+}
+
+export const MAX_PERSONAL_MONTHS = 24;
+
+/**
+ * Month by month balance of one person. Reuses personSummary, so each point matches the
+ * Pessoal card. Leading months with no movement and a zero balance are dropped.
+ */
+export async function personalHistory(
+  db: Db,
+  userId: number,
+  months: string[],
+  now: Date,
+): Promise<PersonalHistory> {
+  const current = currentPeriod(now);
+  const points: PersonalPoint[] = [];
+  for (const month of months) {
+    const s = await personSummary(db, userId, month, monthRange(month));
+    const closing = moneyToCents(s.closingBalance);
+    const allowance = moneyToCents(s.allowanceAllocated);
+    const credits = moneyToCents(s.personalCredits);
+    const spent = moneyToCents(s.personalSpent);
+    const idle = closing === 0n && allowance === 0n && credits === 0n && spent === 0n;
+    if (points.length === 0 && idle) continue;
+    points.push({
+      month,
+      opening: centsToMoney(closing - allowance - credits + spent),
+      allowance: s.allowanceAllocated,
+      credits: s.personalCredits,
+      spent: s.personalSpent,
+      closing: s.closingBalance,
+      partial: month === current,
+    });
+  }
+  return { userId, points };
 }
 
 async function personSummary(
