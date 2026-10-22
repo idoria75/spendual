@@ -116,3 +116,19 @@ body {
     sans-serif;
   font-variant-numeric: tabular-nums;
 }
+
+/* Taps and drags must not highlight text (phone). Fields stay selectable so people can edit. */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+input,
+textarea,
+select,
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}

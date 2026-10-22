@@ -31,7 +31,9 @@ Treat the structural rules (sections 1, 2, 4 and 6) as fixed.
 - `Pessoal` is reachable **only** through `Mais`. No other view shows personal balances or a link
   to them. This includes `Início`.
 - Month views share one month selector (`‹ Outubro 2026 ›`) in the top bar. The selected month is
-  kept across views.
+  kept across views. Tapping the month text returns to the current month.
+  Text cannot be selected anywhere except in fields (`user-select: none` on `body`, `text` on `input`,
+  `textarea`, `select`), so a tap or a drag never highlights text on a phone.
 - Top bar right side: the signed-in user's dot and name.
 - `Entrar / Criar conta` has no shell.
 
@@ -292,7 +294,7 @@ are transparent cut-outs, so it works on light and dark. The colors are fixed; t
 | A pagar | `/a-pagar` | Segmented `Próximas | Recorrentes | Parcelas`. | `Próximas` groups: `Vencidas`, `Esta semana`, then by month. `Confirmar pagamento` opens the entry form pre-filled. `Informar valor` for unknown amounts. Never auto-confirm. |
 | Orçamentos | `/orcamentos` | Overall budget card, then one row per category. | Edit asks `Só <mês>` or `De <mês> em diante`. Past months never change. |
 | Análises | `/analises` | Category chips, 3 number tiles (average, budget, months above), trend chart, month list. `6 meses | 12 meses | Personalizado` (two month pickers, up to 60 months back). | Reached from `Mais` (phone) and the sidebar. Household spending only. Month selector sets the last month. No budget: no gray line, text `sem orçamento`. |
-| Pessoal | `/pessoal` | Phone: segmented per person. Desktop: two columns. | Reached only from `Mais`. Balance, previous balance, allowance, spending, then the person's records. Both people see everything. |
+| Pessoal | `/pessoal` | One person at a time: a `UserPicker` on top (like `Lançamentos`; default the signed-in user; hidden with one account). | Reached only from `Mais`. Order: month card (balance, previous balance, allowance, credits, spending, `Definir mesada` when missing), chart `Saldo no fim de cada mês` (bars like `Análises`, `6 \| 12 meses`, scrolls sideways, negative balance hangs below zero, month in progress hatched), then the person's personal records of the month (same rows and detail sheet as `Lançamentos`). Both people see everything. |
 | Meta de poupança (P1) | in `Orçamentos`, `Início` | `Orçamentos`: a row under the overall budget (saved so far / target, green bar, `Faltam ...` or `Meta atingida`); tap to edit in the budget sheet. `Início`: same bar above the `Sobra do mês` fold, only when a target above 0 exists. |
 | Ritmo de gasto (P1) | in `Início` | Block in `Saldo atual`, current month only: `Até o dia N a casa gastou X. No mesmo ponto do mês passado: Y.`, then `N% a mais` (warn) or `a menos` (pos) and a note that the comparison is not a forecast. |
 | Exportar (P1) | in `Ajustes` | Card `Exportar` between the catalogs and `Backup`: optional `De` / `Até` dates and a `Baixar CSV` button (disabled when the range is backwards). |

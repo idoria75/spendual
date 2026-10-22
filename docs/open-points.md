@@ -124,3 +124,9 @@ Análises period and cumulative net (2026-10-21):
 - DONE: `Personalizado` range (two month pickers, 60 months back, `to` not after this month); chart scrolls sideways; `Mês a mês` shows `Acumulado` (budget − spent, one number for the period, in the section header). Pickers list only months with spending.
 - The cumulative leaves out the month in progress and months before the first spending. A month without a budget adds 0, so it can look better than it is.
 - Not checked on a phone: drag feel, the fixed y axis next to the scrolling plot.
+
+## Pessoal per person (2026-10-22)
+- DONE: `Pessoal` shows one person at a time (picker), a month card, a chart of the balance at the end of each month (carried over, negative allowed) and the personal records of the month. New `GET /personal/history`.
+- Tap the month in the top bar to return to the current month. Text selection is off everywhere except fields (`index.css`).
+- Not checked on a phone: the chart (drag, negative bars, axis), the picker, the month tap, and the no-selection rule (long-press menus on iOS and Android).
+- Not done: the chart range is 6 or 12 months (no custom range); the demo data may have little personal spending, so the curves can look flat.
