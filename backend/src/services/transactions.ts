@@ -205,7 +205,15 @@ export function createTransaction(
           updatedById: actorId,
         },
       });
-      return toTransactionDto(row);
+      const after = toTransactionDto(row);
+      await writeAudit(tx, {
+        actorId,
+        entityType: ENTITY,
+        entityId: row.id,
+        action: "transaction.create",
+        after,
+      });
+      return after;
     }),
   );
 }

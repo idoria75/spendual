@@ -193,6 +193,13 @@ export async function createRule(
         },
       });
       await generateForRules(tx, [rule], from);
+      await writeAudit(tx, {
+        actorId,
+        entityType: "RecurrenceRule",
+        entityId: rule.id,
+        action: "rule.create",
+        after: ruleDto(rule),
+      });
     }),
   );
   return listBills(prisma, from, now);
@@ -315,7 +322,7 @@ export function createInstallmentPlan(
         orderBy: { sequenceNumber: "asc" },
         include: insInclude,
       });
-      return {
+      const detail = {
         id: plan.id,
         description: plan.description,
         totalAmount: plan.totalAmount.toFixed(2),
@@ -323,6 +330,20 @@ export function createInstallmentPlan(
         firstDueDate: dateToDateOnly(plan.firstDueDate),
         items: occ.map(installmentBill),
       };
+      await writeAudit(tx, {
+        actorId,
+        entityType: "InstallmentPlan",
+        entityId: plan.id,
+        action: "plan.create",
+        after: {
+          id: plan.id,
+          description: plan.description,
+          totalAmount: detail.totalAmount,
+          installmentCount: plan.installmentCount,
+          firstDueDate: detail.firstDueDate,
+        },
+      });
+      return detail;
     }),
   );
 }
