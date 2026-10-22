@@ -6,6 +6,7 @@ import { requireCsrf } from "./auth/csrf.js";
 import { errorHandler } from "./auth/errors.js";
 import { requireAuth } from "./auth/requireAuth.js";
 import { auditRouter } from "./routes/audit.js";
+import { exportRouter } from "./routes/export.js";
 import { catalogRouter } from "./routes/catalog.js";
 import { goalsRouter } from "./routes/goals.js";
 import { planningRouter } from "./routes/planning.js";
@@ -64,6 +65,7 @@ export function createApp(opts: AppOptions) {
   protectedApi.use(planningRouter(opts.prisma, opts.now));
   protectedApi.use(goalsRouter(opts.prisma, opts.now));
   protectedApi.use(auditRouter(opts.prisma));
+  protectedApi.use(exportRouter(opts.prisma, opts.now));
   protectedApi.use("/transactions", transactionsRouter(opts.prisma));
   api.use(protectedApi);
   app.use("/api", api);
