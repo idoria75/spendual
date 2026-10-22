@@ -860,6 +860,27 @@ describe("Início chart and upcoming bills", () => {
     expect(within(block).getByText(/\/\s*R\$ 8\.000,00/)).toBeInTheDocument();
   });
 
+  it("shows the savings target and the spending pace", async () => {
+    serve({
+      savingsTarget: "4000.00",
+      pace: {
+        day: 12,
+        spent: "1500.00",
+        lastMonthSameDays: "1000.00",
+        lastMonthTotal: "3000.00",
+      },
+    });
+    renderAt("/");
+    const block = await screen.findByRole("region", { name: "Saldo atual" });
+    expect(within(block).getByText("Meta de poupança")).toBeInTheDocument();
+    expect(within(block).getByText("Faltam R$ 1.000,00 para a meta")).toBeInTheDocument();
+    expect(within(block).getByText("50% a mais que no mesmo ponto do mês passado")).toHaveClass(
+      "text-warn",
+    );
+    expect(block).toHaveTextContent("Até o dia 12 a casa gastou R$ 1.500,00");
+    expect(block).toHaveTextContent("O mês passado fechou em R$ 3.000,00");
+  });
+
   it("sizes the bar against the budget: two halves of 50 % take 25 % each and the rest stays empty", async () => {
     serve({
       overallBudget: { budget: "8000.00", spent: "4000.00" },

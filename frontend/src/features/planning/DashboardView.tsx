@@ -175,8 +175,41 @@ function BalanceCard({ d }: { d: Dashboard }) {
         )}
       </section>
 
+      <Pace d={d} />
       <MonthResult d={d} />
     </section>
+  );
+}
+
+/**
+ * Spending so far against the same days of last month. Only for the current month, and only when
+ * last month had spending by that day. A comparison, not a forecast (guide section 9).
+ */
+function Pace({ d }: { d: Dashboard }) {
+  const { t } = useTranslation();
+  const pace = d.pace;
+  const last = pace ? toCents(pace.lastMonthSameDays) : 0n;
+  if (!pace || last <= 0n) return null;
+  const diff = toCents(pace.spent) - last;
+  const percent = Math.round(Math.abs(percentOf(diff, last)));
+  const verdict =
+    diff === 0n
+      ? t("dashboard.paceSame")
+      : t(diff > 0n ? "dashboard.paceMore" : "dashboard.paceLess", { percent });
+  return (
+    <div className="flex flex-col gap-1 border-t border-line pt-2 text-[0.85rem]">
+      <p className="text-muted">
+        {t("dashboard.paceLine", {
+          day: pace.day,
+          spent: formatMoney(pace.spent),
+          last: formatMoney(pace.lastMonthSameDays),
+        })}
+      </p>
+      <p className={cn("font-semibold", diff > 0n ? "text-warn" : "text-pos")}>{verdict}</p>
+      <p className="text-[0.78rem] text-muted">
+        {t("dashboard.paceHint", { total: formatMoney(pace.lastMonthTotal) })}
+      </p>
+    </div>
   );
 }
 

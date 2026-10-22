@@ -290,7 +290,7 @@ async function spendingPace(db: Db, month: string, now: Date): Promise<Dashboard
   const upTo = (period: string, days: number): Range => {
     const start = monthRange(period);
     return {
-      gte: start.gte as Date,
+      gte: start.gte,
       lt: new Date((start.gte as Date).getTime() + days * 86_400_000),
     };
   };
