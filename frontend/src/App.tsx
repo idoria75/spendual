@@ -9,6 +9,7 @@ import { HomePage } from "./pages/HomePage";
 import { LancamentosPage } from "./pages/LancamentosPage";
 import { LoginPage } from "./pages/LoginPage";
 import { PessoalPage } from "./pages/PessoalPage";
+import { HistoricoPage } from "./pages/HistoricoPage";
 import { MetasPage } from "./pages/MetasPage";
 import { MaisPage } from "./pages/MaisPage";
 import { SetupGate } from "./features/setup/SetupGate";
@@ -31,6 +32,7 @@ export function App() {
               <Route path="/metas" element={<MetasPage />} />
               <Route path="/analises" element={<AnalisesPage />} />
               <Route path="/pessoal" element={<PessoalPage />} />
+              <Route path="/historico" element={<HistoricoPage />} />
               <Route path="/mais" element={<MaisPage />} />
               <Route path="/ajustes" element={<AjustesPage />} />
             </Route>

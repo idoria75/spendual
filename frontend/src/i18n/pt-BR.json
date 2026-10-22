@@ -73,7 +73,9 @@
     "pessoal": "Pessoal",
     "pessoalHint": "Saldo e mesada de cada pessoa",
     "metas": "Metas",
-    "metasHint": "Poupança para objetivos da casa"
+    "metasHint": "Poupança para objetivos da casa",
+    "historico": "Histórico",
+    "historicoHint": "Quem mudou o quê, e quando"
   },
   "form": {
     "titleNew": "Novo lançamento",
@@ -308,6 +310,65 @@
     "finish": "Concluir",
     "skip": "Pular por agora",
     "done": "Configuração salva"
+  },
+  "history": {
+    "title": "Histórico",
+    "filter": "Filtrar por tipo",
+    "empty": "Nenhuma mudança registrada ainda.",
+    "failed": "Não foi possível carregar o histórico.",
+    "more": "Ver mais antigos",
+    "reason": "Motivo:",
+    "filters": {
+      "all": "Tudo",
+      "transactions": "Lançamentos",
+      "rules": "Recorrentes",
+      "plans": "Parcelas",
+      "goals": "Metas"
+    },
+    "action": {
+      "transaction.create": "Lançamento criado",
+      "transaction.update": "Lançamento alterado",
+      "transaction.void": "Lançamento anulado",
+      "transaction.cancel": "Lançamento cancelado",
+      "rule.create": "Recorrente criada",
+      "rule.update": "Recorrente alterada",
+      "bill.confirm": "Conta paga",
+      "bill.cancel": "Conta cancelada",
+      "plan.create": "Compra parcelada criada",
+      "plan.update": "Compra parcelada alterada",
+      "plan.cancel": "Compra parcelada cancelada",
+      "goal.create": "Meta criada",
+      "goal.update": "Meta alterada",
+      "goal.allocate": "Depósito na meta",
+      "goal.withdraw": "Retirada da meta",
+      "goal.complete": "Meta concluída",
+      "goal.reopen": "Meta reaberta",
+      "goal.archive": "Meta arquivada"
+    },
+    "field": {
+      "description": "Descrição",
+      "amount": "Valor",
+      "expectedAmount": "Valor previsto",
+      "totalAmount": "Valor total",
+      "installmentCount": "Parcelas",
+      "firstDueDate": "Primeiro vencimento",
+      "transactionDate": "Data",
+      "status": "Situação",
+      "state": "Estado",
+      "endDate": "Fim",
+      "startDate": "Início",
+      "dayOfMonth": "Dia do mês",
+      "notes": "Observações",
+      "name": "Nome",
+      "type": "Tipo",
+      "scope": "Escopo",
+      "categoryId": "Categoria",
+      "accountId": "Conta",
+      "paymentMethodId": "Método",
+      "payerId": "Quem pagou",
+      "ownerId": "Pessoa",
+      "voidReason": "Motivo"
+    }
   },
   "goals": {
     "new": "Nova meta",

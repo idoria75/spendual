@@ -76,7 +76,7 @@ Início merge and P1 next steps (2026-10-21):
      - rules: allocation and withdrawal are not income or expense; withdraw only back to unallocated money; closing with money left asks for a transfer
      - reconciliation tests (the guide requires them)
      - `/metas` page (`Alocar` / `Retirar`) and a goals line on Início
-  2. Audit history: `AuditEvent` exists but nothing writes to it (see Phase 4 note above). Write events on edit, void, cancel; then a viewer.
+  2. DONE (2026-10-22): audit history. Create events for transactions, rules and plans; `GET /audit`; page `/historico` (Mais menu and sidebar). Not checked on a phone. Gaps: ids (category, payer) show as numbers in the detail sheet; bill rows have no filter chip; no search or date filter.
   3. Monthly savings target (not started).
   4. CSV export (not started); CSV import with preview and duplicate detection is Phase 7.
   5. Later: fuller personal budget screens, spending pace (this month vs same elapsed part of last month), duplicate and correction workflows.

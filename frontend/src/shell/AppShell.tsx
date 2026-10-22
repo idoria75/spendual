@@ -2,6 +2,7 @@ import {
   ChartColumn,
   ChevronLeft,
   ChevronRight,
+  History,
   House,
   List,
   MoreHorizontal,
@@ -36,6 +37,7 @@ type NavKey =
   | "aPagar"
   | "orcamentos"
   | "metas"
+  | "historico"
   | "mais"
   | "ajustes";
 interface NavItem {
@@ -52,6 +54,7 @@ const SIDEBAR: NavItem[] = [
   { to: "/metas", key: "metas", icon: PiggyBank },
   { to: "/analises", key: "analises", icon: ChartColumn },
   { to: "/pessoal", key: "pessoal", icon: User },
+  { to: "/historico", key: "historico", icon: History },
   { to: "/ajustes", key: "ajustes", icon: Settings },
 ];
 const TABS_LEFT: NavItem[] = [SIDEBAR[0]!, SIDEBAR[1]!];
