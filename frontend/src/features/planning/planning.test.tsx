@@ -80,6 +80,44 @@ function bill(over: Record<string, unknown>) {
   };
 }
 
+const point = (
+  m: string,
+  opening: string,
+  closing: string,
+  over: Record<string, unknown> = {},
+) => ({
+  month: m,
+  opening,
+  allowance: "1000.00",
+  credits: "0.00",
+  spent: "0.00",
+  closing,
+  partial: false,
+  ...over,
+});
+const personalTx = {
+  id: 77,
+  type: "expense",
+  status: "confirmed",
+  amount: "200.00",
+  currency: "BRL",
+  description: "Livro",
+  transactionDate: `${month}-02`,
+  scope: "personal",
+  ownerId: 1,
+  payerId: 1,
+  categoryId: 1,
+  accountId: null,
+  paymentMethodId: null,
+  relatedTransactionId: null,
+  notes: null,
+  voidReason: null,
+  createdById: 1,
+  updatedById: 1,
+  createdAt: `${month}-02T10:00:00.000Z`,
+  updatedAt: `${month}-02T10:00:00.000Z`,
+};
+
 let bills: unknown[] = [];
 let overdue: unknown[] = [];
 const allowances: unknown = {
@@ -102,6 +140,21 @@ function base(extra?: Extra): Handler {
     if (path === "/api/lookups") return json(200, lookups);
     if (path === "/api/dashboard") return json(200, dashboard);
     if (path === "/api/allowances" && req.method === "GET") return json(200, allowances);
+    if (path === "/api/personal/history") {
+      const userId = Number(new URL(req.url, "http://x").searchParams.get("userId"));
+      return json(200, {
+        userId,
+        points: [
+          point("2026-08", "0.00", "1000.00"),
+          point("2026-09", "1000.00", "-150.00", { spent: "2150.00" }),
+          point(month, "-150.00", "800.00", { partial: true }),
+        ],
+      });
+    }
+    if (path === "/api/transactions" && req.method === "GET") {
+      const q = new URL(req.url, "http://x").searchParams;
+      return json(200, { items: q.get("personId") === "1" ? [personalTx] : [] });
+    }
     if (path === "/api/bills")
       return json(200, { month, items: bills, overdue, plannedTotal: "190.00", unknownCount: 1 });
     if (path === "/api/recurrence-rules") return json(200, { items: [] });
@@ -210,12 +263,27 @@ describe("Início", () => {
     expect(value.textContent).toMatch(/^[-\u2212]/);
   });
 
-  it("shows the balance of each person on Pessoal", async () => {
-    mockFetch(base());
+  it("shows one person at a time: month card, balance chart and personal records", async () => {
+    const mock = mockFetch(base());
     renderAt("/pessoal");
-    const people = await screen.findByRole("region", { name: "Pessoas" });
-    expect(within(people).getByText("R$ 800,00")).toBeInTheDocument();
-    expect(within(people).getByText("Ana")).toBeInTheDocument();
+    const card = await screen.findByRole("region", { name: /^Em / });
+    expect(within(card).getByText("R$ 800,00")).toBeInTheDocument();
+    expect(within(card).getByText("Saldo anterior")).toBeInTheDocument();
+    const bars = await screen.findAllByTestId("balance-bar");
+    expect(bars).toHaveLength(3);
+    expect(bars.map((b) => b.getAttribute("data-negative"))).toEqual(["false", "true", "false"]);
+    expect(bars[2]).toHaveAttribute("data-partial", "true");
+    expect(await screen.findByText("Livro")).toBeInTheDocument();
+    const calls = mock.mock.calls.map(([u]) => String(u));
+    expect(calls.some((u) => u.startsWith("/api/personal/history?userId=1&"))).toBe(true);
+    expect(calls.some((u) => u.includes("scope=personal") && u.includes("personId=1"))).toBe(true);
+
+    await userEvent.click(screen.getByRole("button", { name: "Bia" }));
+    expect(await screen.findByText("Nenhum lançamento pessoal neste mês.")).toBeInTheDocument();
+    expect(screen.queryByText("Livro")).not.toBeInTheDocument();
+    const after = mock.mock.calls.map(([u]) => String(u));
+    expect(after.some((u) => u.startsWith("/api/personal/history?userId=2&"))).toBe(true);
+    expect(after.some((u) => u.includes("scope=personal") && u.includes("personId=2"))).toBe(true);
   });
 
   it("takes the logo to Início and the user name to Pessoal", async () => {
@@ -227,7 +295,7 @@ describe("Início", () => {
     }
     const header = screen.getByRole("banner");
     await userEvent.click(within(header).getByRole("link", { name: "Ana" }));
-    expect(await screen.findByRole("region", { name: "Pessoas" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: /^Em / })).toBeInTheDocument();
     await userEvent.click(within(header).getByRole("link", { name: "Spendual" }));
     expect(await screen.findByRole("region", { name: "Saldo atual" })).toBeInTheDocument();
   });
@@ -249,6 +317,7 @@ describe("Início", () => {
       ),
     );
     renderAt("/pessoal");
+    await userEvent.click(await screen.findByRole("button", { name: "Bia" }));
     await userEvent.click(await screen.findByRole("button", { name: "Definir mesada de Bia" }));
     const dialog = await screen.findByRole("dialog");
     await userEvent.type(within(dialog).getByLabelText("Valor da mesada"), "1.500,00");

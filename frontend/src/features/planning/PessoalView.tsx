@@ -1,100 +1,200 @@
-import type { AllowanceOverview, Dashboard } from "@spendual/shared";
+import type { PersonSummary } from "@spendual/shared";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "../../auth/AuthContext";
 import { Button } from "../../components/ui/button";
-import { formatMoney } from "../../lib/currency";
+import { Segmented } from "../../components/ui/segmented";
+import { formatMoney, fromCents, toCents } from "../../lib/currency";
+import { currentMonth, formatMonth } from "../../lib/date";
+import { RANGES, formatRange, trendWindow, type RangeMonths } from "../analytics/trend";
+import { listTransactions } from "../transactions/api";
 import { toneColor } from "../transactions/display";
 import { useEntry } from "../transactions/entry";
-import { useLookups } from "../transactions/lookups";
+import { useLookups, useSingleUser } from "../transactions/lookups";
 import { useMonth } from "../transactions/month";
-import { fetchAllowances, fetchDashboard } from "./api";
+import { TransactionList } from "../transactions/TransactionList";
+import { UserPicker } from "../transactions/UserPicker";
+import { fetchAllowances, fetchDashboard, fetchPersonalHistory } from "./api";
 import { AllowanceSheet } from "./AllowanceSheet";
+import { BalanceChart } from "./BalanceChart";
 import { useLoad } from "./use-load";
 
-function PeopleCard({
-  d,
-  allowances,
+function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="text-[0.85rem] text-muted">{label}</dt>
+      <dd className={strong ? "font-bold tabular-nums" : "tabular-nums"}>{value}</dd>
+    </div>
+  );
+}
+
+/** The month of one person: balance, what it started from and what moved it. */
+function MonthCard({
+  p,
+  name,
+  color,
+  month,
+  missingAllowance,
   onAllocate,
 }: {
-  d: Dashboard;
-  allowances: AllowanceOverview | null;
-  onAllocate: (p: { id: number; name: string }) => void;
+  p: PersonSummary;
+  name: string;
+  color: string;
+  month: string;
+  missingAllowance: boolean;
+  onAllocate: () => void;
 }) {
   const { t } = useTranslation();
-  const { data: lookups } = useLookups();
+  const heading = [name, formatMonth(month)].join(" · ");
+  const opening = fromCents(
+    toCents(p.closingBalance) -
+      toCents(p.allowanceAllocated) -
+      toCents(p.personalCredits) +
+      toCents(p.personalSpent),
+  );
   return (
-    <section aria-labelledby="dash-people" className="rounded-card bg-surface p-4">
-      <h2
-        id="dash-people"
-        className="text-[11px] font-semibold uppercase tracking-[0.07em] text-muted"
-      >
-        {t("dashboard.people")}
+    <section
+      aria-label={t("pessoal.month", { month: formatMonth(month) })}
+      style={{ borderLeftColor: color }}
+      className="flex flex-col gap-2 rounded-card border-l-[3px] bg-surface p-4"
+    >
+      <h2 className="text-[11px] font-semibold uppercase tracking-[0.07em] text-muted">
+        {heading}
       </h2>
-      <ul className="mt-2 flex flex-col gap-3">
-        {d.people.map((p) => {
-          const u = lookups?.users.find((x) => x.id === p.userId);
-          const name = u?.displayName ?? String(p.userId);
-          const entry = allowances?.people.find((x) => x.ownerId === p.userId);
-          const missing = allowances !== null && entry?.allocation === null;
-          return (
-            <li
-              key={p.userId}
-              style={{ borderLeftColor: toneColor(u?.tonePalette) }}
-              className="flex flex-col gap-1 border-l-[3px] pl-3"
-            >
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="truncate font-semibold">{name}</span>
-                <span className="whitespace-nowrap font-bold tabular-nums">
-                  <span className="sr-only">{t("dashboard.balance")} </span>
-                  {formatMoney(p.closingBalance)}
-                </span>
-              </div>
-              <p className="text-[0.8rem] text-muted tabular-nums">
-                {t("dashboard.allowanceLine", { amount: formatMoney(p.allowanceAllocated) })}
-              </p>
-              {missing ? (
-                <Button
-                  variant="ghost"
-                  className="self-start"
-                  onClick={() => onAllocate({ id: p.userId, name })}
-                >
-                  {t("allowance.set", { name })}
-                </Button>
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
+      <dl className="flex flex-col gap-1">
+        <Row label={t("pessoal.closing")} value={formatMoney(p.closingBalance)} strong />
+        <Row label={t("pessoal.opening")} value={formatMoney(opening)} />
+        <Row label={t("pessoal.allowance")} value={formatMoney(p.allowanceAllocated)} />
+        <Row label={t("pessoal.credits")} value={formatMoney(p.personalCredits)} />
+        <Row label={t("pessoal.spent")} value={formatMoney(p.personalSpent)} />
+      </dl>
+      {missingAllowance ? (
+        <Button variant="ghost" className="self-start" onClick={onAllocate}>
+          {t("allowance.set", { name })}
+        </Button>
+      ) : null}
     </section>
   );
 }
 
-/** Pessoal: balance and allowance of each person. Reached through Mais (ui-guidelines §2). */
+/**
+ * Pessoal: one person at a time (picker like Lançamentos). The month card, a chart of the
+ * balance at the end of each month, then the person's personal records of the month.
+ * Reached through Mais (ui-guidelines §2).
+ */
 export function PessoalView() {
   const { t } = useTranslation();
   const { month } = useMonth();
   const { version } = useEntry();
+  const { user } = useAuth();
+  const { data: lookups } = useLookups();
+  const singleUser = useSingleUser();
+  const [picked, setPicked] = useState<number | null>(null);
+  const [range, setRange] = useState<RangeMonths>(6);
+  const [allocating, setAllocating] = useState<{ id: number; name: string } | null>(null);
+
+  const users = lookups?.users ?? [];
+  const personId = picked ?? user?.id ?? users[0]?.id ?? null;
+  const person = users.find((u) => u.id === personId);
+  const name = person?.displayName ?? "";
+  const color = toneColor(person?.tonePalette);
+  const { from, to } = trendWindow(month, currentMonth(), range);
+
   const dashboard = useLoad(() => fetchDashboard(month), [month, version]);
   const allowances = useLoad(() => fetchAllowances(month), [month, version]);
-  const [allocating, setAllocating] = useState<{ id: number; name: string } | null>(null);
+  const history = useLoad(
+    () => (personId === null ? Promise.resolve(null) : fetchPersonalHistory(personId, from, to)),
+    [personId, from, to, version],
+  );
+  const records = useLoad(
+    () =>
+      personId === null
+        ? Promise.resolve(null)
+        : listTransactions({ month, scope: "personal", personId }),
+    [personId, month, version],
+  );
+
+  const recordsTitle = [t("pessoal.records"), formatMonth(month)].join(" · ");
+  const summary = dashboard.data?.people.find((x) => x.userId === personId);
+  const entry = allowances.data?.people.find((x) => x.ownerId === personId);
+  const failed = dashboard.failed || history.failed || records.failed;
 
   return (
     <section className="flex flex-col gap-3">
       <h1 className="text-[17px] font-bold">{t("nav.pessoal")}</h1>
-      {dashboard.failed ? (
+      {singleUser || personId === null ? null : (
+        <UserPicker
+          users={users}
+          selected={personId}
+          onSelect={setPicked}
+          legend={t("pessoal.person")}
+        />
+      )}
+      {failed ? (
         <div role="alert" className="flex flex-col items-start gap-2 text-err">
-          <p>{t("dashboard.failed")}</p>
-          <Button variant="ghost" onClick={dashboard.reload}>
+          <p>{t("pessoal.failed")}</p>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              dashboard.reload();
+              history.reload();
+              records.reload();
+            }}
+          >
             {t("common.retry")}
           </Button>
         </div>
-      ) : dashboard.data === null ? (
+      ) : null}
+      {summary ? (
+        <MonthCard
+          p={summary}
+          name={name}
+          color={color}
+          month={month}
+          missingAllowance={allowances.data !== null && entry?.allocation === null}
+          onAllocate={() => personId !== null && setAllocating({ id: personId, name })}
+        />
+      ) : failed ? null : (
         <p role="status" className="py-6 text-muted">
           {t("common.loading")}
         </p>
-      ) : (
-        <PeopleCard d={dashboard.data} allowances={allowances.data} onAllocate={setAllocating} />
       )}
+
+      <section aria-label={t("pessoal.chartTitle")} className="flex flex-col gap-2">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.07em] text-muted">
+          {t("pessoal.chartTitle")}
+        </h2>
+        <Segmented
+          label={t("pessoal.range")}
+          value={String(range)}
+          options={RANGES.map((n) => ({
+            value: String(n),
+            label: t("analytics.months", { count: n }),
+          }))}
+          onChange={(v) => setRange(Number(v) as RangeMonths)}
+        />
+        {history.data === null ? null : history.data.points.length === 0 ? (
+          <p className="text-muted">{t("pessoal.chartEmpty")}</p>
+        ) : (
+          <BalanceChart
+            points={history.data.points}
+            color={color}
+            label={t("pessoal.chartLabel", { name, range: formatRange(from, to) })}
+          />
+        )}
+      </section>
+
+      <section aria-label={t("pessoal.records")} className="flex flex-col gap-3">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.07em] text-muted">
+          {recordsTitle}
+        </h2>
+        {records.data === null ? null : records.data.length === 0 ? (
+          <p className="text-muted">{t("pessoal.empty")}</p>
+        ) : (
+          <TransactionList items={records.data} />
+        )}
+      </section>
+
       <AllowanceSheet
         person={allocating}
         month={month}
@@ -103,6 +203,7 @@ export function PessoalView() {
           setAllocating(null);
           allowances.reload();
           dashboard.reload();
+          history.reload();
         }}
       />
     </section>

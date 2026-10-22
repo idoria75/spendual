@@ -11,6 +11,7 @@ import {
   recurrenceRuleSchema,
   recurrenceRuleListSchema,
   setupStatusSchema,
+  personalHistorySchema,
   trendMonthsSchema,
   type AllowanceCreate,
   type AllowanceOverview,
@@ -32,6 +33,7 @@ import {
   type RecurrenceRuleCreate,
   type RecurrenceRuleList,
   type SetupStatus,
+  type PersonalHistory,
   type TrendMonths,
 } from "@spendual/shared";
 import { api } from "../../lib/api-client";
@@ -79,6 +81,13 @@ export const completeSetup = (): Promise<SetupStatus> =>
 
 export const fetchCategoryTrends = (from: string, to: string): Promise<CategoryTrends> =>
   api.get(`/analytics/categories?from=${from}&to=${to}`, categoryTrendsSchema);
+
+export const fetchPersonalHistory = (
+  userId: number,
+  from: string,
+  to: string,
+): Promise<PersonalHistory> =>
+  api.get(`/personal/history?userId=${userId}&from=${from}&to=${to}`, personalHistorySchema);
 
 export const fetchTrendMonths = (): Promise<TrendMonths> =>
   api.get("/analytics/months", trendMonthsSchema);

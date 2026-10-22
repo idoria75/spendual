@@ -327,6 +327,22 @@
     "skip": "Pular por agora",
     "done": "Configuração salva"
   },
+  "pessoal": {
+    "person": "Pessoa",
+    "range": "Período do gráfico",
+    "chartTitle": "Saldo no fim de cada mês",
+    "chartLabel": "Saldo de {{name}} no fim de cada mês, {{range}}",
+    "chartEmpty": "Ainda não há movimento para mostrar.",
+    "month": "Em {{month}}",
+    "closing": "Saldo",
+    "opening": "Saldo anterior",
+    "allowance": "Mesada",
+    "credits": "Entradas",
+    "spent": "Gastos",
+    "records": "Lançamentos pessoais",
+    "empty": "Nenhum lançamento pessoal neste mês.",
+    "failed": "Não foi possível carregar os dados."
+  },
   "history": {
     "title": "Histórico",
     "filter": "Filtrar por tipo",
