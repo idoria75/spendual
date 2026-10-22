@@ -945,6 +945,42 @@ describe("Início chart and upcoming bills", () => {
     expect(within(block).getByText(/\/\s*R\$ 8\.000,00/)).toBeInTheDocument();
   });
 
+  it("shows what is pending under the balance, with the missing amount in red", async () => {
+    // Balance 600; pending = 190 planned + 100 overdue = 290 -> missing 290 - 600 < 0, so none.
+    serve({
+      overallBudget: { budget: "8000.00", spent: "7400.00" },
+      plannedBillsTotal: "190.00",
+      plannedBillsUnknownCount: 0,
+      overdueBillsTotal: "100.00",
+    });
+    renderAt("/");
+    const block = await screen.findByRole("region", { name: "Saldo atual" });
+    const link = within(block).getByRole("link", { name: /Pendente \(mês\):/ });
+    expect(link).toHaveTextContent("R$ 290,00");
+    expect(link).toHaveAttribute("href", "/a-pagar");
+    expect(within(block).queryByText(/Faltam/)).not.toBeInTheDocument();
+  });
+
+  it("shows Faltam in red when the pending bills are more than the balance", async () => {
+    serve({
+      overallBudget: { budget: "8000.00", spent: "7850.00" },
+      plannedBillsTotal: "190.00",
+      plannedBillsUnknownCount: 1,
+      overdueBillsTotal: "0.00",
+    });
+    renderAt("/");
+    const block = await screen.findByRole("region", { name: "Saldo atual" });
+    expect(within(block).getByText("Faltam R$ 40,00")).toHaveClass("text-err");
+    expect(block).toHaveTextContent("mais 1 conta sem valor");
+  });
+
+  it("hides the pending line for a closed month and when nothing is pending", async () => {
+    serve({ plannedBillsTotal: "190.00", month: shiftMonth(month, -1) });
+    renderAt("/");
+    await screen.findByRole("region", { name: "Saldo atual" });
+    expect(screen.queryByText(/Pendente \(mês\)/)).not.toBeInTheDocument();
+  });
+
   it("shows the savings target and the spending pace", async () => {
     serve({
       savingsTarget: "4000.00",

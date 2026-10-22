@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { cn } from "../../lib/cn";
 import { formatMoney, fromCents, toCents } from "../../lib/currency";
+import { currentMonth } from "../../lib/date";
 import { CategoryTile, categoryColor } from "../transactions/CategoryTile";
 import { spendingLink } from "../transactions/drilldown";
 import { useEntry } from "../transactions/entry";
@@ -33,6 +34,44 @@ const LEGEND_ROW =
  * Two categories that are 25 % of the budget each take a quarter of the bar each; the empty rest
  * is the balance. Over budget, the bar scales to the spending. Without a budget, to the spending.
  */
+/**
+ * Bills still to pay this month (planned this month plus overdue ones from earlier months),
+ * under the balance. Red "Faltam" when they are more than what is left. Not shown for closed
+ * (past) months. Links to A pagar, which lists these bills.
+ */
+function Pending({ d, balance }: { d: Dashboard; balance: bigint | null }) {
+  const { t } = useTranslation();
+  if (d.month < currentMonth()) return null;
+  const pending = toCents(d.plannedBillsTotal) + toCents(d.overdueBillsTotal);
+  const unknown = d.plannedBillsUnknownCount + d.overdueBillsUnknownCount;
+  if (pending <= 0n && unknown === 0) return null;
+  const available = balance === null || balance < 0n ? 0n : balance;
+  const missing = balance === null ? 0n : pending - available;
+  return (
+    <Link
+      to="/a-pagar"
+      className="mt-1 flex min-h-[44px] flex-wrap items-baseline justify-between gap-x-3 text-[0.85rem]"
+    >
+      <span className="text-muted">
+        {pending > 0n ? (
+          <>
+            {t("dashboard.pending")}{" "}
+            <span className="tabular-nums">{formatMoney(fromCents(pending))}</span>
+          </>
+        ) : null}
+        {unknown > 0 ? (
+          <span className="block">{t("dashboard.unknownCount", { count: unknown })}</span>
+        ) : null}
+      </span>
+      {missing > 0n ? (
+        <span className="font-semibold tabular-nums text-err">
+          {t("dashboard.missing", { amount: formatMoney(fromCents(missing)) })}
+        </span>
+      ) : null}
+    </Link>
+  );
+}
+
 function BalanceCard({ d }: { d: Dashboard }) {
   const { t } = useTranslation();
   const { data: lookups } = useLookups();
@@ -80,6 +119,7 @@ function BalanceCard({ d }: { d: Dashboard }) {
             {formatMoney(fromCents(balance))}
           </p>
         )}
+        <Pending d={d} balance={balance} />
       </div>
 
       <div>

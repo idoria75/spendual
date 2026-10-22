@@ -264,6 +264,7 @@ export async function getDashboard(
     spending,
     upcoming,
     goalSums,
+    late,
   ] = await Promise.all([
     sumTx(prisma, { ...household, type: "income", transactionDate: range }),
     netSpent(prisma, household, range),
@@ -281,6 +282,7 @@ export async function getDashboard(
     categorySpending(prisma, month),
     upcomingBills(prisma, now),
     goalEntrySums(prisma, range),
+    overdueBills(prisma, month, now),
   ]);
   const allocations = cents(allocationAgg._sum.amount);
   const savings = savingsBeforeGoals({
@@ -302,6 +304,8 @@ export async function getDashboard(
       cents(recAgg._sum.expectedAmount) + cents(insAgg._sum.expectedAmount),
     ),
     plannedBillsUnknownCount: recUnknown,
+    overdueBillsTotal: centsToMoney(late.total),
+    overdueBillsUnknownCount: late.unknown,
     overallBudget: {
       budget: overall ? overall.amount.toFixed(2) : null,
       spent: centsToMoney(sharedNet),
@@ -343,6 +347,25 @@ async function spendingPace(db: Db, month: string, now: Date): Promise<Dashboard
     lastMonthSameDays: centsToMoney(lastSame),
     lastMonthTotal: centsToMoney(lastTotal),
   };
+}
+
+/**
+ * Planned bills due before the current month (overdue, rule still active). Only for the current
+ * month: other months show their own planned bills and nothing more.
+ */
+async function overdueBills(db: Db, month: string, now: Date) {
+  if (month !== currentPeriod(now)) return { total: 0n, unknown: 0 };
+  const late = { status: "planned" as const, dueDate: { lt: dateOnlyToDate(`${month}-01`) } };
+  const rule = { rule: { state: "active" as const } };
+  const [rec, ins, unknown] = await Promise.all([
+    db.recurrenceOccurrence.aggregate({
+      _sum: { expectedAmount: true },
+      where: { ...late, ...rule },
+    }),
+    db.installmentOccurrence.aggregate({ _sum: { expectedAmount: true }, where: late }),
+    db.recurrenceOccurrence.count({ where: { ...late, ...rule, expectedAmount: null } }),
+  ]);
+  return { total: cents(rec._sum.expectedAmount) + cents(ins._sum.expectedAmount), unknown };
 }
 
 /** Goal ALLOCATION and WITHDRAWAL totals by effectiveDate. Not income, not expense. */

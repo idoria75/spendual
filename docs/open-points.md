@@ -69,7 +69,7 @@ Category drill-down from Início (2026-10-20):
 Início merge and P1 next steps (2026-10-21):
 - DONE: `Realizado` is folded into `Saldo atual` (details element); one dashed `Próximas contas` card; no greeting. Commit `d35b9b1`.
 - ⚠ `Saldo atual` (budget minus spending), `Sobra do mês` (income − expenses − allowances) and `Sem destino` (savings − goal allocations) differ. `Sem destino` equals the savings until goals exist, so Início hides it when equal.
-- DECIDED (2026-10-22): `Poupança do mês` is now `Sobra do mês`, so it does not look like `Poupança sem destino`. Still open: should `Saldo atual` subtract planned bills? (not now)
+- DECIDED (2026-10-22): `Poupança do mês` is now `Sobra do mês`, so it does not look like `Poupança sem destino`. Still open: should `Saldo atual` subtract planned bills? 
 - P1 list: [guide](household-finance-reference-guide.md), "P1 — Important follow-up" and phases 6–7. Proposed order:
   1. DONE (2026-10-21, tag `p1-goals`): shared savings goals (`/metas`). Not checked on a real phone. Was: Tables `SavingsGoal` and `GoalEntry` exist (`backend/prisma/schema.prisma:354`); `domain/accounting.ts` and `services/dashboard.ts` already read `goalAllocationsNet` (always 0). Missing:
      - services and routes: create, edit, close, archive; allocate, withdraw; history and balances

@@ -927,6 +927,18 @@ describe("overdue bills", () => {
     // Today is 2027-03-15, so March 5 is overdue too; April items stay out.
     expect(apr.overdue.map((b) => b.dueDate)).toEqual(["2027-01-05", "2027-02-05", "2027-03-05"]);
     expect(apr.items.map((b) => b.dueDate)).toEqual(["2027-04-05"]);
+
+    // The dashboard adds the overdue amount to the pending total of the current month only.
+    const dashOf = async (month: string) =>
+      dashboardSchema.parse((await ctx.ana.get(`/api/dashboard?month=${month}`)).body);
+    const march = await dashOf("2027-03");
+    expect(march.plannedBillsTotal).toBe("50.00");
+    expect(march.overdueBillsTotal).toBe("100.00");
+    expect(march.overdueBillsUnknownCount).toBe(0);
+    const april = await dashOf("2027-04");
+    expect(april.plannedBillsTotal).toBe("50.00");
+    expect(april.overdueBillsTotal).toBe("0.00");
+    expect((await dashOf("2027-02")).overdueBillsTotal).toBe("0.00");
   });
 
   it("skips confirmed, cancelled, and rows of ended or paused rules", async () => {

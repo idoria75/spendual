@@ -291,6 +291,8 @@
     "paceLess": "{{percent}}% a menos que no mesmo ponto do mês passado",
     "paceSame": "Igual ao mesmo ponto do mês passado",
     "paceHint": "O mês passado fechou em {{total}}. Contas grandes em dias diferentes mudam a comparação. Não é previsão.",
+    "pending": "Pendente (mês):",
+    "missing": "Faltam {{amount}}",
     "target": "Meta de poupança",
     "targetMet": "Meta atingida",
     "targetLeft": "Faltam {{amount}} para a meta",

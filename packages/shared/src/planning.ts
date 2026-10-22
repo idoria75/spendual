@@ -169,6 +169,12 @@ export const dashboardSchema = z.object({
   /** Planned, not yet confirmed, with a known amount. */
   plannedBillsTotal: moneySchema,
   plannedBillsUnknownCount: z.number().int(),
+  /**
+   * Still-planned bills from earlier months (overdue), current month only; "0.00" and 0 for any
+   * other month. Together with `plannedBillsTotal` this is what is pending for the month.
+   */
+  overdueBillsTotal: moneySchema.default("0.00"),
+  overdueBillsUnknownCount: z.number().int().default(0),
   overallBudget: z.object({ budget: moneySchema.nullable(), spent: moneySchema }),
   /**
    * Spending pace, only when `month` is the current month: household expenses net of refunds
