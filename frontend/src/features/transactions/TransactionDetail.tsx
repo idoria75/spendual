@@ -11,10 +11,12 @@ interface Props {
   tx: Transaction | null;
   onClose: () => void;
   onEdit: (tx: Transaction) => void;
+  onCorrect: (tx: Transaction) => void;
+  onDuplicate: (tx: Transaction) => void;
   onVoid: (tx: Transaction) => void;
 }
 
-export function TransactionDetail({ tx, onClose, onEdit, onVoid }: Props) {
+export function TransactionDetail({ tx, onClose, onEdit, onCorrect, onDuplicate, onVoid }: Props) {
   const { t } = useTranslation();
   const { data } = useLookups();
   // One account: who paid is never a question.
@@ -56,10 +58,18 @@ export function TransactionDetail({ tx, onClose, onEdit, onVoid }: Props) {
               ))}
           </dl>
           {canChange ? (
-            <div className="flex justify-between gap-3">
-              <Button variant="ghost" onClick={() => onEdit(tx)}>
-                {t("detail.edit")}
-              </Button>
+            <div className="flex flex-col gap-2">
+              <div className="grid grid-cols-3 gap-2">
+                <Button variant="ghost" onClick={() => onEdit(tx)}>
+                  {t("detail.edit")}
+                </Button>
+                <Button variant="ghost" onClick={() => onCorrect(tx)}>
+                  {t("detail.correct")}
+                </Button>
+                <Button variant="ghost" onClick={() => onDuplicate(tx)}>
+                  {t("detail.duplicate")}
+                </Button>
+              </div>
               <Button onClick={() => onVoid(tx)} className="bg-fg text-bg">
                 <TriangleAlert size={16} aria-hidden className="mr-1 inline" />
                 {t("detail.void")}

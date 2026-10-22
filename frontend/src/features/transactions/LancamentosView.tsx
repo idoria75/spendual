@@ -1,7 +1,7 @@
 import type { Scope, Transaction, TransactionListQuery } from "@spendual/shared";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { messageKeyFor } from "../../auth/error-messages";
 import { Button } from "../../components/ui/button";
 import { Chip } from "../../components/ui/chip";
@@ -91,7 +91,15 @@ export function LancamentosView() {
 
   return (
     <section className="flex flex-col gap-3">
-      <h1 className="text-[17px] font-bold">{t("nav.lancamentos")}</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-[17px] font-bold">{t("nav.lancamentos")}</h1>
+        <Link
+          to="/duplicados"
+          className="inline-flex min-h-[44px] items-center text-[0.85rem] font-semibold text-accent"
+        >
+          {t("nav.duplicados")}
+        </Link>
+      </div>
 
       <div className="flex flex-col gap-2" aria-label={t("list.filters")} role="group">
         <div className="flex flex-wrap gap-2">

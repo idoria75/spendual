@@ -65,6 +65,14 @@ export function TransactionList({ items }: { items: Transaction[] }) {
           setSelected(null);
           entry.openEdit(tx);
         }}
+        onCorrect={(tx) => {
+          setSelected(null);
+          entry.openCorrect(tx);
+        }}
+        onDuplicate={(tx) => {
+          setSelected(null);
+          entry.openDuplicate(tx);
+        }}
         onVoid={(tx) => setVoiding(tx)}
       />
       <ConfirmDialog

@@ -1,6 +1,7 @@
 import {
   ChartColumn,
   ChevronRight,
+  Copy,
   History,
   PiggyBank,
   Settings,
@@ -65,6 +66,19 @@ export function MaisPage() {
             <span className="flex-1">
               <span className="block font-semibold">{t("nav.metas")}</span>
               <span className="block text-[12px] text-muted">{t("nav.metasHint")}</span>
+            </span>
+            <ChevronRight size={16} aria-hidden />
+          </Link>
+        </li>
+        <li>
+          <Link
+            to="/duplicados"
+            className="flex min-h-[56px] items-center gap-3 rounded-input bg-surface px-3"
+          >
+            <Copy size={20} aria-hidden />
+            <span className="flex-1">
+              <span className="block font-semibold">{t("nav.duplicados")}</span>
+              <span className="block text-[12px] text-muted">{t("nav.duplicadosHint")}</span>
             </span>
             <ChevronRight size={16} aria-hidden />
           </Link>

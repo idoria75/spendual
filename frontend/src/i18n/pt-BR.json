@@ -76,12 +76,22 @@
     "pessoalHint": "Saldo e mesada de cada pessoa",
     "metas": "Metas",
     "metasHint": "Poupança para objetivos da casa",
+    "duplicados": "Possíveis duplicados",
+    "duplicadosHint": "Lançamentos que parecem repetidos",
     "historico": "Histórico",
     "historicoHint": "Quem mudou o quê, e quando"
   },
   "form": {
     "titleNew": "Novo lançamento",
     "titleEdit": "Editar lançamento",
+    "titleCorrect": "Corrigir lançamento",
+    "corrected": "Lançamento corrigido",
+    "duplicate": {
+      "title": "Parece repetido",
+      "body_one": "Já existe um lançamento igual perto desta data. Salvar mesmo assim?",
+      "body_other": "Já existem {{count}} lançamentos iguais perto desta data. Salvar mesmo assim?",
+      "confirm": "Salvar mesmo assim"
+    },
     "typeLabel": "Tipo",
     "type": {
       "label": "Tipo",
@@ -164,6 +174,8 @@
   },
   "detail": {
     "edit": "Editar",
+    "correct": "Corrigir",
+    "duplicate": "Duplicar",
     "void": "Anular",
     "cancel": "Cancelar",
     "voidReason": "Motivo"
@@ -346,6 +358,14 @@
     "records": "Lançamentos pessoais",
     "empty": "Nenhum lançamento pessoal neste mês.",
     "failed": "Não foi possível carregar os dados."
+  },
+  "duplicates": {
+    "title": "Possíveis duplicados",
+    "hint": "Lançamentos de {{month}} com o mesmo tipo, valor e descrição, com até 3 dias de diferença. Podem ser reais: abra um para anular ou corrigir.",
+    "group_one": "{{count}} lançamento parecido",
+    "group_other": "{{count}} lançamentos parecidos",
+    "empty": "Nenhum lançamento parece repetido neste mês.",
+    "failed": "Não foi possível carregar os duplicados."
   },
   "history": {
     "title": "Histórico",

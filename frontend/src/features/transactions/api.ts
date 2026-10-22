@@ -3,6 +3,7 @@ import {
   categorySchema,
   lookupsSchema,
   paymentMethodSchema,
+  duplicateGroupsSchema,
   transactionListSchema,
   transactionSchema,
   type Account,
@@ -16,6 +17,7 @@ import {
   type PaymentMethodInput,
   type PaymentMethodPatch,
   type Transaction,
+  type DuplicateGroups,
   type TransactionCreate,
   type TransactionListQuery,
   type TransactionPatch,
@@ -45,6 +47,26 @@ export async function listTransactions(query: TransactionListQuery): Promise<Tra
   const res = await api.get(`/transactions?${params.toString()}`, transactionListSchema);
   return res.items;
 }
+
+export const correctTransaction = (id: number, b: TransactionCreate): Promise<Transaction> =>
+  api.post(`/transactions/${id}/correct`, b, transactionSchema);
+
+/** Confirmed records that look like the one about to be saved (same rule as the duplicates list). */
+export async function findSimilar(b: TransactionCreate): Promise<Transaction[]> {
+  const params = new URLSearchParams({
+    type: b.type,
+    amount: b.amount,
+    transactionDate: b.transactionDate,
+    scope: b.scope,
+    description: b.description,
+  });
+  if (b.ownerId != null) params.set("ownerId", String(b.ownerId));
+  const res = await api.get(`/transactions/similar?${params.toString()}`, transactionListSchema);
+  return res.items;
+}
+
+export const fetchDuplicates = (month: string): Promise<DuplicateGroups> =>
+  api.get(`/transactions/duplicates?month=${month}`, duplicateGroupsSchema);
 
 export const createTransaction = (b: TransactionCreate): Promise<Transaction> =>
   api.post("/transactions", b, transactionSchema);

@@ -1,4 +1,4 @@
-import type { Bill, Transaction, TransactionType } from "@spendual/shared";
+import type { Bill, Transaction, TransactionCreate, TransactionType } from "@spendual/shared";
 import { ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
@@ -8,6 +8,7 @@ import { messageKeyFor } from "../../auth/error-messages";
 import { AmountInput } from "../../components/ui/amount-input";
 import { Button } from "../../components/ui/button";
 import { Chip } from "../../components/ui/chip";
+import { ConfirmDialog } from "../../components/ui/confirm-dialog";
 import { Field, Label } from "../../components/ui/field";
 import { StickyActions } from "../../components/ui/sticky-actions";
 import { Input } from "../../components/ui/input";
@@ -19,7 +20,13 @@ import { formatDayMonth, today } from "../../lib/date";
 import { lastMethodId, rememberMethod } from "../../lib/recent";
 import { confirmBill, createPlan } from "../planning/api";
 import { splitPreview } from "../planning/form-model";
-import { createTransaction, listTransactions, patchTransaction } from "./api";
+import {
+  correctTransaction,
+  createTransaction,
+  findSimilar,
+  listTransactions,
+  patchTransaction,
+} from "./api";
 import { CategoryPicker } from "./CategoryPicker";
 import { UserPicker } from "./UserPicker";
 import {
@@ -54,13 +61,24 @@ const TYPES: TransactionType[] = ["expense", "income", "other_receipt", "transfe
 
 interface Props {
   editing: Transaction | null;
+  /** Copy of another record: the form starts filled, dated today, and saves as a new record. */
+  duplicating?: Transaction | null;
+  /** Record to void and replace by the one in the form. */
+  correcting?: Transaction | null;
   /** A planned bill to confirm: the form is pre-filled and saves through /bills/:kind/:id/confirm. */
   bill?: Bill | null;
   amountRef: React.RefObject<HTMLInputElement>;
   onSaved: () => void;
 }
 
-export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Props) {
+export function TransactionForm({
+  editing,
+  duplicating = null,
+  correcting = null,
+  bill = null,
+  amountRef,
+  onSaved,
+}: Props) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const { data: lookups, failed, reload } = useLookups();
@@ -71,20 +89,24 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
       ? valuesFromBill(bill, user?.id ?? null, bill.dueDate)
       : editing
         ? valuesFromTransaction(editing)
-        : {
-            type: "expense",
-            amount: "",
-            description: "",
-            scope: "household",
-            ownerId: user?.id ?? null,
-            categoryId: null,
-            payerId: user?.id ?? null,
-            date: today(),
-            paymentMethodId: lastMethodId(),
-            accountId: null,
-            relatedTransactionId: null,
-            notes: "",
-          },
+        : correcting
+          ? valuesFromTransaction(correcting)
+          : duplicating
+            ? { ...valuesFromTransaction(duplicating), date: today() }
+            : {
+                type: "expense",
+                amount: "",
+                description: "",
+                scope: "household",
+                ownerId: user?.id ?? null,
+                categoryId: null,
+                payerId: user?.id ?? null,
+                date: today(),
+                paymentMethodId: lastMethodId(),
+                accountId: null,
+                relatedTransactionId: null,
+                notes: "",
+              },
   );
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<ReturnType<typeof messageKeyFor> | null>(null);
@@ -92,6 +114,10 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
   const [showMore, setShowMore] = useState(false);
   const [installment, setInstallment] = useState<"no" | "yes">("no");
   const [installmentCount, setInstallmentCount] = useState("2");
+  const [similar, setSimilar] = useState<{
+    items: Transaction[];
+    run: () => Promise<unknown>;
+  } | null>(null);
   const [expenses, setExpenses] = useState<Transaction[]>([]);
   const locked = useRef(false);
   const dropped = useRef(new Map<string, number>());
@@ -173,6 +199,7 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
     if (locked.current) return;
     setFormError(null);
     let run: (() => Promise<unknown>) | null;
+    let check: TransactionCreate | null = null;
     if (bill) {
       const built = buildConfirm(values);
       if (!built.ok) {
@@ -204,13 +231,32 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
         return;
       }
       const body = built.body;
-      run = () => createTransaction(body);
+      if (correcting) {
+        run = () => correctTransaction(correcting.id, body);
+      } else {
+        run = () => createTransaction(body);
+        check = body;
+      }
     }
     setErrors({});
     if (run === null) {
       onSaved();
       return;
     }
+    // A new record that looks like an existing one asks first. A failed check never blocks saving.
+    if (check) {
+      const similar = await findSimilar(check).catch(() => []);
+      if (similar.length > 0) {
+        setSimilar({ items: similar, run });
+        return;
+      }
+    }
+    await execute(run);
+  };
+
+  /** Runs the save once at a time, then toasts and closes. */
+  const execute = async (run: () => Promise<unknown>) => {
+    if (locked.current) return;
     locked.current = true;
     setSubmitting(true);
     try {
@@ -222,9 +268,11 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
             ? "bills.confirmed"
             : editing
               ? "form.savedEdit"
-              : installing
-                ? "form.installment.saved"
-                : "form.saved",
+              : correcting
+                ? "form.corrected"
+                : installing
+                  ? "form.installment.saved"
+                  : "form.saved",
         ),
       );
       onSaved();
@@ -478,6 +526,21 @@ export function TransactionForm({ editing, bill = null, amountRef, onSaved }: Pr
           {submitting ? t("form.saving") : t(bill ? "bills.confirm" : "form.save")}
         </Button>
       </StickyActions>
+      <ConfirmDialog
+        open={similar !== null}
+        onOpenChange={(open) => {
+          if (!open) setSimilar(null);
+        }}
+        title={t("form.duplicate.title")}
+        record={similar?.items[0] ? relatedLabel(similar.items[0]) : ""}
+        body={t("form.duplicate.body", { count: similar?.items.length ?? 0 })}
+        confirmLabel={t("form.duplicate.confirm")}
+        onConfirm={async () => {
+          const pending = similar;
+          setSimilar(null);
+          if (pending) await execute(pending.run);
+        }}
+      />
     </form>
   );
 }

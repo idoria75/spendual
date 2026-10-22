@@ -790,3 +790,79 @@ describe("Review fixes", () => {
     expect(screen.getByRole("button", { name: /Mercado/ })).toBeInTheDocument();
   });
 });
+
+describe("Duplicates and corrections", () => {
+  const callsTo = (mock: ReturnType<typeof mockFetch>, url: string, method = "POST") =>
+    mock.mock.calls.filter(([u, init]) => String(u).startsWith(url) && init?.method === method);
+
+  it("copies a record into a new one and asks before saving a likely duplicate", async () => {
+    list = [tx({})];
+    const mock = mockFetch(
+      base((req) => {
+        if (req.url.startsWith("/api/transactions/similar")) {
+          return json(200, { items: [tx({})] });
+        }
+        return req.method === "POST" ? json(201, tx({ id: 11 })) : undefined;
+      }),
+    );
+    renderAt("/lancamentos");
+    await userEvent.click(await screen.findByText("iFood"));
+    await userEvent.click(await screen.findByRole("button", { name: "Duplicar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Novo lançamento" });
+    expect(within(dialog).getByLabelText("Valor")).toHaveValue("64,50");
+    expect(within(dialog).getByLabelText("Descrição")).toHaveValue("iFood");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
+
+    const ask = await screen.findByRole("dialog", { name: "Parece repetido" });
+    expect(callsTo(mock, "/api/transactions")).toHaveLength(0);
+    expect(within(ask).getByText(/iFood/)).toBeInTheDocument();
+    await userEvent.click(within(ask).getByRole("button", { name: "Salvar mesmo assim" }));
+    await waitFor(() => expect(posts(mock)).toHaveLength(1));
+    const body = JSON.parse(posts(mock)[0]![1]!.body as string) as Record<string, unknown>;
+    expect(body).toMatchObject({ amount: "64.50", description: "iFood", type: "expense" });
+    expect(body.transactionDate).not.toBe("2026-10-02");
+  });
+
+  it("corrects a record through the correct endpoint, without a duplicate check", async () => {
+    list = [tx({})];
+    const mock = mockFetch(
+      base((req) =>
+        req.method === "POST" ? json(201, tx({ id: 12, amount: "70.00" })) : undefined,
+      ),
+    );
+    renderAt("/lancamentos");
+    await userEvent.click(await screen.findByText("iFood"));
+    await userEvent.click(await screen.findByRole("button", { name: "Corrigir" }));
+    const dialog = await screen.findByRole("dialog", { name: "Corrigir lançamento" });
+    const amount = within(dialog).getByLabelText("Valor");
+    expect(amount).toHaveValue("64,50");
+    await userEvent.clear(amount);
+    await userEvent.type(amount, "7000");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Salvar" }));
+    await waitFor(() => expect(callsTo(mock, "/api/transactions/10/correct")).toHaveLength(1));
+    const body = JSON.parse(
+      callsTo(mock, "/api/transactions/10/correct")[0]![1]!.body as string,
+    ) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      amount: "70.00",
+      description: "iFood",
+      transactionDate: "2026-10-02",
+    });
+    expect(callsTo(mock, "/api/transactions/similar", "GET")).toHaveLength(0);
+  });
+
+  it("lists possible duplicates of the month", async () => {
+    mockFetch(
+      base((req) =>
+        req.url.startsWith("/api/transactions/duplicates")
+          ? json(200, { groups: [{ items: [tx({ id: 11 }), tx({ id: 10 })] }] })
+          : undefined,
+      ),
+    );
+    renderAt("/duplicados");
+    expect(
+      await screen.findByText("2 lançamentos parecidos", { selector: "p" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("iFood")).toHaveLength(2);
+  });
+});
