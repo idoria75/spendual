@@ -27,7 +27,7 @@ import { LookupsProvider, useLookups } from "../features/transactions/lookups";
 import { MonthProvider, useMonth } from "../features/transactions/month";
 import { toneColor } from "../features/transactions/display";
 import { cn } from "../lib/cn";
-import { formatMonth, shiftMonth } from "../lib/date";
+import { currentMonth, formatMonth, shiftMonth } from "../lib/date";
 
 type NavKey =
   | "inicio"
@@ -96,9 +96,15 @@ function MonthSelector() {
       >
         <ChevronLeft size={18} aria-hidden />
       </button>
-      <span className="min-w-[8.5rem] text-center text-[0.9rem] font-semibold">
+      <button
+        type="button"
+        title={t("nav.currentMonth")}
+        aria-label={t("nav.currentMonthLabel", { month: formatMonth(month) })}
+        onClick={() => setMonth(currentMonth())}
+        className="min-h-[44px] min-w-[8.5rem] rounded-input text-center text-[0.9rem] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+      >
         {formatMonth(month)}
-      </span>
+      </button>
       <button
         type="button"
         aria-label={t("nav.nextMonth")}

@@ -64,6 +64,8 @@
     "ajustes": "Ajustes",
     "ajustesHint": "Categorias, contas e métodos",
     "prevMonth": "Mês anterior",
+    "currentMonth": "Voltar ao mês atual",
+    "currentMonthLabel": "{{month}}. Voltar ao mês atual",
     "nextMonth": "Próximo mês",
     "newEntry": "Novo lançamento",
     "newEntryLong": "Novo lançamento",

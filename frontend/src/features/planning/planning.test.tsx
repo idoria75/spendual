@@ -300,6 +300,22 @@ describe("Início", () => {
     expect(await screen.findByRole("region", { name: "Saldo atual" })).toBeInTheDocument();
   });
 
+  it("goes back to the current month when the month in the top bar is tapped", async () => {
+    mockFetch(base());
+    renderAt("/");
+    const header = await screen.findByRole("banner");
+    const label = (m: string) => new RegExp(`^${formatMonth(m)}\\. Voltar ao mês atual$`);
+    await userEvent.click(within(header).getByRole("button", { name: "Mês anterior" }));
+    await userEvent.click(within(header).getByRole("button", { name: "Mês anterior" }));
+    expect(
+      within(header).getByRole("button", { name: label(shiftMonth(month, -2)) }),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      within(header).getByRole("button", { name: label(shiftMonth(month, -2)) }),
+    );
+    expect(within(header).getByRole("button", { name: label(month) })).toBeInTheDocument();
+  });
+
   it("links Pessoal from Mais", async () => {
     mockFetch(base());
     renderAt("/mais");
