@@ -348,6 +348,8 @@
   "pessoal": {
     "person": "Pessoa",
     "range": "Período do gráfico",
+    "goals": "Metas pessoais",
+    "inGoals": "Em metas pessoais",
     "chartTitle": "Saldo no fim de cada mês",
     "chartLabel": "Saldo de {{name}} no fim de cada mês, {{range}}",
     "chartEmpty": "Ainda não há movimento para mostrar.",
@@ -430,6 +432,9 @@
   },
   "goals": {
     "new": "Nova meta",
+    "newPersonal": "Nova meta pessoal",
+    "emptyPersonal": "Nenhuma meta pessoal ainda. Crie uma, por exemplo, para comprar um celular.",
+    "availablePersonal": "Seu saldo pessoal: {{amount}}",
     "edit": "Editar",
     "save": "Salvar meta",
     "name": "Nome da meta",
@@ -443,6 +448,7 @@
     "availableFree": "Poupança sem destino: {{amount}}",
     "errors": {
       "overFree": "Informe um valor até a poupança sem destino.",
+      "overPersonal": "Informe um valor até o seu saldo pessoal.",
       "overBalance": "Informe um valor até o saldo da meta."
     },
     "allocate": "Depositar",

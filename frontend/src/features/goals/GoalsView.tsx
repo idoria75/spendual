@@ -1,6 +1,7 @@
 import type { Goal } from "@spendual/shared";
 import { Plus } from "lucide-react";
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { messageKeyFor } from "../../auth/error-messages";
 import { Button } from "../../components/ui/button";
@@ -75,8 +76,11 @@ function GoalCard({
   onEdit,
   onClose,
   onReopen,
+  canAct,
 }: {
   goal: Goal;
+  /** false: the goal belongs to someone else, so it is only shown. */
+  canAct: boolean;
   onAllocate: () => void;
   onWithdraw: () => void;
   onEdit: () => void;
@@ -116,7 +120,7 @@ function GoalCard({
           {t("goals.until", { date: formatDate(goal.targetDate) })}
         </p>
       ) : null}
-      {active ? (
+      {active && canAct ? (
         <div className="flex gap-2">
           <Button className="flex-1" onClick={onAllocate}>
             {t("goals.allocate")}
@@ -126,7 +130,7 @@ function GoalCard({
           </Button>
         </div>
       ) : null}
-      {!archived ? (
+      {!archived && canAct ? (
         <div className="flex flex-wrap gap-2">
           <Button variant="ghost" onClick={onEdit}>
             {t("goals.edit")}
@@ -150,15 +154,27 @@ function GoalCard({
   );
 }
 
-/** Metas: unallocated savings of the month, then one card per shared goal. */
-export function GoalsView() {
+interface PanelProps {
+  /** null = the household's shared goals; a user id = that person's personal goals. */
+  ownerId: number | null;
+  /** Money a deposit can use (household unallocated savings, or the person's own balance). */
+  free: string | null;
+  /** false: the goals are only shown (someone else's personal goals). */
+  canAct: boolean;
+  heading: ReactNode;
+  /** Shown between the heading and the goals. */
+  intro?: ReactNode;
+  /** Called after any change, so the page can reload what depends on it. */
+  onChanged: () => void;
+}
+
+/** Goal cards with their sheets. Used by Metas (shared) and Pessoal (personal). */
+export function GoalsPanel({ ownerId, free, canAct, heading, intro, onChanged }: PanelProps) {
   const { t } = useTranslation();
-  // Deposits are dated today, so the pool is the current month, whatever month the bar shows.
-  const month = currentMonth();
+  const personal = ownerId !== null;
   const { notifySaved } = useEntry();
   const { showToast } = useToast();
   const goals = useLoad(fetchGoals, []);
-  const dashboard = useLoad(() => fetchDashboard(month), [month]);
   const [moving, setMoving] = useState<{ goal: Goal; kind: "allocate" | "withdraw" } | null>(null);
   const [editing, setEditing] = useState<Goal | "new" | null>(null);
   const [closing, setClosing] = useState<Closing | null>(null);
@@ -168,7 +184,7 @@ export function GoalsView() {
     showToast(message);
     // Reload in place: a new key would blank the list. notifySaved refreshes the open histories.
     goals.reload();
-    dashboard.reload();
+    onChanged();
     notifySaved();
   };
   const run = async (fn: () => Promise<unknown>, message: string) => {
@@ -187,7 +203,7 @@ export function GoalsView() {
     } else setClosing({ goal, name });
   };
 
-  const items = goals.data?.items ?? [];
+  const items = (goals.data?.items ?? []).filter((g) => g.ownerId === ownerId);
   const live = items.filter((g) => g.status !== "archived");
   const archived = items.filter((g) => g.status === "archived");
   const hasBalance = closing !== null && toCents(closing.goal.balance) > 0n;
@@ -195,25 +211,15 @@ export function GoalsView() {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-[17px] font-bold">{t("nav.metas")}</h1>
-        <Button onClick={() => setEditing("new")}>
-          <Plus size={16} aria-hidden className="mr-1 inline" />
-          {t("goals.new")}
-        </Button>
+        {heading}
+        {canAct ? (
+          <Button onClick={() => setEditing("new")}>
+            <Plus size={16} aria-hidden className="mr-1 inline" />
+            {t(personal ? "goals.newPersonal" : "goals.new")}
+          </Button>
+        ) : null}
       </div>
-
-      <section aria-labelledby="goals-free" className="rounded-card bg-surface p-4">
-        <h2
-          id="goals-free"
-          className="text-[11px] font-semibold uppercase tracking-[0.07em] text-muted"
-        >
-          {t("dashboard.unallocated")}
-        </h2>
-        <p className="text-[1.7rem] font-bold tabular-nums">
-          {dashboard.data ? formatMoney(dashboard.data.unallocatedSavings) : "…"}
-        </p>
-        <p className="text-[0.8rem] text-muted">{t("goals.freeHint")}</p>
-      </section>
+      {intro}
 
       {actionError ? (
         <p role="alert" className="text-[0.85rem] text-err">
@@ -233,13 +239,14 @@ export function GoalsView() {
           {t("common.loading")}
         </p>
       ) : live.length === 0 ? (
-        <p className="text-muted">{t("goals.empty")}</p>
+        <p className="text-muted">{t(personal ? "goals.emptyPersonal" : "goals.empty")}</p>
       ) : (
         <ul className="flex flex-col gap-3">
           {live.map((g) => (
             <GoalCard
               key={g.id}
               goal={g}
+              canAct={canAct}
               onAllocate={() => setMoving({ goal: g, kind: "allocate" })}
               onWithdraw={() => setMoving({ goal: g, kind: "withdraw" })}
               onEdit={() => setEditing(g)}
@@ -260,6 +267,7 @@ export function GoalsView() {
               <GoalCard
                 key={g.id}
                 goal={g}
+                canAct={false}
                 onAllocate={() => undefined}
                 onWithdraw={() => undefined}
                 onEdit={() => undefined}
@@ -274,7 +282,8 @@ export function GoalsView() {
       <MoveSheet
         goal={moving?.goal ?? null}
         kind={moving?.kind ?? "allocate"}
-        free={dashboard.data?.unallocatedSavings ?? null}
+        free={free}
+        personal={personal}
         onClose={() => setMoving(null)}
         onSaved={() => {
           setMoving(null);
@@ -283,6 +292,7 @@ export function GoalsView() {
       />
       <GoalFormSheet
         goal={editing}
+        personal={personal}
         onClose={() => setEditing(null)}
         onSaved={() => {
           setEditing(null);
@@ -324,5 +334,36 @@ export function GoalsView() {
         }}
       />
     </section>
+  );
+}
+
+/** Metas: unallocated savings of the month, then one card per shared goal. */
+export function GoalsView() {
+  const { t } = useTranslation();
+  // Deposits are dated today, so the pool is the current month, whatever month the bar shows.
+  const month = currentMonth();
+  const dashboard = useLoad(() => fetchDashboard(month), [month]);
+  return (
+    <GoalsPanel
+      ownerId={null}
+      free={dashboard.data?.unallocatedSavings ?? null}
+      canAct
+      heading={<h1 className="text-[17px] font-bold">{t("nav.metas")}</h1>}
+      intro={
+        <section aria-labelledby="goals-free" className="rounded-card bg-surface p-4">
+          <h2
+            id="goals-free"
+            className="text-[11px] font-semibold uppercase tracking-[0.07em] text-muted"
+          >
+            {t("dashboard.unallocated")}
+          </h2>
+          <p className="text-[1.7rem] font-bold tabular-nums">
+            {dashboard.data ? formatMoney(dashboard.data.unallocatedSavings) : "…"}
+          </p>
+          <p className="text-[0.8rem] text-muted">{t("goals.freeHint")}</p>
+        </section>
+      }
+      onChanged={dashboard.reload}
+    />
   );
 }

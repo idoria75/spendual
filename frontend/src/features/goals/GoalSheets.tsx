@@ -50,12 +50,14 @@ interface MoveProps {
   kind: "allocate" | "withdraw";
   /** Unallocated savings: a deposit cannot be above it. */
   free: string | null;
+  /** The deposit comes from the person's own balance (a personal goal), not the household savings. */
+  personal?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }
 
 /** `Depositar` and `Retirar`. A withdrawal asks for a confirmation first (ui-guidelines §6.8). */
-export function MoveSheet({ goal, kind, free, onClose, onSaved }: MoveProps) {
+export function MoveSheet({ goal, kind, free, personal = false, onClose, onSaved }: MoveProps) {
   const { t } = useTranslation();
   return (
     <Sheet
@@ -63,7 +65,9 @@ export function MoveSheet({ goal, kind, free, onClose, onSaved }: MoveProps) {
       onOpenChange={(open) => !open && onClose()}
       title={goal ? t(`goals.${kind}Title`, { name: goal.name }) : ""}
     >
-      {goal ? <MoveForm goal={goal} kind={kind} free={free} onSaved={onSaved} /> : null}
+      {goal ? (
+        <MoveForm goal={goal} kind={kind} free={free} personal={personal} onSaved={onSaved} />
+      ) : null}
     </Sheet>
   );
 }
@@ -72,6 +76,7 @@ function MoveForm({
   goal,
   kind,
   free,
+  personal = false,
   onSaved,
 }: Omit<MoveProps, "goal" | "onClose"> & { goal: Goal }) {
   const { t } = useTranslation();
@@ -114,7 +119,9 @@ function MoveForm({
         {kind === "withdraw"
           ? t("goals.available", { amount: formatMoney(goal.balance) })
           : free !== null
-            ? t("goals.availableFree", { amount: formatMoney(free) })
+            ? t(personal ? "goals.availablePersonal" : "goals.availableFree", {
+                amount: formatMoney(free),
+              })
             : null}
       </p>
       <AmountField
@@ -124,7 +131,13 @@ function MoveForm({
         onValueChange={setAmount}
         error={
           amountError
-            ? t(kind === "allocate" ? "goals.errors.overFree" : "goals.errors.overBalance")
+            ? t(
+                kind === "allocate"
+                  ? personal
+                    ? "goals.errors.overPersonal"
+                    : "goals.errors.overFree"
+                  : "goals.errors.overBalance",
+              )
             : undefined
         }
       />
@@ -161,25 +174,37 @@ function MoveForm({
 interface FormProps {
   /** null = closed; "new" = create; a goal = edit. */
   goal: Goal | "new" | null;
+  /** A new goal is personal (the signed-in person's own). */
+  personal?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }
 
 /** Create or edit a goal. Target amount and date are optional. */
-export function GoalFormSheet({ goal, onClose, onSaved }: FormProps) {
+export function GoalFormSheet({ goal, personal = false, onClose, onSaved }: FormProps) {
   const { t } = useTranslation();
   return (
     <Sheet
       open={goal !== null}
       onOpenChange={(open) => !open && onClose()}
-      title={goal === "new" ? t("goals.new") : t("goals.edit")}
+      title={goal === "new" ? t(personal ? "goals.newPersonal" : "goals.new") : t("goals.edit")}
     >
-      {goal ? <GoalForm goal={goal === "new" ? null : goal} onSaved={onSaved} /> : null}
+      {goal ? (
+        <GoalForm goal={goal === "new" ? null : goal} personal={personal} onSaved={onSaved} />
+      ) : null}
     </Sheet>
   );
 }
 
-function GoalForm({ goal, onSaved }: { goal: Goal | null; onSaved: () => void }) {
+function GoalForm({
+  goal,
+  personal,
+  onSaved,
+}: {
+  goal: Goal | null;
+  personal: boolean;
+  onSaved: () => void;
+}) {
   const { t } = useTranslation();
   const [name, setName] = useState(goal?.name ?? "");
   const [description, setDescription] = useState(goal?.description ?? "");
@@ -199,6 +224,7 @@ function GoalForm({ goal, onSaved }: { goal: Goal | null; onSaved: () => void })
       description: description.trim() === "" ? null : description,
       targetAmount,
       targetDate,
+      ...(personal && !goal ? { personal: true } : {}),
     };
     const parsed = goalCreateSchema.safeParse(body);
     const bad = {

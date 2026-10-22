@@ -131,3 +131,9 @@ Análises period and cumulative net (2026-10-21):
 - Tap the month in the top bar to return to the current month. Text selection is off everywhere except fields (`index.css`).
 - Not checked on a phone: the chart (drag, negative bars, axis), the picker, the month tap, and the no-selection rule (long-press menus on iOS and Android).
 - Not done: the chart range is 6 or 12 months (no custom range); the demo data may have little personal spending, so the curves can look flat.
+
+## Personal goals (2026-10-22)
+- DONE: personal goals on `Pessoal` (`SavingsGoal.ownerId`, migration `20261022130000`). Created with `personal: true`; both people can read them, only the owner can change them (403 `forbidden`). A deposit comes from the owner's own balance and is refused above it (409 `insufficient_personal`); a withdrawal goes back to it. Money in a personal goal leaves the person's free balance (`goalNet`, shown as `Em metas pessoais`) and never touches the household's `Poupança sem destino`. `Metas` lists household goals only.
+- The deposit limit is the balance of the current month (deposits are dated today), as for household goals.
+- Not checked on a phone. Not done: personal goals are not in the demo data; no CSV export of goals.
+- Also fixed: goal deposits now lock before any read (a plain read first made two parallel deposits both pass).

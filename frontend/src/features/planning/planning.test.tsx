@@ -118,6 +118,23 @@ const personalTx = {
   updatedAt: `${month}-02T10:00:00.000Z`,
 };
 
+const phoneGoal = {
+  id: 9,
+  name: "Celular novo",
+  description: null,
+  targetAmount: "3000.00",
+  targetDate: null,
+  currency: "BRL",
+  status: "active",
+  ownerId: 1,
+  balance: "900.00",
+  createdById: 1,
+  updatedById: 1,
+  createdAt: "2026-10-01T10:00:00.000Z",
+  updatedAt: "2026-10-01T10:00:00.000Z",
+};
+const biaGoal = { ...phoneGoal, id: 10, name: "Bicicleta", ownerId: 2, balance: "200.00" };
+let goals: unknown[] = [phoneGoal, biaGoal];
 let bills: unknown[] = [];
 let overdue: unknown[] = [];
 const allowances: unknown = {
@@ -140,6 +157,7 @@ function base(extra?: Extra): Handler {
     if (path === "/api/lookups") return json(200, lookups);
     if (path === "/api/dashboard") return json(200, dashboard);
     if (path === "/api/allowances" && req.method === "GET") return json(200, allowances);
+    if (path === "/api/goals" && req.method === "GET") return json(200, { items: goals });
     if (path === "/api/personal/history") {
       const userId = Number(new URL(req.url, "http://x").searchParams.get("userId"));
       return json(200, {
@@ -177,6 +195,7 @@ beforeEach(() => {
   resetCsrfToken();
   localStorage.clear();
   bills = [];
+  goals = [phoneGoal, biaGoal];
   overdue = [];
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -298,6 +317,34 @@ describe("Início", () => {
     expect(await screen.findByRole("region", { name: /^Em / })).toBeInTheDocument();
     await userEvent.click(within(header).getByRole("link", { name: "Spendual" }));
     expect(await screen.findByRole("region", { name: "Saldo atual" })).toBeInTheDocument();
+  });
+
+  it("keeps personal goals on Pessoal: only the owner can act on them", async () => {
+    mockFetch(base());
+    renderAt("/pessoal");
+    const mine = await screen.findByText("Celular novo");
+    const card = mine.closest("li") as HTMLElement;
+    expect(within(card).getByText("R$ 900,00")).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: "Depositar" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Nova meta pessoal" })).toBeInTheDocument();
+
+    await userEvent.click(within(card).getByRole("button", { name: "Depositar" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Seu saldo pessoal: R$ 800,00")).toBeInTheDocument();
+    await userEvent.type(within(dialog).getByLabelText("Valor"), "90000");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Depositar valor" }));
+    expect(
+      await within(dialog).findByText("Informe um valor até o seu saldo pessoal."),
+    ).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+
+    // Bia's goals are shown to Ana, but without any action.
+    await userEvent.click(screen.getByRole("button", { name: "Bia" }));
+    const others = (await screen.findByText("Bicicleta")).closest("li") as HTMLElement;
+    expect(within(others).getByText("R$ 200,00")).toBeInTheDocument();
+    expect(within(others).queryByRole("button", { name: "Depositar" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Celular novo")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Nova meta pessoal" })).not.toBeInTheDocument();
   });
 
   it("goes back to the current month when the month in the top bar is tapped", async () => {

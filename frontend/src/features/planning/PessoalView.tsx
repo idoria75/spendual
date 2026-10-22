@@ -7,6 +7,7 @@ import { Segmented } from "../../components/ui/segmented";
 import { formatMoney, fromCents, toCents } from "../../lib/currency";
 import { currentMonth, formatMonth } from "../../lib/date";
 import { RANGES, formatRange, trendWindow, type RangeMonths } from "../analytics/trend";
+import { GoalsPanel } from "../goals/GoalsView";
 import { listTransactions } from "../transactions/api";
 import { toneColor } from "../transactions/display";
 import { useEntry } from "../transactions/entry";
@@ -50,7 +51,8 @@ function MonthCard({
     toCents(p.closingBalance) -
       toCents(p.allowanceAllocated) -
       toCents(p.personalCredits) +
-      toCents(p.personalSpent),
+      toCents(p.personalSpent) +
+      toCents(p.goalNet),
   );
   return (
     <section
@@ -67,6 +69,9 @@ function MonthCard({
         <Row label={t("pessoal.allowance")} value={formatMoney(p.allowanceAllocated)} />
         <Row label={t("pessoal.credits")} value={formatMoney(p.personalCredits)} />
         <Row label={t("pessoal.spent")} value={formatMoney(p.personalSpent)} />
+        {toCents(p.goalNet) !== 0n ? (
+          <Row label={t("pessoal.inGoals")} value={formatMoney(p.goalNet)} />
+        ) : null}
       </dl>
       {missingAllowance ? (
         <Button variant="ghost" className="self-start" onClick={onAllocate}>
@@ -115,6 +120,9 @@ export function PessoalView() {
   );
 
   const recordsTitle = [t("pessoal.records"), formatMonth(month)].join(" · ");
+  // Deposits are dated today, so what a deposit can use is the balance of the current month.
+  const nowDashboard = useLoad(() => fetchDashboard(currentMonth()), [version]);
+  const free = nowDashboard.data?.people.find((x) => x.userId === personId)?.closingBalance ?? null;
   const summary = dashboard.data?.people.find((x) => x.userId === personId);
   const entry = allowances.data?.people.find((x) => x.ownerId === personId);
   const failed = dashboard.failed || history.failed || records.failed;
@@ -158,6 +166,21 @@ export function PessoalView() {
         <p role="status" className="py-6 text-muted">
           {t("common.loading")}
         </p>
+      )}
+
+      {personId === null ? null : (
+        <GoalsPanel
+          key={personId}
+          ownerId={personId}
+          free={free}
+          canAct={personId === user?.id}
+          heading={<h2 className="text-[17px] font-bold">{t("pessoal.goals")}</h2>}
+          onChanged={() => {
+            dashboard.reload();
+            nowDashboard.reload();
+            history.reload();
+          }}
+        />
       )}
 
       <section aria-label={t("pessoal.chartTitle")} className="flex flex-col gap-2">
