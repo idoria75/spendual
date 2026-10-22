@@ -5,20 +5,16 @@ import { useSearchParams } from "react-router-dom";
 import { messageKeyFor } from "../../auth/error-messages";
 import { Button } from "../../components/ui/button";
 import { Chip } from "../../components/ui/chip";
-import { ConfirmDialog } from "../../components/ui/confirm-dialog";
-import { useToast } from "../../components/ui/toast";
 import { formatMoney } from "../../lib/currency";
-import { formatDayHeader, formatDayMonth } from "../../lib/date";
-import { cancelTransaction, listTransactions, voidTransaction } from "./api";
-import { dayTotal, formatTxAmount, groupByDay, netSpent } from "./display";
+import { listTransactions } from "./api";
+import { netSpent } from "./display";
 import { CategoryPicker } from "./CategoryPicker";
 import { categoryIdsOf, readDrilldown } from "./drilldown";
 import { useEntry } from "./entry";
 import { byUsage, useLookups, useSingleUser } from "./lookups";
 import { UserPicker } from "./UserPicker";
 import { useMonth } from "./month";
-import { TransactionDetail } from "./TransactionDetail";
-import { TransactionRow } from "./TransactionRow";
+import { TransactionList } from "./TransactionList";
 
 type StatusFilter = "all" | "confirmed" | "voided";
 type ScopeFilter = "all" | Scope;
@@ -29,7 +25,6 @@ export function LancamentosView() {
   const { data: lookups } = useLookups();
   const singleUser = useSingleUser();
   const entry = useEntry();
-  const { showToast } = useToast();
 
   // Links from Início set the filters once; the UI does not write them back to the URL.
   const [params] = useSearchParams();
@@ -55,8 +50,6 @@ export function LancamentosView() {
 
   const [items, setItems] = useState<Transaction[] | null>(null);
   const [error, setError] = useState<ReturnType<typeof messageKeyFor> | null>(null);
-  const [selected, setSelected] = useState<Transaction | null>(null);
-  const [voiding, setVoiding] = useState<Transaction | null>(null);
   const requestId = useRef(0);
 
   const load = useCallback(async () => {
@@ -84,7 +77,6 @@ export function LancamentosView() {
     void load();
   }, [load, entry.version]);
 
-  const groups = items ? groupByDay(items) : [];
   const pickable = useMemo(
     () =>
       (lookups?.categories ?? [])
@@ -96,17 +88,6 @@ export function LancamentosView() {
   );
   const pick = (id: number | null) =>
     setPicked((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [id]));
-
-  const confirmVoid = async (reason: string) => {
-    if (!voiding) return;
-    const target = voiding;
-    if (target.status === "planned") await cancelTransaction(target.id, reason);
-    else await voidTransaction(target.id, reason);
-    setVoiding(null);
-    setSelected(null);
-    showToast(t(target.status === "planned" ? "list.cancelledToast" : "list.voidedToast"));
-    entry.notifySaved();
-  };
 
   return (
     <section className="flex flex-col gap-3">
@@ -176,55 +157,7 @@ export function LancamentosView() {
         </div>
       ) : null}
 
-      {groups.map((g) => (
-        <section key={g.date} aria-label={formatDayMonth(g.date)} className="flex flex-col gap-2">
-          <header className="flex items-baseline justify-between text-[12px] font-semibold text-muted">
-            <h2>{formatDayHeader(g.date)}</h2>
-            <span>
-              {(() => {
-                const total = dayTotal(g.items);
-                return formatMoney(
-                  total,
-                  total.startsWith("-") || total === "0.00" ? "none" : "plus",
-                );
-              })()}
-            </span>
-          </header>
-          <ul className="flex flex-col gap-2">
-            {g.items.map((tx) => (
-              <TransactionRow key={tx.id} tx={tx} onOpen={() => setSelected(tx)} />
-            ))}
-          </ul>
-        </section>
-      ))}
-
-      <TransactionDetail
-        tx={voiding ? null : selected}
-        onClose={() => setSelected(null)}
-        onEdit={(tx) => {
-          setSelected(null);
-          entry.openEdit(tx);
-        }}
-        onVoid={(tx) => setVoiding(tx)}
-      />
-      <ConfirmDialog
-        open={voiding !== null}
-        onOpenChange={(open) => {
-          if (!open) setVoiding(null);
-        }}
-        title={t(voiding?.status === "planned" ? "confirm.cancelTitle" : "confirm.voidTitle")}
-        record={
-          voiding
-            ? `${voiding.description} · ${formatTxAmount(voiding)} · ${formatDayMonth(voiding.transactionDate)}`
-            : ""
-        }
-        body={t(voiding?.status === "planned" ? "confirm.cancelBody" : "confirm.voidBody")}
-        confirmLabel={t(
-          voiding?.status === "planned" ? "confirm.cancelAction" : "confirm.voidAction",
-        )}
-        reasonRequired
-        onConfirm={confirmVoid}
-      />
+      {items !== null ? <TransactionList items={items} /> : null}
     </section>
   );
 }
