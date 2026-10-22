@@ -137,3 +137,4 @@ Análises period and cumulative net (2026-10-21):
 - The deposit limit is the balance of the current month (deposits are dated today), as for household goals.
 - Not checked on a phone. Not done: personal goals are not in the demo data; no CSV export of goals.
 - Also fixed: goal deposits now lock before any read (a plain read first made two parallel deposits both pass).
+- Adding personal balance: `Adicionar saldo` on Pessoal opens `Novo lançamento` as a personal income (type, scope and person preset). The monthly allowance (`mesada`) stays one per person and month; there is no second or extra allowance (the `ADJUSTMENT` kind has no screen).

@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { cn } from "../../lib/cn";
 import { formatMoney, fromCents, toCents } from "../../lib/currency";
-import { currentMonth } from "../../lib/date";
+import { currentMonth, formatDayMonth } from "../../lib/date";
 import { CategoryTile, categoryColor } from "../transactions/CategoryTile";
 import { spendingLink } from "../transactions/drilldown";
 import { useEntry } from "../transactions/entry";
@@ -240,7 +240,7 @@ function Pace({ d }: { d: Dashboard }) {
     <div className="flex flex-col gap-1 border-t border-line pt-2 text-[0.85rem]">
       <p className="text-muted">
         {t("dashboard.paceLine", {
-          day: pace.day,
+          date: formatDayMonth(`${d.month}-${String(pace.day).padStart(2, "0")}`),
           spent: formatMoney(pace.spent),
           last: formatMoney(pace.lastMonthSameDays),
         })}

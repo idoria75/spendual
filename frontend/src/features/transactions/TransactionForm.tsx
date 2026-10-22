@@ -43,6 +43,7 @@ import {
   type FieldErrors,
   type FormValues,
 } from "./form-model";
+import type { EntryPreset } from "./entry";
 import { byUsage, useLookups } from "./lookups";
 
 type ErrKey =
@@ -61,6 +62,8 @@ const TYPES: TransactionType[] = ["expense", "income", "other_receipt", "transfe
 
 interface Props {
   editing: Transaction | null;
+  /** Starting type, scope and owner of a new record. */
+  preset?: EntryPreset | null;
   /** Copy of another record: the form starts filled, dated today, and saves as a new record. */
   duplicating?: Transaction | null;
   /** Record to void and replace by the one in the form. */
@@ -73,6 +76,7 @@ interface Props {
 
 export function TransactionForm({
   editing,
+  preset = null,
   duplicating = null,
   correcting = null,
   bill = null,
@@ -94,11 +98,11 @@ export function TransactionForm({
           : duplicating
             ? { ...valuesFromTransaction(duplicating), date: today() }
             : {
-                type: "expense",
+                type: preset?.type ?? "expense",
                 amount: "",
                 description: "",
-                scope: "household",
-                ownerId: user?.id ?? null,
+                scope: preset?.scope ?? "household",
+                ownerId: preset ? preset.ownerId : (user?.id ?? null),
                 categoryId: null,
                 payerId: user?.id ?? null,
                 date: today(),

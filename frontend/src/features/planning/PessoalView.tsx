@@ -37,6 +37,7 @@ function MonthCard({
   month,
   missingAllowance,
   onAllocate,
+  onAddBalance,
 }: {
   p: PersonSummary;
   name: string;
@@ -44,6 +45,7 @@ function MonthCard({
   month: string;
   missingAllowance: boolean;
   onAllocate: () => void;
+  onAddBalance: () => void;
 }) {
   const { t } = useTranslation();
   const heading = [name, formatMonth(month)].join(" · ");
@@ -73,11 +75,16 @@ function MonthCard({
           <Row label={t("pessoal.inGoals")} value={formatMoney(p.goalNet)} />
         ) : null}
       </dl>
-      {missingAllowance ? (
-        <Button variant="ghost" className="self-start" onClick={onAllocate}>
-          {t("allowance.set", { name })}
+      <div className="flex flex-wrap gap-2">
+        <Button variant="ghost" onClick={onAddBalance}>
+          {t("pessoal.addBalance")}
         </Button>
-      ) : null}
+        {missingAllowance ? (
+          <Button variant="ghost" onClick={onAllocate}>
+            {t("allowance.set", { name })}
+          </Button>
+        ) : null}
+      </div>
     </section>
   );
 }
@@ -90,7 +97,8 @@ function MonthCard({
 export function PessoalView() {
   const { t } = useTranslation();
   const { month } = useMonth();
-  const { version } = useEntry();
+  const entry = useEntry();
+  const { version } = entry;
   const { user } = useAuth();
   const { data: lookups } = useLookups();
   const singleUser = useSingleUser();
@@ -124,7 +132,7 @@ export function PessoalView() {
   const nowDashboard = useLoad(() => fetchDashboard(currentMonth()), [version]);
   const free = nowDashboard.data?.people.find((x) => x.userId === personId)?.closingBalance ?? null;
   const summary = dashboard.data?.people.find((x) => x.userId === personId);
-  const entry = allowances.data?.people.find((x) => x.ownerId === personId);
+  const allowance = allowances.data?.people.find((x) => x.ownerId === personId);
   const failed = dashboard.failed || history.failed || records.failed;
 
   return (
@@ -159,8 +167,12 @@ export function PessoalView() {
           name={name}
           color={color}
           month={month}
-          missingAllowance={allowances.data !== null && entry?.allocation === null}
+          missingAllowance={allowances.data !== null && allowance?.allocation === null}
           onAllocate={() => personId !== null && setAllocating({ id: personId, name })}
+          onAddBalance={() =>
+            personId !== null &&
+            entry.openPreset({ type: "income", scope: "personal", ownerId: personId })
+          }
         />
       ) : failed ? null : (
         <p role="status" className="py-6 text-muted">

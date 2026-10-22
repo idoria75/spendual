@@ -1,11 +1,20 @@
-import type { Bill, Transaction } from "@spendual/shared";
+import type { Bill, Scope, Transaction, TransactionType } from "@spendual/shared";
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+
+/** Starting values for a new record (for example a personal income for one person). */
+export interface EntryPreset {
+  type: TransactionType;
+  scope: Scope;
+  ownerId: number | null;
+}
 
 interface EntryValue {
   /** Open the new record sheet. */
   openNew: () => void;
   openEdit: (tx: Transaction) => void;
+  /** New record with some fields already chosen. */
+  openPreset: (preset: EntryPreset) => void;
   /** New record pre-filled from another one (date = today). */
   openDuplicate: (tx: Transaction) => void;
   /** Void `tx` and enter the right record in one step. */
@@ -15,6 +24,8 @@ interface EntryValue {
   close: () => void;
   /** The record being edited, or null for a new record. */
   editing: Transaction | null;
+  /** The chosen starting values of the new record, or null. */
+  preset: EntryPreset | null;
   /** The record to copy into a new one, or null. */
   duplicating: Transaction | null;
   /** The record being corrected, or null. */
@@ -35,6 +46,7 @@ export function EntryProvider({ children }: { children: ReactNode }) {
   const [bill, setBill] = useState<Bill | null>(null);
   const [duplicating, setDuplicating] = useState<Transaction | null>(null);
   const [correcting, setCorrecting] = useState<Transaction | null>(null);
+  const [preset, setPreset] = useState<EntryPreset | null>(null);
   const [version, setVersion] = useState(0);
 
   // One mode at a time: set the one asked for, clear the others.
@@ -44,17 +56,20 @@ export function EntryProvider({ children }: { children: ReactNode }) {
       bill?: Bill;
       duplicating?: Transaction;
       correcting?: Transaction;
+      preset?: EntryPreset;
     }) => {
       setEditing(mode.editing ?? null);
       setBill(mode.bill ?? null);
       setDuplicating(mode.duplicating ?? null);
       setCorrecting(mode.correcting ?? null);
+      setPreset(mode.preset ?? null);
       setOpen(true);
     },
     [],
   );
   const openNew = useCallback(() => open({}), [open]);
   const openEdit = useCallback((tx: Transaction) => open({ editing: tx }), [open]);
+  const openPreset = useCallback((p: EntryPreset) => open({ preset: p }), [open]);
   const openDuplicate = useCallback((tx: Transaction) => open({ duplicating: tx }), [open]);
   const openCorrect = useCallback((tx: Transaction) => open({ correcting: tx }), [open]);
   const openConfirm = useCallback((b: Bill) => open({ bill: b }), [open]);
@@ -65,12 +80,14 @@ export function EntryProvider({ children }: { children: ReactNode }) {
     () => ({
       openNew,
       openEdit,
+      openPreset,
       openDuplicate,
       openCorrect,
       openConfirm,
       close,
       editing,
       bill,
+      preset,
       duplicating,
       correcting,
       isOpen,
@@ -80,12 +97,14 @@ export function EntryProvider({ children }: { children: ReactNode }) {
     [
       openNew,
       openEdit,
+      openPreset,
       openDuplicate,
       openCorrect,
       openConfirm,
       close,
       editing,
       bill,
+      preset,
       duplicating,
       correcting,
       isOpen,

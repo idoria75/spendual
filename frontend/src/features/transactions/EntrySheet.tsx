@@ -7,7 +7,7 @@ import { TransactionForm } from "./TransactionForm";
 /** The Novo lançamento sheet (phone) or dialog (desktop). Also used to edit. */
 export function EntrySheet() {
   const { t } = useTranslation();
-  const { isOpen, close, editing, bill, duplicating, correcting, notifySaved } = useEntry();
+  const { isOpen, close, editing, bill, preset, duplicating, correcting, notifySaved } = useEntry();
   const amountRef = useRef<HTMLInputElement>(null);
   return (
     <Sheet
@@ -30,6 +30,7 @@ export function EntrySheet() {
     >
       <TransactionForm
         editing={editing}
+        preset={preset}
         duplicating={duplicating}
         correcting={correcting}
         bill={bill}

@@ -238,7 +238,7 @@ describe("Início", () => {
     const next = screen.getByRole("region", { name: "Próximas contas" });
     expect(within(next).getByText("Previsão · inclui planejados")).toBeInTheDocument();
     expect(within(next).getByText("R$ 190,00")).toBeInTheDocument();
-    expect(within(next).getByText(/mais 2 contas sem valor \(valor \?\)/)).toBeInTheDocument();
+    expect(within(next).getByText(/\+2 sem valor/)).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Pessoas" })).not.toBeInTheDocument();
     expect(screen.getByText("▲ R$ 1.000,00 acima")).toBeInTheDocument();
   });
@@ -317,6 +317,24 @@ describe("Início", () => {
     expect(await screen.findByRole("region", { name: /^Em / })).toBeInTheDocument();
     await userEvent.click(within(header).getByRole("link", { name: "Spendual" }));
     expect(await screen.findByRole("region", { name: "Saldo atual" })).toBeInTheDocument();
+  });
+
+  it("opens a personal income for the person from Adicionar saldo", async () => {
+    mockFetch(base());
+    renderAt("/pessoal");
+    await userEvent.click(await screen.findByRole("button", { name: "Bia" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Adicionar saldo" }));
+    const dialog = await screen.findByRole("dialog", { name: "Novo lançamento" });
+    expect(within(dialog).getByRole("button", { name: "Receita" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(within(dialog).getByRole("radio", { name: "Pessoal" })).toBeChecked();
+    const owner = within(dialog).getByRole("group", { name: "De quem" });
+    expect(within(owner).getByRole("button", { name: "Bia" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 
   it("keeps personal goals on Pessoal: only the owner can act on them", async () => {
@@ -1018,7 +1036,7 @@ describe("Início chart and upcoming bills", () => {
     renderAt("/");
     const block = await screen.findByRole("region", { name: "Saldo atual" });
     expect(within(block).getByText("Faltam R$ 40,00")).toHaveClass("text-err");
-    expect(block).toHaveTextContent("mais 1 conta sem valor");
+    expect(block).toHaveTextContent("+1 sem valor");
   });
 
   it("hides the pending line for a closed month and when nothing is pending", async () => {
@@ -1041,12 +1059,12 @@ describe("Início chart and upcoming bills", () => {
     renderAt("/");
     const block = await screen.findByRole("region", { name: "Saldo atual" });
     expect(within(block).getByText("Meta de poupança")).toBeInTheDocument();
-    expect(within(block).getByText("Faltam R$ 1.000,00 para a meta")).toBeInTheDocument();
-    expect(within(block).getByText("50% a mais que no mesmo ponto do mês passado")).toHaveClass(
-      "text-warn",
+    expect(within(block).getByText("Faltam R$ 1.000,00")).toBeInTheDocument();
+    expect(within(block).getByText("50% a mais")).toHaveClass("text-warn");
+    expect(block).toHaveTextContent(
+      `Até 12/${month.slice(5)}: R$ 1.500,00 · mês passado: R$ 1.000,00`,
     );
-    expect(block).toHaveTextContent("Até o dia 12 a casa gastou R$ 1.500,00");
-    expect(block).toHaveTextContent("O mês passado fechou em R$ 3.000,00");
+    expect(block).toHaveTextContent("Mês passado fechou em R$ 3.000,00");
   });
 
   it("sizes the bar against the budget: two halves of 50 % take 25 % each and the rest stays empty", async () => {
