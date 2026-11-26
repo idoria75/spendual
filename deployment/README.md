@@ -60,6 +60,35 @@ Never mount an old volume read-write by hand.
 - Production stack: the name is published by `deployment/avahi/spendual.service` on the deploy box
   (port 80, or `APP_PORT`, see "mDNS" below). The dev name uses port 5173.
 
+## Move to another machine
+
+What git carries and what it does not:
+
+| Item | In git | How to move it |
+|---|---|---|
+| Code, docs, `CLAUDE.md`, `.claude/` | yes (branch `dev`; `main` after a merge) | `git clone`, then `git checkout dev` if `main` is behind |
+| Global Claude files | copy in `.claude/global/` | see [.claude/global/README.md](../.claude/global/README.md) |
+| `.env` (passwords, `SESSION_SECRET`) | no | copy by hand, or make new ones from `deployment/.env.example` |
+| Database | no | dump, copy, restore (below) |
+| `backups/` | no | copy the folder |
+| Claude chat history (`~/.claude/projects/`) | no | not needed; decisions are in `docs/open-points.md` |
+
+Steps:
+
+1. Old machine: stop the app, so no write comes after the dump. `make down` keeps the data.
+2. Old machine: `make backup-dev` (dev) or `deployment/backup.sh` (prod). Copy the `.sql.gz` file.
+3. New machine: clone, checkout the same commit, create `.env`, start MySQL only.
+4. New machine: `make restore-dev FILE=... CONFIRM=yes` (dev) or `deployment/restore.sh FILE` (prod).
+5. Start the app. Log in. Check the row counts with `make test-restore` if in doubt.
+
+Notes:
+
+- Use the same commit on both machines, so the Prisma migrations match the dump.
+- Sessions are in MySQL. A new `SESSION_SECRET` logs everyone out. Nothing else breaks.
+- Keep `TZ` and the MySQL image (`mysql:8.4`) the same.
+- ⚠ Not tested across two machines. Do one real restore on the final box before you trust it.
+- ⚠ Prod and dev share the compose project name `spendual`. Give prod its own name first.
+
 ## Backup and restore
 
 Backups are `mysqldump` files, gzipped, in a host folder **outside** the MySQL data volume.
