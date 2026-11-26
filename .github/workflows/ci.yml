@@ -37,7 +37,7 @@ jobs:
       SESSION_SECRET: ci-only-secret-0123456789-0123456789
       TZ: America/Sao_Paulo
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
@@ -52,7 +52,7 @@ jobs:
   secrets:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       # Pinned image, no license key, no upload. Scans the full git history.
@@ -65,7 +65,7 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # Build only. Nothing is pushed.
       - name: Build production image
         run: docker build -t spendual:ci .
@@ -95,7 +95,7 @@ jobs:
       TZ: America/Sao_Paulo
       HOME: /root
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
