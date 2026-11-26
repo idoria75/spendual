@@ -1,4 +1,4 @@
-# Household Finance App — Product & Implementation Reference Guide
+# spendual — Product & Implementation Reference Guide
 
 **Document purpose:** Single source of truth for product requirements, accounting rules, architecture, implementation priorities, testing, security, and deployment.
 
@@ -108,7 +108,7 @@ The app initially serves two people in one household. Each person has their own 
 - Provide logout and server-side session revocation.
 - Set appropriate session expiry; a persistent session of up to seven days is a reasonable initial default.
 - Support password managers with correct `autocomplete` attributes.
-- Never store passwords in plaintext; use Django’s password hashing.
+- Never store passwords in plaintext; use a vetted password hash (argon2).
 - Do not put long-lived authentication tokens in browser local storage.
 - Rate-limit or otherwise protect login attempts where practical.
 
@@ -639,15 +639,15 @@ The exact schema may evolve, but the domain model should preserve these concepts
 
 ### Recommended stack
 
-- **Backend:** Python, Django, Django REST Framework.
+- **Backend:** Node.js, Express, TypeScript, Prisma.
 - **Frontend:** React, TypeScript, Vite.
 - **UI:** Tailwind CSS and shadcn/ui (or a similarly accessible component system).
 - **Database:** MySQL.
-- **Tests:** pytest/pytest-django; Vitest and React Testing Library; Playwright for browser end-to-end tests.
+- **Tests:** Vitest (backend and frontend) and React Testing Library; Playwright for browser end-to-end tests.
 - **Deployment:** Docker Compose is a practical option for repeatable deployment on Ubuntu, but is not mandatory.
 - **CI:** GitHub Actions running checks and tests against a disposable MySQL service.
 
-This stack fits the project’s Python and MySQL familiarity and offers a mature authentication/admin foundation. Django admin is useful for controlled setup and troubleshooting, but regular household workflows should use the custom React UI.
+This stack reuses the author's Express and TypeScript experience, with MySQL as the database and Prisma for typed queries and migrations. Regular household workflows use the custom React UI.
 
 ### Responsibilities
 
@@ -655,26 +655,28 @@ This stack fits the project’s Python and MySQL familiarity and offers a mature
 - Frontend handles forms, navigation, responsive layout, accessible presentation, and client-side feedback.
 - Never rely on the browser alone to enforce financial or authorization rules.
 - Keep calculations in a domain/service layer rather than scattering them across views.
-- Keep API serializers and UI types aligned; document API behavior.
+- Keep API DTOs and UI types aligned; document API behavior.
 - Use database constraints in addition to application validation.
 
 ### Suggested repository layout
 
 ```text
-household-finance/
+spendual/
 ├── backend/
-│   ├── config/
-│   ├── apps/
-│   │   ├── users/
-│   │   ├── transactions/
-│   │   ├── budgets/
-│   │   ├── allowances/
-│   │   ├── recurring/
-│   │   ├── installments/
-│   │   ├── savings_goals/
-│   │   └── audit/
+│   ├── prisma/
+│   ├── src/
+│   │   ├── modules/
+│   │   │   ├── users/
+│   │   │   ├── transactions/
+│   │   │   ├── budgets/
+│   │   │   ├── allowances/
+│   │   │   ├── recurring/
+│   │   │   ├── installments/
+│   │   │   ├── savings-goals/
+│   │   │   └── audit/
+│   │   └── index.ts
 │   ├── tests/
-│   └── manage.py
+│   └── package.json
 ├── frontend/
 │   ├── src/
 │   │   ├── app/
@@ -889,7 +891,7 @@ Recommended order:
 
 ### Phase 0 — Foundations
 - Create repository, README, `.gitignore`, `.env.example`, and coding standards.
-- Set up Django, React/TypeScript/Vite, MySQL, migrations, and local development environment.
+- Set up Express/Prisma, React/TypeScript/Vite, MySQL, migrations, and local development environment.
 - Set up CI and tests immediately.
 - Implement users, authentication, sessions, and locale/timezone configuration.
 

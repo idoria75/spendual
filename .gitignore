@@ -1,1 +1,11 @@
 *.pyc
+node_modules/
+dist/
+.env
+backups/
+*.log
+playwright-report/
+test-results/
+blob-report/
+feedback/
+screenshots/

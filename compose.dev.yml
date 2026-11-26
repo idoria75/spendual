@@ -1,0 +1,73 @@
+# Fixed project name: the MySQL data lives in the volume "spendual_mysql_data", whatever the
+# folder or worktree you run from. COMPOSE_PROJECT_NAME still overrides this (parallel agents).
+name: spendual
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    working_dir: /workspace
+    command: sleep infinity
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    environment:
+      DATABASE_URL: mysql://spendual:spendual@mysql:3306/spendual
+      SESSION_SECRET: dev-only-secret-change-for-real-use-0123456789
+      TZ: America/Sao_Paulo
+      HOME: /tmp
+      # Extra host names Vite accepts, comma separated. Example: VITE_ALLOWED_HOSTS=mybox.lan
+      VITE_ALLOWED_HOSTS: "${VITE_ALLOWED_HOSTS:-}"
+      BACKUP_DIR: /workspace/backups
+      NPM_CONFIG_UPDATE_NOTIFIER: "false"
+      npm_config_cache: /tmp/.npm
+    volumes:
+      - .:/workspace
+    ports:
+      - "5173:5173"
+      - "3000:3000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # Browser tests. Keep the image tag equal to the @playwright/test version in e2e/package.json.
+  # Run with: make e2e
+  e2e:
+    profiles: ["e2e"]
+    image: mcr.microsoft.com/playwright:v1.49.1-jammy
+    working_dir: /workspace/e2e
+    command: npm run e2e
+    # SCREENSHOTS=1 make e2e also takes the phone/desktop light/dark screenshots.
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    ipc: host
+    environment:
+      DATABASE_URL: mysql://root:root@mysql:3306/spendual_e2e
+      SESSION_SECRET: e2e-only-secret-0123456789-0123456789
+      SCREENSHOTS: "${SCREENSHOTS:-}"
+      TZ: America/Sao_Paulo
+      HOME: /tmp
+      NPM_CONFIG_UPDATE_NOTIFIER: "false"
+      npm_config_cache: /tmp/.npm
+    volumes:
+      - .:/workspace
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: spendual
+      MYSQL_USER: spendual
+      MYSQL_PASSWORD: spendual
+      TZ: America/Sao_Paulo
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  mysql_data: # real name: <project>_mysql_data, so spendual_mysql_data by default

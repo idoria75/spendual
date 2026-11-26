@@ -1,0 +1,445 @@
+import { z } from "zod";
+import { Scope, dateOnlySchema, moneySchema } from "./base.js";
+import { periodKeySchema, positiveMoneySchema } from "./transactions.js";
+
+/**
+ * Phase 4 contract: dashboard, budgets, allowances, bills (recurring and installments).
+ * All routes are under /api, need a session, and the ones that change data need X-CSRF-Token.
+ * Errors use ApiError. Every `month` is a period key "YYYY-MM".
+ *
+ * Dashboard (read only; Appendix A formulas, computed on the server in integer cents).
+ *   GET  /dashboard?month=            -> 200 Dashboard
+ *        Also generates missing planned occurrences for the next months (idempotent).
+ *
+ * Budgets (versioned; past periods are never changed).
+ *   GET  /budgets?month=              -> 200 BudgetOverview
+ *   PUT  /budgets                     -> 200 BudgetOverview   body BudgetEdit
+ *
+ * Allowances (append-only ledger; one ALLOCATION per person and month).
+ *   GET  /allowances?month=           -> 200 AllowanceOverview
+ *   POST /allowances                  -> 201 AllowanceOverview   body AllowanceCreate
+ *        Second ALLOCATION for the same person and month -> 409 allocation_exists.
+ *
+ * Bills (planned items; "A pagar").
+ *   GET  /bills?month=                -> 200 BillList   (due in that month, every status)
+ *   POST /recurrence-rules            -> 201 BillList   body RecurrenceRuleCreate (generates occurrences)
+ *   GET  /recurrence-rules            -> 200 RecurrenceRuleList
+ *   PATCH /recurrence-rules/:id       -> 200 RecurrenceRule     body RecurrenceRulePatch
+ *   POST /installment-plans           -> 201 InstallmentPlanDetail   body InstallmentPlanCreate
+ *   GET  /installment-plans           -> 200 InstallmentPlanList   (newest first, every status)
+ *   PATCH /installment-plans/:id      -> 200 InstallmentPlanSummary   body InstallmentPlanPatch
+ *        `description` renames the plan. `installmentAmount` sets the expected amount of every
+ *        PLANNED installment (paid ones stay). Without planned installments -> 409 invalid_state.
+ *   POST /installment-plans/:id/cancel -> 200 InstallmentPlanSummary   body ReasonRequest
+ *        Cancels every planned installment. Paid ones stay. No planned left -> 409 invalid_state.
+ *   POST /bills/:kind/:id/confirm     -> 200 Bill   body BillConfirm (kind = recurrence | installment)
+ *        Creates ONE confirmed Transaction (type expense, linked to the occurrence) and
+ *        marks the occurrence confirmed, in one transaction. Already confirmed -> 409 invalid_state.
+ *        Two parallel confirms -> one wins, the other gets 409. Never auto-confirmed by date.
+ *   POST /bills/:kind/:id/cancel      -> 200 Bill   body ReasonRequest (planned -> cancelled)
+ *
+ * Rules:
+ *  - BillList.overdue is always returned. `plannedTotal` and `unknownCount` cover the month only.
+ *  - `expectedAmount` null means "unknown" (UI shows `valor ?`). It is not 0. Totals skip nulls
+ *    and report how many were skipped (`unknownCount`).
+ *  - Planned items are never counted as actual spending. Only confirmed transactions count.
+ *  - Budget "spent" = confirmed household expenses in the month minus their linked confirmed
+ *    refunds, per category (overall = all household expenses). Personal spending is not budgeted.
+ *  - Savings rate = savings before goals / household income, as a percent string "12.5",
+ *    or null when income is 0.
+ *  - Setup (first run, shared by both users): GET /setup -> 200 SetupStatus,
+ *    POST /setup/complete -> 200 SetupStatus (idempotent, stores Household.setupCompletedAt).
+ *    The app shows the setup page (overall and category budgets, optional allowances) until it is
+ *    completed. Skipping is allowed and still calls complete. Budgets use PUT /budgets.
+ *  - Installments from the entry form use POST /installment-plans. The entry form offers
+ *    "Parcelado" when the chosen payment method is a credit card.
+ *  - `goalAllocationsNet` = goal ALLOCATION minus WITHDRAWAL entries whose effectiveDate is in
+ *    the month (see goals.ts). Unallocated savings = savings before goals - that number.
+ */
+
+export const dashboardQuerySchema = z.object({ month: periodKeySchema });
+export type DashboardQuery = z.infer<typeof dashboardQuerySchema>;
+
+export const personSummarySchema = z.object({
+  userId: z.number().int(),
+  allowanceAllocated: moneySchema, // ALLOCATION + ADJUSTMENT + CORRECTION rows of the month
+  personalSpent: moneySchema, // confirmed personal expenses (net of refunds)
+  personalCredits: moneySchema, // confirmed personal income and other_receipt
+  /** Opening balance + month movements. Unused allowance is never reset. */
+  closingBalance: moneySchema,
+  /** Net put into the person's personal goals this month (deposits - withdrawals); already left out of `closingBalance`. */
+  goalNet: moneySchema.default("0.00"),
+});
+export type PersonSummary = z.infer<typeof personSummarySchema>;
+
+export const budgetLineSchema = z.object({
+  /** null = the overall household budget */
+  categoryId: z.number().int().nullable(),
+  /** Amount in force for the month; null when no budget was ever set. */
+  amount: moneySchema.nullable(),
+  spent: moneySchema,
+});
+export type BudgetLine = z.infer<typeof budgetLineSchema>;
+
+export const budgetOverviewSchema = z.object({
+  month: periodKeySchema,
+  overall: budgetLineSchema,
+  categories: z.array(budgetLineSchema),
+  /** Monthly savings target: `amount` in force (null = none), `spent` = Sobra do mês so far. */
+  savings: budgetLineSchema,
+});
+export type BudgetOverview = z.infer<typeof budgetOverviewSchema>;
+
+export const BudgetEditMode = z.enum(["going_forward", "this_period_only"]);
+export type BudgetEditMode = z.infer<typeof BudgetEditMode>;
+
+export const budgetEditSchema = z
+  .object({
+    categoryId: z.number().int().positive().nullable(),
+    /** true: edit the monthly savings target. Then `categoryId` must be null. */
+    savings: z.boolean().optional(),
+    period: periodKeySchema,
+    amount: moneySchema.refine((s) => Number(s) >= 0, "Must not be negative"),
+    mode: BudgetEditMode,
+  })
+  .refine((b) => !b.savings || b.categoryId === null, {
+    path: ["categoryId"],
+    message: "Must be null for the savings target",
+  });
+export type BudgetEdit = z.infer<typeof budgetEditSchema>;
+
+export const allowanceKindSchema = z.enum(["ALLOCATION", "ADJUSTMENT", "CORRECTION"]);
+
+export const allowanceCreateSchema = z.object({
+  ownerId: z.number().int().positive(),
+  month: periodKeySchema,
+  amount: positiveMoneySchema,
+  notes: z.string().trim().max(500).optional(),
+});
+export type AllowanceCreate = z.infer<typeof allowanceCreateSchema>;
+
+export const allowanceOverviewSchema = z.object({
+  month: periodKeySchema,
+  people: z.array(
+    z.object({
+      ownerId: z.number().int(),
+      allocation: moneySchema.nullable(), // null = not yet allocated this month
+      closingBalance: moneySchema,
+    }),
+  ),
+});
+export type AllowanceOverview = z.infer<typeof allowanceOverviewSchema>;
+
+export const BillKind = z.enum(["recurrence", "installment"]);
+export type BillKind = z.infer<typeof BillKind>;
+
+export const OccurrenceStatus = z.enum(["planned", "confirmed", "cancelled"]);
+export type OccurrenceStatus = z.infer<typeof OccurrenceStatus>;
+
+export const billSchema = z.object({
+  kind: BillKind,
+  /** Id of the RecurrenceOccurrence or InstallmentOccurrence. */
+  id: z.number().int(),
+  parentId: z.number().int(), // rule id or plan id
+  description: z.string(),
+  dueDate: dateOnlySchema,
+  expectedAmount: moneySchema.nullable(),
+  status: OccurrenceStatus,
+  scope: Scope,
+  ownerId: z.number().int().nullable(),
+  payerId: z.number().int().nullable(),
+  categoryId: z.number().int().nullable(),
+  accountId: z.number().int().nullable(),
+  paymentMethodId: z.number().int().nullable(),
+  /** "3/10" for installments. */
+  sequenceNumber: z.number().int().nullable(),
+  installmentCount: z.number().int().nullable(),
+  /** Set after confirm. */
+  transactionId: z.number().int().nullable(),
+});
+export type Bill = z.infer<typeof billSchema>;
+
+export const dashboardSchema = z.object({
+  month: periodKeySchema,
+  householdIncome: moneySchema,
+  sharedExpensesNet: moneySchema,
+  allowanceAllocations: moneySchema,
+  savingsBeforeGoals: moneySchema,
+  goalAllocationsNet: moneySchema,
+  unallocatedSavings: moneySchema,
+  savingsRate: z.string().nullable(),
+  /** Planned, not yet confirmed, with a known amount. */
+  plannedBillsTotal: moneySchema,
+  plannedBillsUnknownCount: z.number().int(),
+  /**
+   * Still-planned bills from earlier months (overdue), current month only; "0.00" and 0 for any
+   * other month. Together with `plannedBillsTotal` this is what is pending for the month.
+   */
+  overdueBillsTotal: moneySchema.default("0.00"),
+  overdueBillsUnknownCount: z.number().int().default(0),
+  overallBudget: z.object({ budget: moneySchema.nullable(), spent: moneySchema }),
+  /**
+   * Spending pace, only when `month` is the current month: household expenses net of refunds
+   * from day 1 to `day`, against the same days of the previous month. Not a forecast.
+   */
+  pace: z
+    .object({
+      day: z.number().int(),
+      spent: moneySchema,
+      lastMonthSameDays: moneySchema,
+      lastMonthTotal: moneySchema,
+    })
+    .nullable()
+    .default(null),
+  /** Monthly savings target in force; null = none. Compared with `savingsBeforeGoals`. */
+  savingsTarget: moneySchema.nullable(),
+  /** Household expenses net of refunds by category, biggest first. Feeds the stacked bar. */
+  categorySpending: z.array(
+    z.object({ categoryId: z.number().int().nullable(), amount: moneySchema }),
+  ),
+  /** Next planned bills, soonest first, at most 5, due from today on (not overdue ones). */
+  upcoming: z.array(billSchema),
+  people: z.array(personSummarySchema),
+});
+export type Dashboard = z.infer<typeof dashboardSchema>;
+
+export const billListSchema = z.object({
+  month: periodKeySchema,
+  items: z.array(billSchema),
+  /**
+   * Planned bills (active rules only) due before min(today, first day of `month`),
+   * from any earlier month, oldest first. Not in `items`, `plannedTotal` or `unknownCount`.
+   */
+  overdue: z.array(billSchema),
+  plannedTotal: moneySchema,
+  unknownCount: z.number().int(),
+});
+export type BillList = z.infer<typeof billListSchema>;
+
+const idSchema = z.number().int().positive();
+const descriptionSchema = z.string().trim().min(1).max(200);
+
+const scopeOwnerCheck = (v: { scope: Scope; ownerId?: number | null }, ctx: z.RefinementCtx) => {
+  if (v.scope === "personal" && v.ownerId == null)
+    ctx.addIssue({ code: "custom", path: ["ownerId"], message: "Owner required" });
+  if (v.scope === "household" && v.ownerId != null)
+    ctx.addIssue({ code: "custom", path: ["ownerId"], message: "Household has no owner" });
+};
+
+export const RecurrenceState = z.enum(["active", "paused", "ended"]);
+export type RecurrenceState = z.infer<typeof RecurrenceState>;
+
+export const recurrenceRuleCreateSchema = z
+  .object({
+    description: descriptionSchema,
+    /** null = amount not known yet. */
+    expectedAmount: positiveMoneySchema.nullable(),
+    dayOfMonth: z.number().int().min(1).max(31),
+    startDate: dateOnlySchema,
+    endDate: dateOnlySchema.nullable().optional(),
+    scope: Scope,
+    ownerId: idSchema.nullable().optional(),
+    payerId: idSchema.optional(),
+    categoryId: idSchema,
+    accountId: idSchema.nullable().optional(),
+    paymentMethodId: idSchema.nullable().optional(),
+  })
+  .superRefine(scopeOwnerCheck)
+  .refine((v) => v.endDate == null || v.endDate >= v.startDate, {
+    path: ["endDate"],
+    message: "End before start",
+  });
+export type RecurrenceRuleCreate = z.infer<typeof recurrenceRuleCreateSchema>;
+
+export const recurrenceRulePatchSchema = z
+  .object({
+    description: descriptionSchema,
+    expectedAmount: positiveMoneySchema.nullable(),
+    endDate: dateOnlySchema.nullable(),
+    state: RecurrenceState,
+  })
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, "Empty patch");
+export type RecurrenceRulePatch = z.infer<typeof recurrenceRulePatchSchema>;
+
+export const recurrenceRuleSchema = z.object({
+  id: z.number().int(),
+  description: z.string(),
+  expectedAmount: moneySchema.nullable(),
+  dayOfMonth: z.number().int(),
+  startDate: dateOnlySchema,
+  endDate: dateOnlySchema.nullable(),
+  state: RecurrenceState,
+  scope: Scope,
+  ownerId: z.number().int().nullable(),
+  payerId: z.number().int().nullable(),
+  categoryId: z.number().int().nullable(),
+  accountId: z.number().int().nullable(),
+  paymentMethodId: z.number().int().nullable(),
+});
+export type RecurrenceRule = z.infer<typeof recurrenceRuleSchema>;
+export const recurrenceRuleListSchema = z.object({ items: z.array(recurrenceRuleSchema) });
+export type RecurrenceRuleList = z.infer<typeof recurrenceRuleListSchema>;
+
+export const installmentPlanCreateSchema = z
+  .object({
+    description: descriptionSchema,
+    totalAmount: positiveMoneySchema,
+    installmentCount: z.number().int().min(2).max(60),
+    firstDueDate: dateOnlySchema,
+    scope: Scope,
+    ownerId: idSchema.nullable().optional(),
+    payerId: idSchema.optional(),
+    categoryId: idSchema,
+    accountId: idSchema.nullable().optional(),
+    notes: z.string().trim().max(500).nullable().optional(),
+  })
+  .superRefine(scopeOwnerCheck);
+export type InstallmentPlanCreate = z.infer<typeof installmentPlanCreateSchema>;
+
+export const installmentPlanDetailSchema = z.object({
+  id: z.number().int(),
+  description: z.string(),
+  totalAmount: moneySchema,
+  installmentCount: z.number().int(),
+  firstDueDate: dateOnlySchema,
+  items: z.array(billSchema),
+});
+export type InstallmentPlanDetail = z.infer<typeof installmentPlanDetailSchema>;
+
+/**
+ * Body of "Confirmar pagamento". All fields are optional: the server pre-fills from the
+ * occurrence. `amount` is required when the expected amount is unknown (null).
+ */
+export const billConfirmSchema = z.object({
+  amount: positiveMoneySchema.optional(),
+  transactionDate: dateOnlySchema.optional(),
+  payerId: idSchema.optional(),
+  accountId: idSchema.nullable().optional(),
+  paymentMethodId: idSchema.nullable().optional(),
+  notes: z.string().trim().max(500).nullable().optional(),
+});
+export type BillConfirm = z.infer<typeof billConfirmSchema>;
+
+export const setupStatusSchema = z.object({ completed: z.boolean() });
+export type SetupStatus = z.infer<typeof setupStatusSchema>;
+
+/**
+ * Category trends (page "Análises"). Read only.
+ *   GET /analytics/categories?from=&to=   -> 200 CategoryTrends
+ *   GET /analytics/months                 -> 200 TrendMonths
+ *        Months (newest first) with at least one confirmed household expense, from 60 months
+ *        back to the current month. The month pickers offer only these.
+ *
+ * Rules:
+ *  - `from` and `to` are period keys, `from <= to`, at most 60 months, `to` not after the
+ *    current month, `from` at most 60 months before the current month.
+ *  - Amounts are household expenses, confirmed, net of linked refunds. A refund counts in the
+ *    month of its expense. Personal spending is not included. Same rule as the dashboard chart.
+ *  - `overall` covers every household expense (also those with no category); its budget is the
+ *    overall budget. Each entry of `categories` has the category budget in force that month.
+ *  - `budget` is null when no budget row is in force yet. Past months use the row that was in force
+ *    then, so a budget change shows as a step.
+ *  - `categories` lists only categories with spending or a budget in the range, plus
+ *    `categoryId: null` (no category) when it has spending. Every series has one point per month.
+ *  - `partial` is true for the current month. The client leaves it out of the average, and so
+ *    the closed months before the first month with spending.
+ */
+export const categoryTrendsQuerySchema = z.object({
+  from: periodKeySchema,
+  to: periodKeySchema,
+});
+export type CategoryTrendsQuery = z.infer<typeof categoryTrendsQuerySchema>;
+
+export const trendPointSchema = z.object({
+  month: periodKeySchema,
+  amount: moneySchema,
+  budget: moneySchema.nullable(),
+  partial: z.boolean(),
+});
+export type TrendPoint = z.infer<typeof trendPointSchema>;
+
+export const trendSeriesSchema = z.object({
+  categoryId: z.number().int().nullable(),
+  points: z.array(trendPointSchema),
+});
+export type TrendSeries = z.infer<typeof trendSeriesSchema>;
+
+export const categoryTrendsSchema = z.object({
+  from: periodKeySchema,
+  to: periodKeySchema,
+  overall: trendSeriesSchema,
+  categories: z.array(trendSeriesSchema),
+});
+export type CategoryTrends = z.infer<typeof categoryTrendsSchema>;
+
+/**
+ * Personal balance history (page "Pessoal"). Read only.
+ *
+ *   GET /personal/history?userId=&from=&to=  -> 200 PersonalHistory
+ *
+ *  - One point per month, oldest first. `closing` = opening + allowance + credits - spent, and the
+ *    next month's `opening` is this `closing` (unused allowance is never reset).
+ *  - `credits` are personal income and other receipts; `spent` is personal expenses net of refunds.
+ *  - Months before the person's first activity are left out, so the list can be shorter than the range.
+ *  - `partial` is true for the current month.
+ *  - 400 when `from` is after `to`, `to` is after the current month, `from` is older than 60 months
+ *    back, the range is over 24 months, or `userId` is not an active user.
+ */
+export const personalHistoryQuerySchema = z.object({
+  userId: z.coerce.number().int().positive(),
+  from: periodKeySchema,
+  to: periodKeySchema,
+});
+export type PersonalHistoryQuery = z.infer<typeof personalHistoryQuerySchema>;
+
+export const personalPointSchema = z.object({
+  month: periodKeySchema,
+  opening: moneySchema,
+  allowance: moneySchema,
+  credits: moneySchema,
+  spent: moneySchema,
+  /** Net put into personal goals this month. */
+  goals: moneySchema.default("0.00"),
+  closing: moneySchema,
+  partial: z.boolean(),
+});
+export type PersonalPoint = z.infer<typeof personalPointSchema>;
+
+export const personalHistorySchema = z.object({
+  userId: z.number().int(),
+  points: z.array(personalPointSchema),
+});
+export type PersonalHistory = z.infer<typeof personalHistorySchema>;
+
+export const installmentPlanPatchSchema = z
+  .object({ description: descriptionSchema, installmentAmount: positiveMoneySchema })
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, "Empty patch");
+export type InstallmentPlanPatch = z.infer<typeof installmentPlanPatchSchema>;
+
+export const PlanStatus = z.enum(["active", "finished", "cancelled"]);
+export type PlanStatus = z.infer<typeof PlanStatus>;
+
+export const installmentPlanSummarySchema = z.object({
+  id: z.number().int(),
+  description: z.string(),
+  totalAmount: moneySchema,
+  installmentCount: z.number().int(),
+  firstDueDate: dateOnlySchema,
+  paidCount: z.number().int(),
+  plannedCount: z.number().int(),
+  cancelledCount: z.number().int(),
+  /** Sum of the planned installments. */
+  remainingAmount: moneySchema,
+  /** Expected amount of the next planned installment; null when none is planned. */
+  nextAmount: moneySchema.nullable(),
+  /** active: something is planned. finished: all paid. cancelled: nothing planned, none paid. */
+  status: PlanStatus,
+});
+export type InstallmentPlanSummary = z.infer<typeof installmentPlanSummarySchema>;
+export const installmentPlanListSchema = z.object({ items: z.array(installmentPlanSummarySchema) });
+export type InstallmentPlanList = z.infer<typeof installmentPlanListSchema>;
+
+export const trendMonthsSchema = z.object({ months: z.array(periodKeySchema) });
+export type TrendMonths = z.infer<typeof trendMonthsSchema>;

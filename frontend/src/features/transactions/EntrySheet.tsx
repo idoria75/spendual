@@ -1,0 +1,45 @@
+import { useRef } from "react";
+import { useTranslation } from "react-i18next";
+import { Sheet } from "../../components/ui/sheet";
+import { useEntry } from "./entry";
+import { TransactionForm } from "./TransactionForm";
+
+/** The Novo lançamento sheet (phone) or dialog (desktop). Also used to edit. */
+export function EntrySheet() {
+  const { t } = useTranslation();
+  const { isOpen, close, editing, bill, preset, duplicating, correcting, notifySaved } = useEntry();
+  const amountRef = useRef<HTMLInputElement>(null);
+  return (
+    <Sheet
+      open={isOpen}
+      onOpenChange={(open) => !open && close()}
+      title={t(
+        bill
+          ? "bills.confirmTitle"
+          : editing
+            ? "form.titleEdit"
+            : correcting
+              ? "form.titleCorrect"
+              : "form.titleNew",
+      )}
+      tall
+      onOpenAutoFocus={(e) => {
+        e.preventDefault();
+        amountRef.current?.focus();
+      }}
+    >
+      <TransactionForm
+        editing={editing}
+        preset={preset}
+        duplicating={duplicating}
+        correcting={correcting}
+        bill={bill}
+        amountRef={amountRef}
+        onSaved={() => {
+          notifySaved();
+          close();
+        }}
+      />
+    </Sheet>
+  );
+}
