@@ -2,7 +2,7 @@
 # Build:  docker build -t spendual .
 
 # ---- build: compile shared, backend and frontend ----
-FROM node:22-bookworm-slim AS build
+FROM node:25-bookworm-slim AS build
 RUN apt-get update && apt-get install -y --no-install-recommends openssl \
   && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
@@ -19,7 +19,7 @@ RUN npm run build -w @spendual/shared \
   && npm run build -w @spendual/frontend
 
 # ---- deps: production dependencies only, plus the generated Prisma client ----
-FROM node:22-bookworm-slim AS deps
+FROM node:25-bookworm-slim AS deps
 # Prisma needs openssl to detect the libssl version.
 RUN apt-get update && apt-get install -y --no-install-recommends openssl \
   && rm -rf /var/lib/apt/lists/*
@@ -34,7 +34,7 @@ COPY backend/prisma backend/prisma
 RUN npx prisma generate --schema backend/prisma/schema.prisma
 
 # ---- runtime ----
-FROM node:22-bookworm-slim AS runtime
+FROM node:25-bookworm-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends openssl \
   && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production \
